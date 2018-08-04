@@ -59,9 +59,7 @@ fn main() {
         .and(warp::path("aggregate"));
 
     let aggregate_default = aggregate_default_index
-        .map(|cube: String| {
-            format!("aggregate cube but no query: {:?}", cube)
-        });
+        .and_then(aggregate_error_handler);
 
     let aggregate_default_query = aggregate_default_index
         .and(warp::query::<AggregateQuery>())
@@ -117,7 +115,7 @@ fn main() {
 //            // because aggregate specified without query
 //            .or(aggregate_json_records)
 //            .or(aggregate_csv)
-//            .or(aggregate_default)
+            .or(aggregate_default)
 //
 //            // metadata routes
 //            .or(cubes_id)
@@ -125,4 +123,12 @@ fn main() {
 
     warp::serve(routes)
         .run(([127,0,0,1], 7777));
+}
+
+fn aggregate_error_handler(cube: String) -> Result<impl warp::Reply, warp::Rejection> {
+    if false {
+        Ok("") // unreachable, but for inference?
+    } else {
+        Err(warp::reject::not_found())
+    }
 }
