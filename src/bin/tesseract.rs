@@ -42,7 +42,8 @@ fn main() {
         .map(|| "All cubes info");
 
     let cubes_id_index = cubes
-        .and(warp::path::param::<String>());
+        .and(warp::path::param::<String>())
+        .and(warp::path::index());
 
     let cubes_id = cubes_id_index
         .map(|cube: String| {
@@ -118,7 +119,7 @@ fn main() {
             .or(aggregate_default)
 //
 //            // metadata routes
-//            .or(cubes_id)
+            .or(cubes_id)
     );
 
     warp::serve(routes)
