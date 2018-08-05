@@ -22,12 +22,6 @@ pub struct SchemaData {
 }
 
 impl SchemaData {
-    pub fn new() -> Self {
-        SchemaData {
-            cubes: vec![],
-        }
-    }
-
     pub fn from_json(input: &str) -> Result<Self, Error> {
         serde_json::from_str(input)
             .map_err(|err| {
