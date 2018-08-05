@@ -8,6 +8,7 @@ pub fn init(schema_data: SchemaData) -> Schema {
 
 // replaces the schema inside of the Arc Mutex
 // with another one read from scratch
+#[allow(dead_code)]
 pub fn flush(schema: Schema, schema_data: SchemaData) {
     let mut data = schema.lock().unwrap();
     *data = schema_data;
