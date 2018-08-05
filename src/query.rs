@@ -11,3 +11,8 @@ pub struct AggregateQuery {
 //    sparse: Option<bool>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FlushQuery {
+    secret: String,
+}
+

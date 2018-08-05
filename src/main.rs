@@ -6,13 +6,15 @@ extern crate serde;
 extern crate serde_derive;
 extern crate warp;
 
+use std::env;
 use warp::Filter;
 
+mod env_vars;
 mod handlers;
 mod query;
 mod schema;
 
-use query::AggregateQuery;
+use query::{AggregateQuery, FlushQuery};
 
 
 // contains routes
@@ -23,6 +25,21 @@ fn main() {
     let schema_data = schema::SchemaData::new();
     let schema = schema::init(schema_data);
     let schema = warp::any().map(move || schema.clone());
+
+    let mut env_vars = env_vars::EnvVars::new();
+    env_vars.secret = env::var("TESSERACT_SECRET").ok();
+    let env_vars = warp::any().map(move || env_vars.clone());
+
+    // >> Flush
+
+    let flush = warp::path("flush")
+        .and(warp::query::<FlushQuery>())
+        .and(warp::path::index())
+        .and(schema.clone())
+        .and(env_vars)
+        .and_then(handlers::flush);
+
+    // << end Flush
 
     // >> Cubes basic route and metadata,
     // from
@@ -184,6 +201,9 @@ fn main() {
             .or(dimensions_id_metadata)
             .or(hierarchies_id_metadata)
             .or(levels_id_metadata)
+
+            // flush
+            .or(flush)
     );
 
     warp::serve(routes)

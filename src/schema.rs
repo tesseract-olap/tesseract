@@ -8,8 +8,9 @@ pub fn init(schema_data: SchemaData) -> Schema {
 
 // replaces the schema inside of the Arc Mutex
 // with another one read from scratch
-pub fn flush(schema: Schema) {
-
+pub fn flush(schema: Schema, schema_data: SchemaData) {
+    let mut data = schema.lock().unwrap();
+    *data = schema_data;
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
