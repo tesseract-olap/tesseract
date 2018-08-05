@@ -46,8 +46,75 @@ fn main() {
     let cubes_id_metadata = cubes_id
         .and(warp::path::index())
         .map(|cube: String| {
-            info!("{} route hit", cube);
             format!("The cube you're getting info about: {}", cube)
+        });
+
+    let dimensions = cubes_id
+        .and(warp::path("dimensions"));
+
+    let dimensions_metadata = dimensions
+        .and(warp::path::index())
+        .map(|cube: String| format!("list all dims for {}", cube));
+
+    let dimensions_id = dimensions
+        .and(warp::path::param::<String>());
+
+    let dimensions_id_metadata = dimensions_id
+        .and(warp::path::index())
+        .map(|cube: String, dim: String| {
+            format!("The cube and dim you're getting info about: {}, {}", cube, dim)
+        });
+
+    let hierarchies = dimensions_id
+        .and(warp::path("hierarchies"));
+
+    let hierarchies_metadata = hierarchies
+        .and(warp::path::index())
+        .map(|cube: String, dim: String| {
+            format!("list all hierarchies for {}, {}", cube, dim)
+        });
+
+    let hierarchies_id = hierarchies
+        .and(warp::path::param::<String>());
+
+    let hierarchies_id_metadata = hierarchies_id
+        .and(warp::path::index())
+        .map(|cube: String, dim: String, hier: String| {
+            format!("The cube, dim, hier you're getting info about: {}, {}, {}",
+                cube,
+                dim,
+                hier,
+            )
+        });
+
+    let levels = hierarchies_id
+        .and(warp::path("levels"));
+
+    let levels_metadata = levels
+        .and(warp::path::index())
+        .map(|cube: String, dim: String, hier: String| {
+            format!("list all levels for {}, {}, {}", cube, dim, hier)
+        });
+
+    let levels_id = levels
+        .and(warp::path::param::<String>());
+
+    let levels_id_metadata = levels_id
+        .and(warp::path::index())
+        .map(|cube: String, dim: String, hier: String, level: String| {
+            format!("The cube, dim, hier, level you're getting info about: {}, {}, {}, {}",
+                cube,
+                dim,
+                hier,
+                level,
+            )
+        });
+
+    let members_metadata = levels_id
+        .and(warp::path("members"))
+        .and(warp::path::index())
+        .map(|cube: String, dim: String, hier: String, level: String| {
+            format!("list all members for {}, {}, {}, {}", cube, dim, hier, level)
         });
 
     // << end cubes basic route
@@ -93,8 +160,17 @@ fn main() {
             .or(aggregate_csv_query)
             .or(aggregate_jsonrecords_query)
 
-            // metadata routes
+            // metadata list routes
+            .or(dimensions_metadata)
+            .or(hierarchies_metadata)
+            .or(levels_metadata)
+            .or(members_metadata)
+
+            // metadata for id routes
             .or(cubes_id_metadata)
+            .or(dimensions_id_metadata)
+            .or(hierarchies_id_metadata)
+            .or(levels_id_metadata)
     );
 
     warp::serve(routes)
