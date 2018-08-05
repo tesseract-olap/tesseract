@@ -6,20 +6,19 @@ extern crate serde;
 extern crate serde_derive;
 extern crate warp;
 
-use std::collections::HashMap;
 use warp::Filter;
 
 #[derive(Debug, Deserialize)]
 struct AggregateQuery {
-    drilldowns: Vec<String>,
-    cuts: Vec<String>,
-    measures: Vec<String>,
-    properties: Vec<String>,
-    parents: bool,
-    debug: bool,
-//    distinct: bool,
-//    nonempty: bool,
-//    sparse: bool,
+    drilldowns: Option<Vec<String>>,
+    cuts: Option<Vec<String>>,
+    measures: Option<Vec<String>>,
+    properties: Option<Vec<String>>,
+    parents: Option<bool>,
+    debug: Option<bool>,
+//    distinct: Option<bool>,
+//    nonempty: Option<bool>,
+//    sparse: Option<bool>,
 }
 
 fn main() {
@@ -37,15 +36,15 @@ fn main() {
 
     let cubes = warp::path("cubes");
 
-    let cubes_index = cubes
+    let cubes_metadata = cubes
         .and(warp::path::index())
         .map(|| "All cubes info");
 
-    let cubes_id_index = cubes
-        .and(warp::path::param::<String>())
-        .and(warp::path::index());
+    let cubes_id = cubes
+        .and(warp::path::param::<String>());
 
-    let cubes_id = cubes_id_index
+    let cubes_id_metadata = cubes_id
+        .and(warp::path::index())
         .map(|cube: String| {
             info!("{} route hit", cube);
             format!("The cube you're getting info about: {}", cube)
@@ -56,48 +55,30 @@ fn main() {
     // >> aggregate route
 
     // default json
-    let aggregate_default_index = cubes_id_index
-        .and(warp::path("aggregate"));
-
-    let aggregate_default = aggregate_default_index
-        .and_then(aggregate_error_handler);
-
-    let aggregate_default_query = aggregate_default_index
+    let aggregate_default_query = cubes_id
+        .and(warp::path("aggregate"))
         .and(warp::query::<AggregateQuery>())
+        .and(warp::path::index())
         .map(|cube: String, query: AggregateQuery| {
             format!("aggregate cube default: {:?}, query: {:?}", cube, query)
         });
 
-    // csv 
-    let aggregate_csv_index = cubes_id_index
+    // csv
+    let aggregate_csv_query = cubes_id
         .and(warp::path("aggregate.csv"))
-        .and(warp::path::index());
-
-    let aggregate_csv = aggregate_csv_index
-        .map(|cube: String| {
-            format!("you specified an aggregation for {:?} without a query", cube)
-        });
-
-    let aggregate_csv_query = aggregate_csv_index
-        .and(warp::query::<HashMap<String, String>>())
-        .map(|cube: String, query: HashMap<String, String>| {
-            format!("aggregate cube with csv: {:?}, query: {:?}", cube, query)
+        .and(warp::query::<AggregateQuery>())
+        .and(warp::path::index())
+        .map(|cube: String, query: AggregateQuery| {
+            format!("aggregate cube csv: {:?}, query: {:?}", cube, query)
         });
 
     // jsonrecords
-    let aggregate_json_records_index = cubes_id_index
+    let aggregate_jsonrecords_query = cubes_id
         .and(warp::path("aggregate.jsonrecords"))
-        .and(warp::path::index());
-
-    let aggregate_json_records = aggregate_json_records_index
-        .map(|cube: String| {
-            format!("you specified an aggregation for {:?} without a query", cube)
-        });
-
-    let aggregate_json_records_query = aggregate_json_records_index
-        .and(warp::query::<HashMap<String, String>>())
-        .map(|cube: String, query: HashMap<String, String>| {
-            format!("aggregate cube with jsonrecords: {:?}, query: {:?}", cube, query)
+        .and(warp::query::<AggregateQuery>())
+        .and(warp::path::index())
+        .map(|cube: String, query: AggregateQuery| {
+            format!("aggregate cube jsonrecords: {:?}, query: {:?}", cube, query)
         });
 
     // << end agg route
@@ -106,30 +87,17 @@ fn main() {
     // Routes specified from most specific to least,
     // otherwise the more general will match first.
     let routes = warp::get(
-        cubes_index
+        cubes_metadata
             // aggregate with query routes
-//            .or(aggregate_json_records_query)
-//            .or(aggregate_csv_query)
             .or(aggregate_default_query)
-//
-//            // these routes send back an error,
-//            // because aggregate specified without query
-//            .or(aggregate_json_records)
-//            .or(aggregate_csv)
-            .or(aggregate_default)
-//
-//            // metadata routes
-            .or(cubes_id)
+            .or(aggregate_csv_query)
+            .or(aggregate_jsonrecords_query)
+
+            // metadata routes
+            .or(cubes_id_metadata)
     );
 
     warp::serve(routes)
         .run(([127,0,0,1], 7777));
 }
 
-fn aggregate_error_handler(cube: String) -> Result<impl warp::Reply, warp::Rejection> {
-    if false {
-        Ok("") // unreachable, but for inference?
-    } else {
-        Err(warp::reject::not_found())
-    }
-}
