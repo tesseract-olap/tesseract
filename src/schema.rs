@@ -1,3 +1,5 @@
+use failure::Error;
+use serde_json;
 use std::sync::{Arc, Mutex};
 
 pub type Schema = Arc<Mutex<SchemaData>>;
@@ -14,7 +16,7 @@ pub fn flush(schema: Schema, schema_data: SchemaData) {
     *data = schema_data;
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SchemaData {
     cubes: Vec<Cube>,
 }
@@ -25,9 +27,16 @@ impl SchemaData {
             cubes: vec![],
         }
     }
+
+    pub fn from_json(input: &str) -> Result<Self, Error> {
+        serde_json::from_str(input)
+            .map_err(|err| {
+                format_err!("error reading json schema: {}", err)
+            })
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Cube {
     can_aggregate: bool,
     dimensions: Vec<String>,

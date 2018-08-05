@@ -1,0 +1,9 @@
+{
+    "cubes": [
+        {
+            "can_aggregate": true,
+            "dimensions": ["dim_one", "dim_two"],
+            "measures": ["mea_one", "mea_two"]
+        }
+    ]
+}

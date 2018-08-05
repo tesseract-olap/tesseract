@@ -1,11 +1,16 @@
 #[macro_use]
+extern crate failure;
+#[macro_use]
 extern crate log;
 extern crate pretty_env_logger;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 extern crate warp;
 
+use failure::Error;
+use std::fs;
 use std::env;
 use warp::Filter;
 
@@ -18,11 +23,15 @@ use query::{AggregateQuery, FlushQuery};
 
 
 // contains routes
-fn main() {
+fn main() -> Result<(), Error> {
     pretty_env_logger::init();
 
     // Turn schema into Filter
-    let schema_data = schema::SchemaData::new();
+    let schema_filepath = env::var("TESSERACT_SCHEMA_PATH")
+        .unwrap_or("schema.json".to_owned());
+    info!("Reading schema from: {}", schema_filepath);
+    let schema_raw = fs::read_to_string(schema_filepath)?;
+    let schema_data = schema::SchemaData::from_json(&schema_raw)?;
     let schema = schema::init(schema_data);
     let schema = warp::any().map(move || schema.clone());
 
@@ -209,5 +218,7 @@ fn main() {
 
     warp::serve(routes)
         .run(([127,0,0,1], 7777));
+
+    Ok(())
 }
 
