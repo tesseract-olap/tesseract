@@ -204,6 +204,7 @@ fn main() {
 
             // flush
             .or(flush)
+            .with(warp::log("warp::route"))
     );
 
     warp::serve(routes)
