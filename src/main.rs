@@ -20,7 +20,8 @@ fn main() {
     pretty_env_logger::init();
 
     // Turn schema into Filter
-    let schema = schema::init();
+    let schema_data = schema::SchemaData::new();
+    let schema = schema::init(schema_data);
     let schema = warp::any().map(move || schema.clone());
 
     // >> Cubes basic route and metadata,

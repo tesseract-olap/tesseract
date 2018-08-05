@@ -2,8 +2,8 @@ use std::sync::{Arc, Mutex};
 
 pub type Schema = Arc<Mutex<SchemaData>>;
 
-pub fn init() -> Schema {
-    Arc::new(Mutex::new(SchemaData::new()))
+pub fn init(schema_data: SchemaData) -> Schema {
+    Arc::new(Mutex::new(schema_data))
 }
 
 // replaces the schema inside of the Arc Mutex
