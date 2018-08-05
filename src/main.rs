@@ -8,13 +8,20 @@ extern crate warp;
 
 use warp::Filter;
 
+mod handlers;
 mod query;
+mod schema;
 
 use query::AggregateQuery;
+
 
 // contains routes
 fn main() {
     pretty_env_logger::init();
+
+    // Turn schema into Filter
+    let schema = schema::init();
+    let schema = warp::any().map(move || schema.clone());
 
     // >> Cubes basic route and metadata,
     // from
@@ -31,7 +38,8 @@ fn main() {
     // GET cubes/
     let cubes_metadata = cubes
         .and(warp::path::index())
-        .map(|| "All cubes info");
+        .and(schema.clone())
+        .map(handlers::list_cube_metadata);
 
     let cubes_id = cubes
         .and(warp::path::param::<String>());
