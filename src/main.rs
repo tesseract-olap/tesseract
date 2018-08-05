@@ -8,19 +8,11 @@ extern crate warp;
 
 use warp::Filter;
 
-#[derive(Debug, Deserialize)]
-struct AggregateQuery {
-    drilldowns: Option<Vec<String>>,
-    cuts: Option<Vec<String>>,
-    measures: Option<Vec<String>>,
-    properties: Option<Vec<String>>,
-    parents: Option<bool>,
-    debug: Option<bool>,
-//    distinct: Option<bool>,
-//    nonempty: Option<bool>,
-//    sparse: Option<bool>,
-}
+mod query;
 
+use query::AggregateQuery;
+
+// contains routes
 fn main() {
     pretty_env_logger::init();
 
