@@ -13,6 +13,6 @@ pub struct AggregateQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct FlushQuery {
-    secret: String,
+    pub secret: String,
 }
 

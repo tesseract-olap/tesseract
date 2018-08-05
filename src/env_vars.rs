@@ -1,12 +1,7 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct EnvVars {
-    pub secret: Option<String>,
+    pub flush_secret: Option<String>,
+    pub database: String,
+    pub schema_filepath: Option<String>,
 }
 
-impl EnvVars {
-    pub fn new() -> Self {
-        EnvVars {
-            secret: None,
-        }
-    }
-}

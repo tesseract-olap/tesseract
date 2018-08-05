@@ -1,3 +1,4 @@
+extern crate envy;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -6,12 +7,12 @@ extern crate pretty_env_logger;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 extern crate warp;
 
 use failure::Error;
 use std::fs;
-use std::env;
 use warp::Filter;
 
 mod env_vars;
@@ -19,6 +20,7 @@ mod handlers;
 mod query;
 mod schema;
 
+use env_vars::EnvVars;
 use query::{AggregateQuery, FlushQuery};
 
 
@@ -26,8 +28,11 @@ use query::{AggregateQuery, FlushQuery};
 fn main() -> Result<(), Error> {
     pretty_env_logger::init();
 
+    let env = envy::prefixed("TESSERACT_").from_env::<EnvVars>()?;
+    info!("Environment variables: {:?}", env);
+
     // Turn schema into Filter
-    let schema_filepath = env::var("TESSERACT_SCHEMA_PATH")
+    let schema_filepath = env.schema_filepath.clone()
         .unwrap_or("schema.json".to_owned());
     info!("Reading schema from: {}", schema_filepath);
     let schema_raw = fs::read_to_string(schema_filepath)?;
@@ -35,9 +40,7 @@ fn main() -> Result<(), Error> {
     let schema = schema::init(schema_data);
     let schema = warp::any().map(move || schema.clone());
 
-    let mut env_vars = env_vars::EnvVars::new();
-    env_vars.secret = env::var("TESSERACT_SECRET").ok();
-    let env_vars = warp::any().map(move || env_vars.clone());
+    let flush_secret = warp::any().map(move || env.flush_secret.clone());
 
     // >> Flush
 
@@ -45,7 +48,7 @@ fn main() -> Result<(), Error> {
         .and(warp::query::<FlushQuery>())
         .and(warp::path::index())
         .and(schema.clone())
-        .and(env_vars)
+        .and(flush_secret)
         .and_then(handlers::flush);
 
     // << end Flush

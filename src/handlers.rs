@@ -1,14 +1,27 @@
 use warp;
-use warp::http::StatusCode;
 
-use ::env_vars::EnvVars;
 use ::query::FlushQuery;
 use ::schema::Schema;
 
 // GET flush?=:flush_query
-pub fn flush(_flush_query: FlushQuery, _schema: Schema, _env_vars: EnvVars) -> Result<impl warp::Reply, warp::Rejection> {
-    info!("flush endpoint");
-    Ok(StatusCode::OK)
+pub fn flush(flush_query: FlushQuery, _schema: Schema, flush_secret: Option<String>) -> Result<impl warp::Reply, warp::Rejection> {
+    // the router will already reject if no querystring with secret
+
+    if let Some(secret) = flush_secret {
+        if secret == flush_query.secret {
+            info!("flush with secret match");
+            // TODO flush here
+            Ok(warp::reply::json(&json!({"flush": true})))
+        } else {
+            // if there's a secret set, but query secret does
+            // not match, then reject
+            Err(warp::reject())
+        }
+    } else {
+        // don't flush if there's no secret, the query secret doesn't matter
+        info!("no flush with no secret set");
+        Err(warp::reject())
+    }
 }
 
 // GET cubes/
