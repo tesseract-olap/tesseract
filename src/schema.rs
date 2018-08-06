@@ -25,6 +25,7 @@ pub fn flush(schema: Schema, schema_data: SchemaData) {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SchemaData {
+    pub name: String,
     pub cubes: Vec<Cube>,
 }
 
@@ -72,6 +73,7 @@ impl From<SchemaConfig> for SchemaData {
         }
 
         SchemaData {
+            name: schema_config.name,
             cubes: cubes,
         }
     }

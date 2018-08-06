@@ -3,6 +3,7 @@ use serde_json;
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct SchemaConfig {
+    pub name: String,
     pub shared_dimensions: Vec<SharedDimensionConfig>,
     pub cubes: Vec<CubeConfig>,
 }
