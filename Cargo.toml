@@ -18,5 +18,4 @@ warp = "0.1.0"
 
 [patch.crates-io]
 
-[patch.crates-io.warp]
-path = "../warp"
+warp = { git = "https://github.com/hwchen/warp.git", branch = "serde_qs" }
