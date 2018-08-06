@@ -27,5 +27,5 @@ pub fn flush(flush_query: FlushQuery, _schema: Schema, flush_secret: Option<Stri
 // GET cubes/
 pub fn list_cube_metadata(schema: Schema) -> impl warp::Reply {
     info!("list all cube metadata endpoint");
-    warp::reply::json(&*schema.lock().unwrap())
+    warp::reply::json(&*schema.read().unwrap())
 }

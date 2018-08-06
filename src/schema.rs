@@ -1,18 +1,18 @@
 use failure::Error;
 use serde_json;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
-pub type Schema = Arc<Mutex<SchemaData>>;
+pub type Schema = Arc<RwLock<SchemaData>>;
 
 pub fn init(schema_data: SchemaData) -> Schema {
-    Arc::new(Mutex::new(schema_data))
+    Arc::new(RwLock::new(schema_data))
 }
 
 // replaces the schema inside of the Arc Mutex
 // with another one read from scratch
 #[allow(dead_code)]
 pub fn flush(schema: Schema, schema_data: SchemaData) {
-    let mut data = schema.lock().unwrap();
+    let mut data = schema.write().unwrap();
     *data = schema_data;
 }
 
