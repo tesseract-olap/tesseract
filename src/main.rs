@@ -35,12 +35,14 @@ fn main() -> Result<(), Error> {
     let schema_filepath = env.schema_filepath.clone()
         .unwrap_or("schema.json".to_owned());
     info!("Reading schema from: {}", schema_filepath);
-    let schema_raw = fs::read_to_string(schema_filepath)?;
+    let schema_raw = fs::read_to_string(&schema_filepath)?;
     let schema_data = schema::SchemaData::from_json(&schema_raw)?;
     let schema = schema::init(schema_data);
     let schema = warp::any().map(move || schema.clone());
 
+    // filters for passing on config info to routes
     let flush_secret = warp::any().map(move || env.flush_secret.clone());
+    let schema_filepath = warp::any().map(move || schema_filepath.clone());
 
     // >> Flush
 
@@ -49,6 +51,7 @@ fn main() -> Result<(), Error> {
         .and(warp::path::index())
         .and(schema.clone())
         .and(flush_secret)
+        .and(schema_filepath)
         .and_then(handlers::flush);
 
     // << end Flush
