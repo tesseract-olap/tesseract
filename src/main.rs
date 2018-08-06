@@ -19,6 +19,7 @@ mod env_vars;
 mod handlers;
 mod query;
 mod schema;
+mod schema_config;
 
 use env_vars::EnvVars;
 use query::{AggregateQuery, FlushQuery};
@@ -36,7 +37,8 @@ fn main() -> Result<(), Error> {
         .unwrap_or("schema.json".to_owned());
     info!("Reading schema from: {}", schema_filepath);
     let schema_raw = fs::read_to_string(&schema_filepath)?;
-    let schema_data = schema::SchemaData::from_json(&schema_raw)?;
+    let schema_config = schema_config::SchemaConfig::from_json(&schema_raw)?;
+    let schema_data = schema::SchemaData::from_config(&schema_config);
     let schema = schema::init(schema_data);
     let schema = warp::any().map(move || schema.clone());
 

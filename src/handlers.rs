@@ -3,6 +3,7 @@ use warp;
 
 use ::query::FlushQuery;
 use ::schema::{self, Schema};
+use ::schema_config;
 
 // GET flush?=:flush_query
 pub fn flush(
@@ -28,13 +29,16 @@ pub fn flush(
                     return Err(warp::reject::server_error());
                 },
             };
-            let schema_data = match schema::SchemaData::from_json(&schema_raw) {
+            let schema_config = match schema_config::SchemaConfig::from_json(&schema_raw) {
                 Ok(s) => s,
                 Err(err) => {
                     error!("Error parsing schema file: {}", err);
                     return Err(warp::reject::server_error());
                 },
             };
+
+            let schema_data = schema::SchemaData::from_config(&schema_config);
+
             schema::flush(schema, schema_data);
 
             Ok(warp::reply::json(&json!({"flush": true})))
