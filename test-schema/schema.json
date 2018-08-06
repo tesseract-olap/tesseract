@@ -1,9 +1,60 @@
 {
+    "shared_dimensions": [
+        {
+            "name": "Geography",
+            "hierarchies": [
+                {
+                    "name": "County",
+                    "levels": [
+                        {
+                            "name": "State",
+                            "key_column": "state_code",
+                            "name_column": "state_label"
+                        },
+                        {
+                            "name": "County",
+                            "key_column": "county_code",
+                            "name_column": "county_label"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
     "cubes": [
         {
-            "can_aggregate": true,
-            "dimensions": ["dim_one", "dim_two"],
-            "measures": ["mea_one", "mea_two"]
+            "name": "Height Distribution",
+            "dimension_usages": [
+                {
+                    "name": "Geography",
+                    "foreign_key": "geoid"
+                }
+            ],
+            "dimensions": [
+                {
+                    "name": "Age",
+                    "foreign_key": "dim_one",
+                    "hierarchies": [
+                        {
+                            "name": "Age",
+                            "primary_key": "age_code",
+                            "levels": [
+                                {
+                                    "name": "Age",
+                                    "key_column": "age_code",
+                                    "name_column": "age"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "measures": [
+                {
+                    "name": "Height",
+                    "column": "mea_height"
+                }
+            ]
         }
     ]
 }

@@ -37,7 +37,7 @@ pub fn flush(
                 },
             };
 
-            let schema_data = schema::SchemaData::from_config(&schema_config);
+            let schema_data = schema_config.into();
 
             schema::flush(schema, schema_data);
 
