@@ -4,6 +4,7 @@ name = "tesseract"
 version = "0.1.0"
 
 [dependencies]
+csv = "1.0.0"
 envy = "0.3.2"
 failure = "0.1.2"
 log = "0.4.3"
@@ -18,4 +19,6 @@ warp = "0.1.0"
 
 [patch.crates-io]
 
-warp = { git = "https://github.com/hwchen/warp.git", branch = "serde_qs" }
+[patch.crates-io.warp]
+branch = "serde_qs"
+git = "https://github.com/hwchen/warp.git"

@@ -1,3 +1,4 @@
+extern crate csv;
 extern crate envy;
 #[macro_use]
 extern crate failure;
@@ -15,6 +16,7 @@ use failure::Error;
 use std::fs;
 use warp::Filter;
 
+mod engine;
 mod env_vars;
 mod handlers;
 mod query;
@@ -31,6 +33,13 @@ fn main() -> Result<(), Error> {
 
     let env = envy::prefixed("TESSERACT_").from_env::<EnvVars>()?;
     info!("Environment variables: {:?}", env);
+
+    // storage engine init
+    // this is temporary for testing
+    // create interface for engine?
+    let mut db = engine::MemoryEngine::new();
+    db.add_table("operating_budget".to_owned(), "test-cube/operating_budget.csv")?;
+    //println!("{:#?}", db);
 
     // Turn schema into Filter
     let schema_filepath = env.schema_filepath.clone()
