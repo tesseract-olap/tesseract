@@ -6,6 +6,10 @@
             "hierarchies": [
                 {
                     "name": "County",
+                    "table": {
+                        "name": "dim_county",
+                        "schema": "geography"
+                    },
                     "levels": [
                         {
                             "name": "State",
@@ -25,6 +29,10 @@
     "cubes": [
         {
             "name": "Height Distribution",
+            "table": {
+                "name": "lilliput_height",
+                "schema": "test"
+            },
             "dimension_usages": [
                 {
                     "name": "Geography",
@@ -38,6 +46,10 @@
                     "hierarchies": [
                         {
                             "name": "Age",
+                            "table": {
+                                "name": "dim_age",
+                                "schema": "facts"
+                            },
                             "primary_key": "age_code",
                             "levels": [
                                 {

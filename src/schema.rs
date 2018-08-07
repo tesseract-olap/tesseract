@@ -7,6 +7,7 @@ use ::schema_config::{
     HierarchyConfig,
     LevelConfig,
     MeasureConfig,
+    TableConfig,
 };
 
 pub type Schema = Arc<RwLock<SchemaData>>;
@@ -66,6 +67,7 @@ impl From<SchemaConfig> for SchemaData {
 
             cubes.push(Cube {
                 name: cube_config.name,
+                table: cube_config.table.into(),
                 can_aggregate: false,
                 dimensions: dimensions,
                 measures: measures,
@@ -82,6 +84,7 @@ impl From<SchemaConfig> for SchemaData {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Cube {
     pub name: String,
+    pub table: Table,
     pub can_aggregate: bool,
     pub dimensions: Vec<Dimension>,
     pub measures: Vec<Measure>,
@@ -111,6 +114,7 @@ impl From<DimensionConfig> for Dimension {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Hierarchy {
     pub name: String,
+    pub table: Table,
     pub primary_key: String,
     pub levels: Vec<Level>,
 }
@@ -132,6 +136,7 @@ impl From<HierarchyConfig> for Hierarchy {
 
         Hierarchy {
             name: hierarchy_config.name,
+            table: hierarchy_config.table.into(),
             primary_key: primary_key,
             levels: levels,
         }
@@ -169,3 +174,19 @@ impl From<MeasureConfig> for Measure {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Table{
+    pub name: String,
+    pub schema: String,
+}
+
+impl From<TableConfig> for Table {
+    fn from(table_config: TableConfig) -> Self {
+        Table {
+            name: table_config.name,
+            schema: table_config.schema,
+        }
+    }
+}
+

@@ -20,6 +20,7 @@ impl SchemaConfig {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct CubeConfig {
     pub name: String,
+    pub table: TableConfig,
     pub dimensions: Vec<DimensionConfig>,
     pub dimension_usages: Vec<DimensionUsage>,
     pub measures: Vec<MeasureConfig>,
@@ -47,6 +48,7 @@ pub struct DimensionUsage {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct HierarchyConfig {
     pub name: String,
+    pub table: TableConfig,
     pub primary_key: Option<String>,
     pub levels: Vec<LevelConfig>,
 }
@@ -62,5 +64,11 @@ pub struct LevelConfig {
 pub struct MeasureConfig {
     pub name: String,
     pub column: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct TableConfig {
+    pub name: String,
+    pub schema: String,
 }
 
