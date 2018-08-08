@@ -86,7 +86,8 @@ fn main() -> Result<(), Error> {
     let cubes_metadata = cubes
         .and(warp::path::index())
         .and(schema.clone())
-        .map(handlers::list_cube_metadata);
+        .map(handlers::list_cube_metadata)
+        .boxed();
 
     let cubes_id = cubes
         .and(warp::path::param::<String>());
@@ -96,7 +97,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path::index())
         .map(|cube: String| {
             format!("The cube you're getting info about: {}", cube)
-        });
+        })
+        .boxed();
 
     let dimensions = cubes_id
         .and(warp::path("dimensions"));
@@ -104,7 +106,8 @@ fn main() -> Result<(), Error> {
     // GET cubes/:id/dimensions/
     let dimensions_metadata = dimensions
         .and(warp::path::index())
-        .map(|cube: String| format!("list all dims for {}", cube));
+        .map(|cube: String| format!("list all dims for {}", cube))
+        .boxed();
 
     let dimensions_id = dimensions
         .and(warp::path::param::<String>());
@@ -114,7 +117,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path::index())
         .map(|cube: String, dim: String| {
             format!("The cube and dim you're getting info about: {}, {}", cube, dim)
-        });
+        })
+        .boxed();
 
     let hierarchies = dimensions_id
         .and(warp::path("hierarchies"));
@@ -124,7 +128,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path::index())
         .map(|cube: String, dim: String| {
             format!("list all hierarchies for {}, {}", cube, dim)
-        });
+        })
+        .boxed();
 
     let hierarchies_id = hierarchies
         .and(warp::path::param::<String>());
@@ -138,7 +143,8 @@ fn main() -> Result<(), Error> {
                 dim,
                 hier,
             )
-        });
+        })
+        .boxed();
 
     let levels = hierarchies_id
         .and(warp::path("levels"));
@@ -148,7 +154,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path::index())
         .map(|cube: String, dim: String, hier: String| {
             format!("list all levels for {}, {}, {}", cube, dim, hier)
-        });
+        })
+        .boxed();
 
     let levels_id = levels
         .and(warp::path::param::<String>());
@@ -163,7 +170,8 @@ fn main() -> Result<(), Error> {
                 hier,
                 level,
             )
-        });
+        })
+        .boxed();
 
     // GET cubes/:id/dimensions/:id/hierarchies/:id/levels/:id/members
     let members_metadata = levels_id
@@ -171,7 +179,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path::index())
         .map(|cube: String, dim: String, hier: String, level: String| {
             format!("list all members for {}, {}, {}, {}", cube, dim, hier, level)
-        });
+        })
+        .boxed();
 
     // << end cubes basic route
 
@@ -183,7 +192,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path("aggregate"))
         .and(warp::query::raw())
         .and(warp::path::index())
-        .and_then(handlers::aggregate_query);
+        .and_then(handlers::aggregate_query)
+        .boxed();
 
     // csv
     // GET cubes/:id/aggregate.csv?=:query
@@ -191,7 +201,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path("aggregate.csv"))
         .and(warp::query::raw())
         .and(warp::path::index())
-        .and_then(handlers::aggregate_query);
+        .and_then(handlers::aggregate_query)
+        .boxed();
 
     // jsonrecords
     // GET cubes/:id/aggregate.jsonrecords?=:query
@@ -199,7 +210,8 @@ fn main() -> Result<(), Error> {
         .and(warp::path("aggregate.jsonrecords"))
         .and(warp::query::raw())
         .and(warp::path::index())
-        .and_then(handlers::aggregate_query);
+        .and_then(handlers::aggregate_query)
+        .boxed();
 
     // << end agg route
 
