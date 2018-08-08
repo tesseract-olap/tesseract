@@ -7,6 +7,7 @@ version = "0.1.0"
 csv = "1.0.0"
 envy = "0.3.2"
 failure = "0.1.2"
+lazy_static = "1.1.0"
 log = "0.4.3"
 pretty_env_logger = "0.2.4"
 serde = "1.0.70"
@@ -20,5 +21,4 @@ warp = "0.1.0"
 [patch.crates-io]
 
 [patch.crates-io.warp]
-branch = "serde_qs"
-git = "https://github.com/hwchen/warp.git"
+path = "../warp"

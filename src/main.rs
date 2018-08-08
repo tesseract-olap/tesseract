@@ -3,6 +3,8 @@ extern crate envy;
 #[macro_use]
 extern crate failure;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 extern crate pretty_env_logger;
 extern crate serde;
@@ -10,6 +12,7 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate serde_qs;
 extern crate warp;
 
 use failure::Error;
@@ -24,7 +27,7 @@ mod schema;
 mod schema_config;
 
 use env_vars::EnvVars;
-use query::{AggregateQuery, FlushQuery};
+use query::FlushQuery;
 
 
 // contains routes
@@ -178,31 +181,25 @@ fn main() -> Result<(), Error> {
     // GET cubes/:id/aggregate?=:query
     let aggregate_default_query = cubes_id
         .and(warp::path("aggregate"))
-        .and(warp::query::<AggregateQuery>())
+        .and(warp::raw_query())
         .and(warp::path::index())
-        .map(|cube: String, query: AggregateQuery| {
-            format!("aggregate cube default: {:?}, query: {:?}", cube, query)
-        });
+        .and_then(handlers::aggregate_query);
 
     // csv
     // GET cubes/:id/aggregate.csv?=:query
     let aggregate_csv_query = cubes_id
         .and(warp::path("aggregate.csv"))
-        .and(warp::query::<AggregateQuery>())
+        .and(warp::raw_query())
         .and(warp::path::index())
-        .map(|cube: String, query: AggregateQuery| {
-            format!("aggregate cube csv: {:?}, query: {:?}", cube, query)
-        });
+        .and_then(handlers::aggregate_query);
 
     // jsonrecords
     // GET cubes/:id/aggregate.jsonrecords?=:query
     let aggregate_jsonrecords_query = cubes_id
         .and(warp::path("aggregate.jsonrecords"))
-        .and(warp::query::<AggregateQuery>())
+        .and(warp::raw_query())
         .and(warp::path::index())
-        .map(|cube: String, query: AggregateQuery| {
-            format!("aggregate cube jsonrecords: {:?}, query: {:?}", cube, query)
-        });
+        .and_then(handlers::aggregate_query);
 
     // << end agg route
 

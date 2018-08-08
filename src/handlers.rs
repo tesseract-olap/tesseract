@@ -1,7 +1,8 @@
+use serde_qs as qs;
 use std::fs;
 use warp;
 
-use ::query::FlushQuery;
+use ::query::{AggregateQuery, FlushQuery};
 use ::schema::{self, Schema};
 use ::schema_config;
 
@@ -58,4 +59,26 @@ pub fn flush(
 pub fn list_cube_metadata(schema: Schema) -> impl warp::Reply {
     info!("list all cube metadata endpoint");
     warp::reply::json(&*schema.read().unwrap())
+}
+
+// GET cubes/:id/aggregate?:query
+pub fn aggregate_query(cube: String, query: String) -> Result<impl warp::Reply, warp::Rejection> {
+    info!("{}", query);
+    lazy_static!{
+        static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
+    }
+    let agg_query = QS_NON_STRICT.deserialize_str::<AggregateQuery>(&query);
+    agg_query
+        .map(|query| {
+            warp::reply::json(
+                &json!({
+                    "cube": cube,
+                    "query":  query,
+                })
+            )
+        })
+        .map_err(|err| {
+            error!("Could not parse aggregate query string: {}", err);
+            warp::reject()
+        })
 }

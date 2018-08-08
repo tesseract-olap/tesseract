@@ -1,4 +1,4 @@
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AggregateQuery {
     drilldowns: Option<Vec<String>>,
     cuts: Option<Vec<String>>,
@@ -11,7 +11,7 @@ pub struct AggregateQuery {
 //    sparse: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct FlushQuery {
     pub secret: String,
 }
