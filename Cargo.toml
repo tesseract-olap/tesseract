@@ -21,4 +21,4 @@ warp = "0.1.0"
 [patch.crates-io]
 
 [patch.crates-io.warp]
-path = "../warp"
+git  = "https://github.com/seanmonstar/warp"
