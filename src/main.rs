@@ -181,7 +181,7 @@ fn main() -> Result<(), Error> {
     // GET cubes/:id/aggregate?=:query
     let aggregate_default_query = cubes_id
         .and(warp::path("aggregate"))
-        .and(warp::raw_query())
+        .and(warp::query::raw())
         .and(warp::path::index())
         .and_then(handlers::aggregate_query);
 
@@ -189,7 +189,7 @@ fn main() -> Result<(), Error> {
     // GET cubes/:id/aggregate.csv?=:query
     let aggregate_csv_query = cubes_id
         .and(warp::path("aggregate.csv"))
-        .and(warp::raw_query())
+        .and(warp::query::raw())
         .and(warp::path::index())
         .and_then(handlers::aggregate_query);
 
@@ -197,7 +197,7 @@ fn main() -> Result<(), Error> {
     // GET cubes/:id/aggregate.jsonrecords?=:query
     let aggregate_jsonrecords_query = cubes_id
         .and(warp::path("aggregate.jsonrecords"))
-        .and(warp::raw_query())
+        .and(warp::query::raw())
         .and(warp::path::index())
         .and_then(handlers::aggregate_query);
 
