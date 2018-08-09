@@ -1,5 +1,4 @@
 use std::convert::From;
-use std::sync::{Arc, RwLock};
 
 use ::schema_config::{
     SchemaConfig,
@@ -10,28 +9,14 @@ use ::schema_config::{
     TableConfig,
 };
 
-pub type Schema = Arc<RwLock<SchemaData>>;
-
-pub fn init(schema_data: SchemaData) -> Schema {
-    Arc::new(RwLock::new(schema_data))
-}
-
-// replaces the schema inside of the Arc Mutex
-// with another one read from scratch
-#[allow(dead_code)]
-pub fn flush(schema: Schema, schema_data: SchemaData) {
-    let mut data = schema.write().unwrap();
-    *data = schema_data;
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SchemaData {
+pub struct Schema {
     pub name: String,
     pub cubes: Vec<Cube>,
 }
 
-impl From<SchemaConfig> for SchemaData {
-    fn from(schema_config: SchemaConfig) -> SchemaData {
+impl From<SchemaConfig> for Schema {
+    fn from(schema_config: SchemaConfig) -> Self {
         // TODO
         // check for:
         // - duplicate cube names,
@@ -74,7 +59,7 @@ impl From<SchemaConfig> for SchemaData {
             });
         }
 
-        SchemaData {
+        Schema {
             name: schema_config.name,
             cubes: cubes,
         }
@@ -189,4 +174,5 @@ impl From<TableConfig> for Table {
         }
     }
 }
+
 

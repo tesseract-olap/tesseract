@@ -3,13 +3,12 @@ use std::fs;
 use warp;
 
 use ::query::{AggregateQuery, FlushQuery};
-use ::schema::{self, Schema};
-use ::schema_config;
+use ::Tesseract;
 
 // GET flush?=:flush_query
 pub fn flush(
     flush_query: FlushQuery,
-    schema: Schema,
+    tesseract: Tesseract,
     flush_secret: Option<String>,
     schema_filepath: String,
     ) -> Result<impl warp::Reply, warp::Rejection>
@@ -30,17 +29,15 @@ pub fn flush(
                     return Err(warp::reject::server_error());
                 },
             };
-            let schema_config = match schema_config::SchemaConfig::from_json(&schema_raw) {
-                Ok(s) => s,
+
+            let mut engine = tesseract.write().unwrap();
+            match (*engine).flush(&schema_raw) {
+                Ok(()) => (),
                 Err(err) => {
-                    error!("Error parsing schema file: {}", err);
+                    error!("Error flushing tesseract: {}", err);
                     return Err(warp::reject::server_error());
                 },
-            };
-
-            let schema_data = schema_config.into();
-
-            schema::flush(schema, schema_data);
+            }
 
             Ok(warp::reply::json(&json!({"flush": true})))
         } else {
@@ -56,9 +53,9 @@ pub fn flush(
 }
 
 // GET cubes/
-pub fn list_cube_metadata(schema: Schema) -> impl warp::Reply {
+pub fn list_cube_metadata(tesseract: Tesseract) -> impl warp::Reply {
     info!("list all cube metadata endpoint");
-    warp::reply::json(&*schema.read().unwrap())
+    warp::reply::json(&tesseract.read().unwrap().schema)
 }
 
 // GET cubes/:id/aggregate?:query

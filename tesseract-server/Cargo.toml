@@ -4,7 +4,6 @@ name = "tesseract"
 version = "0.1.0"
 
 [dependencies]
-csv = "1.0.0"
 envy = "0.3.2"
 failure = "0.1.2"
 lazy_static = "1.1.0"
@@ -14,6 +13,7 @@ serde = "1.0.70"
 serde_derive = "1.0.70"
 serde_json = "1.0.24"
 serde_qs = "0.4.1"
+tesseract-engine = { path = "../tesseract-engine" }
 warp = "0.1.0"
 
 [patch]

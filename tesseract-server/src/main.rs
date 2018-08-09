@@ -1,6 +1,4 @@
-extern crate csv;
 extern crate envy;
-#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate lazy_static;
@@ -13,22 +11,23 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate serde_qs;
+extern crate tesseract_engine;
 extern crate warp;
 
 use failure::Error;
 use std::fs;
 use warp::Filter;
 
-mod engine;
 mod env_vars;
 mod handlers;
 mod query;
-mod schema;
-mod schema_config;
 
 use env_vars::EnvVars;
 use query::FlushQuery;
+use std::sync::{Arc, RwLock};
+use tesseract_engine::TesseractEngine;
 
+pub type Tesseract = Arc<RwLock<TesseractEngine>>;
 
 // contains routes
 fn main() -> Result<(), Error> {
@@ -37,22 +36,15 @@ fn main() -> Result<(), Error> {
     let env = envy::prefixed("TESSERACT_").from_env::<EnvVars>()?;
     info!("Environment variables: {:?}", env);
 
-    // storage engine init
-    // this is temporary for testing
-    // create interface for engine?
-    let mut db = engine::MemoryEngine::new();
-    db.add_table("operating_budget".to_owned(), "test-cube/operating_budget.csv")?;
-    //println!("{:#?}", db);
-
-    // Turn schema into Filter
+    // Initialize Engine from schema
     let schema_filepath = env.schema_filepath.clone()
         .unwrap_or("schema.json".to_owned());
     info!("Reading schema from: {}", schema_filepath);
     let schema_raw = fs::read_to_string(&schema_filepath)?;
-    let schema_config = schema_config::SchemaConfig::from_json(&schema_raw)?;
-    let schema_data = schema_config.into();
-    let schema = schema::init(schema_data);
-    let schema = warp::any().map(move || schema.clone());
+
+    let tesseract = TesseractEngine::from_json(&schema_raw)?;
+    let tesseract = Arc::new(RwLock::new(tesseract));
+    let tesseract = warp::any().map(move || tesseract.clone());
 
     // filters for passing on config info to routes
     let flush_secret = warp::any().map(move || env.flush_secret.clone());
@@ -63,7 +55,7 @@ fn main() -> Result<(), Error> {
     let flush = warp::path("flush")
         .and(warp::query::<FlushQuery>())
         .and(warp::path::index())
-        .and(schema.clone())
+        .and(tesseract.clone())
         .and(flush_secret)
         .and(schema_filepath)
         .and_then(handlers::flush);
@@ -85,7 +77,7 @@ fn main() -> Result<(), Error> {
     // GET cubes/
     let cubes_metadata = cubes
         .and(warp::path::index())
-        .and(schema.clone())
+        .and(tesseract.clone())
         .map(handlers::list_cube_metadata)
         .boxed();
 
