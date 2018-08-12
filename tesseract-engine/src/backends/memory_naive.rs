@@ -273,6 +273,16 @@ impl Table {
                 res_values.push(agg_value.clone());
             }
             //START HERE do flt and str, the test
+            for (i, agg_value) in agg_values.mea_cols_flt.iter().enumerate() {
+                let (_, res_values) = query_res.mea_cols_flt.get_index_mut(i)
+                    .ok_or(format_err!("no result column found!"))?;
+                res_values.push(agg_value.clone());
+            }
+            for (i, agg_value) in agg_values.mea_cols_str.iter().enumerate() {
+                let (_, res_values) = query_res.mea_cols_str.get_index_mut(i)
+                    .ok_or(format_err!("no result column found!"))?;
+                res_values.push(agg_value.clone());
+            }
         }
 
         Ok(query_res)
