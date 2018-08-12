@@ -130,6 +130,7 @@ impl Table {
                 }
             })
             .collect();
+        println!("{:?}", dim_cols);
 
         let mea_cols_int: Vec<_> = self.mea_cols_int.iter()
             .filter_map(|(col_name, col)| {
@@ -201,6 +202,78 @@ impl Table {
             mea_cols_flt: indexmap!{},
             mea_cols_str: indexmap!{},
         };
+
+        // initialize query result with col names
+
+        let dim_col_names: Vec<_> = self.dim_cols_int.keys()
+            .filter_map(|col_name| {
+                if query.drilldowns.contains(col_name) {
+                    Some(col_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mea_col_names_int: Vec<_> = self.mea_cols_int.keys()
+            .filter_map(|col_name| {
+                if query.measures.contains(col_name) {
+                    Some(col_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mea_col_names_flt: Vec<_> = self.mea_cols_flt.keys()
+            .filter_map(|col_name| {
+                if query.measures.contains(col_name) {
+                    Some(col_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mea_col_names_str: Vec<_> = self.mea_cols_str.keys()
+            .filter_map(|col_name| {
+                if query.measures.contains(col_name) {
+                    Some(col_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for col in dim_col_names {
+            query_res.dim_cols_int.insert(col.to_owned(), vec![]);
+        }
+        for col in mea_col_names_int {
+            query_res.mea_cols_int.insert(col.to_owned(), vec![]);
+        }
+        for col in mea_col_names_flt {
+            query_res.mea_cols_flt.insert(col.to_owned(), vec![]);
+        }
+        for col in mea_col_names_str {
+            query_res.mea_cols_str.insert(col.to_owned(), vec![]);
+        }
+
+        // put in results
+        // First dimesions
+        for (dim_members, agg_values) in agg_state.iter() {
+            for (i, member) in dim_members.iter().enumerate() {
+                let (_, res_values) = query_res.dim_cols_int.get_index_mut(i)
+                    .ok_or(format_err!("no result column found!"))?;
+                res_values.push(member.clone());
+            }
+
+            for (i, agg_value) in agg_values.mea_cols_int.iter().enumerate() {
+                let (_, res_values) = query_res.mea_cols_int.get_index_mut(i)
+                    .ok_or(format_err!("no result column found!"))?;
+                res_values.push(agg_value.clone());
+            }
+            //START HERE do flt and str, the test
+        }
 
         Ok(query_res)
     }
