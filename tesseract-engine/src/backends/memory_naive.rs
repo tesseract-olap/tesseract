@@ -2,6 +2,8 @@ use csv;
 use failure::Error;
 use indexmap::IndexMap;
 
+use query::{Query, QueryResult};
+
 // basic in-memory engine
 // just stores vecs of strings
 // It's slow, but doesn't matter
@@ -27,6 +29,7 @@ pub struct Table {
     mea_cols_int: IndexMap<String, Vec<isize>>,
     mea_cols_flt: IndexMap<String, Vec<f64>>,
     mea_cols_str: IndexMap<String, Vec<String>>,
+    col_len: usize,
 }
 
 impl Table {
@@ -37,6 +40,7 @@ impl Table {
             mea_cols_int: indexmap!{},
             mea_cols_flt: indexmap!{},
             mea_cols_str: indexmap!{},
+            col_len: 0,
         };
 
         let mut lines = table_schema.lines();
@@ -89,7 +93,9 @@ impl Table {
             .map(|s| s.to_owned())
             .collect();
 
+        let mut records_len = 0;
         for result in rdr.records() {
+            records_len += 1;
             let record = result?;
             for (i, field) in record.into_iter().enumerate() {
                 // match col name and insert
@@ -107,7 +113,118 @@ impl Table {
             }
         }
 
+        self.col_len = records_len;
+
         Ok(())
+    }
+
+    pub fn execute_query(&self, query: &Query) -> Result<QueryResult, Error> {
+        // gather all cols in drilldowns and cuts
+
+        let dim_cols: Vec<_> = self.dim_cols_int.iter()
+            .filter_map(|(col_name, col)| {
+                if query.drilldowns.contains(col_name) {
+                    Some(col)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mea_cols_int: Vec<_> = self.mea_cols_int.iter()
+            .filter_map(|(col_name, col)| {
+                if query.measures.contains(col_name) {
+                    Some(col)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mea_cols_flt: Vec<_> = self.mea_cols_flt.iter()
+            .filter_map(|(col_name, col)| {
+                if query.measures.contains(col_name) {
+                    Some(col)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mea_cols_str: Vec<_> = self.mea_cols_str.iter()
+            .filter_map(|(col_name, col)| {
+                if query.measures.contains(col_name) {
+                    Some(col)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mut agg_state: IndexMap<Vec<usize>, AggMeaCols> = indexmap!{};
+
+        // guts
+        // change to fold?
+        for i in 0..self.col_len {
+            let dim_members: Vec<_> = dim_cols.iter().map(|col| col[i]).collect();
+
+            let mea_cols_int_values: Vec<_> = mea_cols_int.iter().map(|col| col[i].clone()).collect();
+            let mea_cols_flt_values: Vec<_> = mea_cols_flt.iter().map(|col| col[i].clone()).collect();
+            let mea_cols_str_values: Vec<_> = mea_cols_str.iter().map(|col| col[i].clone()).collect();
+
+            let measures = agg_state.entry(dim_members)
+                .or_insert(AggMeaCols::new(
+                    mea_cols_int_values.len(),
+                    mea_cols_flt_values.len(),
+                    mea_cols_str_values.len(),
+                ));
+
+
+            // for now sum aggregation is hardcoded
+            // lazy, str will just take last str value
+            for (i, agg_value) in measures.mea_cols_int.iter_mut().enumerate() {
+                *agg_value += mea_cols_int_values[i];
+            }
+            for (i, agg_value) in measures.mea_cols_flt.iter_mut().enumerate() {
+                *agg_value += mea_cols_flt_values[i];
+            }
+            for (i, agg_value) in measures.mea_cols_str.iter_mut().enumerate() {
+                *agg_value = mea_cols_str_values[i].clone();
+            }
+        }
+
+        println!("{:?}", agg_state);
+
+        let mut query_res = QueryResult {
+            dim_cols_int: indexmap!{},
+            mea_cols_int: indexmap!{},
+            mea_cols_flt: indexmap!{},
+            mea_cols_str: indexmap!{},
+        };
+
+        Ok(query_res)
+    }
+}
+
+#[derive(Debug)]
+struct AggMeaCols {
+    pub mea_cols_int: Vec<isize>,
+    pub mea_cols_flt: Vec<f64>,
+    pub mea_cols_str: Vec<String>,
+}
+
+impl AggMeaCols {
+    // this initialization is for sum!
+    pub fn new(
+        mea_cols_int_len: usize,
+        mea_cols_flt_len: usize,
+        mea_cols_str_len: usize,
+    ) -> Self {
+        AggMeaCols {
+            mea_cols_int: vec![0; mea_cols_int_len],
+            mea_cols_flt: vec![0.; mea_cols_flt_len],
+            mea_cols_str: vec!["".to_owned(); mea_cols_str_len],
+        }
     }
 }
 
@@ -119,6 +236,7 @@ mod test {
     fn test_basic_backend() {
         let table_schema =
             "test_table\n\
+            dim year int\n\
             dim dim_0 int\n\
             dim dim_1 int\n\
             mea mea_0 flt\n\
@@ -126,13 +244,19 @@ mod test {
             ";
 
         let test_csv =
-            "dim_0,dim_1,mea_0,mea_1\n\
-            0,0,11.5,100\n\
-            0,1,12.5,200\n\
-            0,2,13.5,300\n\
-            1,0,14.5,400\n\
-            1,1,15.5,500\n\
-            1,2,16.5,600\
+            "year,dim_0,dim_1,mea_0,mea_1\n\
+            2015,0,0,11.0,100\n\
+            2015,0,1,12.0,200\n\
+            2015,0,2,13.0,300\n\
+            2015,1,0,14.0,400\n\
+            2015,1,1,15.0,500\n\
+            2015,1,2,16.0,600\n\
+            2016,0,0,21.0,700\n\
+            2016,0,1,22.0,800\n\
+            2016,0,2,23.0,900\n\
+            2016,1,0,24.0,1000\n\
+            2016,1,1,25.0,1100\n\
+            2016,1,2,26.0,1200\
             ";
 
 
@@ -141,6 +265,11 @@ mod test {
 
         table.import_csv(test_csv).unwrap();
         println!("{:?}", table);
+
+        table.execute_query(&Query {
+            drilldowns: vec!["dim_0".to_owned(), "dim_1".to_owned()],
+            measures: vec!["mea_0".to_owned(), "mea_1".to_owned()],
+        }).unwrap();
 
         panic!();
     }

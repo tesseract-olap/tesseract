@@ -36,3 +36,6 @@ Tesseract engine contains:
 - Executor uses info from the cube and the Query to generate a QueryPlan (state machine?).
 - Executor gets a reference to the fact table and necessary dims.
 - Executor 
+
+# note
+columns are stream? Compressed as streams? (the struct could be a combination of null bitvec and vec chunks, with metadata on null ranges, and present an iterator interface)

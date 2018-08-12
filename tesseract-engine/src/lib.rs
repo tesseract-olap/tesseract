@@ -11,6 +11,7 @@ extern crate serde_json;
 mod backends;
 mod schema;
 mod schema_config;
+mod query;
 
 use failure::Error;
 
