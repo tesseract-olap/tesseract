@@ -49,7 +49,7 @@ impl Table {
 
         let mut col_names = indexset!{};
 
-        for line in table_schema.lines() {
+        for line in lines {
             match line.split_whitespace().collect::<Vec<_>>().as_slice() {
                 ["dim", name, _    ] => {
                     if !col_names.insert(name.to_owned()) {
@@ -83,8 +83,8 @@ impl Table {
     }
 
     // Header with col names required.
-    pub fn import_csv(&mut self, name: String, filepath: &str) -> Result<(), Error> {
-        let mut rdr = csv::Reader::from_path(filepath)?;
+    pub fn import_csv(&mut self, csv: &str) -> Result<(), Error> {
+        let mut rdr = csv::Reader::from_reader(csv.as_bytes());
         let header: Vec<String> = rdr.headers()?.into_iter()
             .map(|s| s.to_owned())
             .collect();
@@ -111,3 +111,37 @@ impl Table {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_basic_backend() {
+        let table_schema =
+            "test_table\n\
+            dim dim_0 int\n\
+            dim dim_1 int\n\
+            mea mea_0 flt\n\
+            mea mea_1 int\
+            ";
+
+        let test_csv =
+            "dim_0,dim_1,mea_0,mea_1\n\
+            0,0,11.5,100\n\
+            0,1,12.5,200\n\
+            0,2,13.5,300\n\
+            1,0,14.5,400\n\
+            1,1,15.5,500\n\
+            1,2,16.5,600\
+            ";
+
+
+        let mut table = Table::create(table_schema).unwrap();
+        println!("{:?}", table);
+
+        table.import_csv(test_csv).unwrap();
+        println!("{:?}", table);
+
+        panic!();
+    }
+}
