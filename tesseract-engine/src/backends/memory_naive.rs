@@ -169,9 +169,9 @@ impl Table {
         for i in 0..self.col_len {
             let dim_members: Vec<_> = dim_cols.iter().map(|col| col[i]).collect();
 
-            let mea_cols_int_values: Vec<_> = mea_cols_int.iter().map(|col| col[i].clone()).collect();
-            let mea_cols_flt_values: Vec<_> = mea_cols_flt.iter().map(|col| col[i].clone()).collect();
-            let mea_cols_str_values: Vec<_> = mea_cols_str.iter().map(|col| col[i].clone()).collect();
+            let mea_cols_int_values = mea_cols_int.iter().map(|col| col[i]);
+            let mea_cols_flt_values = mea_cols_flt.iter().map(|col| col[i]);
+            let mea_cols_str_values = mea_cols_str.iter().map(|col| col[i].clone());
 
             let measures = agg_state.entry(dim_members)
                 .or_insert(AggMeaCols::new(
@@ -183,14 +183,14 @@ impl Table {
 
             // for now sum aggregation is hardcoded
             // lazy, str will just take last str value
-            for (i, agg_value) in measures.mea_cols_int.iter_mut().enumerate() {
-                *agg_value += mea_cols_int_values[i];
+            for (agg_value, row_value) in measures.mea_cols_int.iter_mut().zip(mea_cols_int_values) {
+                *agg_value += row_value;
             }
-            for (i, agg_value) in measures.mea_cols_flt.iter_mut().enumerate() {
-                *agg_value += mea_cols_flt_values[i];
+            for (agg_value, row_value) in measures.mea_cols_flt.iter_mut().zip(mea_cols_flt_values) {
+                *agg_value += row_value;
             }
-            for (i, agg_value) in measures.mea_cols_str.iter_mut().enumerate() {
-                *agg_value = mea_cols_str_values[i].clone();
+            for (agg_value, row_value) in measures.mea_cols_str.iter_mut().zip(mea_cols_str_values) {
+                *agg_value = row_value;
             }
         }
 

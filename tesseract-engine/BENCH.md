@@ -19,3 +19,10 @@ real 0.20
 user 0.00
 sys 0.00
 ```
+
+08/13/2018
+Removed some allocations in memory-naive in the hot loop.
+```
+execute query: 1.933
+```
+30% improvement
