@@ -130,7 +130,7 @@ impl Table {
                 }
             })
             .collect();
-        println!("{:?}", dim_cols);
+        // println!("{:?}", dim_cols);
 
         let mea_cols_int: Vec<_> = self.mea_cols_int.iter()
             .filter_map(|(col_name, col)| {
@@ -194,7 +194,7 @@ impl Table {
             }
         }
 
-        println!("{:?}", agg_state);
+        // println!("{:?}", agg_state);
 
         let mut wtr = csv::WriterBuilder::new()
             .has_headers(false)
