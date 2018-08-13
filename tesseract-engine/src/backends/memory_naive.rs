@@ -118,7 +118,7 @@ impl Table {
         Ok(())
     }
 
-    pub fn execute_query(&self, query: &Query) -> Result<QueryResult, Error> {
+    pub fn execute_query(&self, query: &Query) -> Result<String, Error> {
         // gather all cols in drilldowns and cuts
 
         let dim_cols: Vec<_> = self.dim_cols_int.iter()
@@ -196,100 +196,30 @@ impl Table {
 
         println!("{:?}", agg_state);
 
-        let mut query_res = QueryResult {
-            dim_cols_int: indexmap!{},
-            mea_cols_int: indexmap!{},
-            mea_cols_flt: indexmap!{},
-            mea_cols_str: indexmap!{},
-        };
-
-        // initialize query result with col names
-
-        let dim_col_names: Vec<_> = self.dim_cols_int.keys()
-            .filter_map(|col_name| {
-                if query.drilldowns.contains(col_name) {
-                    Some(col_name)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let mea_col_names_int: Vec<_> = self.mea_cols_int.keys()
-            .filter_map(|col_name| {
-                if query.measures.contains(col_name) {
-                    Some(col_name)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let mea_col_names_flt: Vec<_> = self.mea_cols_flt.keys()
-            .filter_map(|col_name| {
-                if query.measures.contains(col_name) {
-                    Some(col_name)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let mea_col_names_str: Vec<_> = self.mea_cols_str.keys()
-            .filter_map(|col_name| {
-                if query.measures.contains(col_name) {
-                    Some(col_name)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        for col in dim_col_names {
-            query_res.dim_cols_int.insert(col.to_owned(), vec![]);
+        let mut wtr = csv::WriterBuilder::new()
+            .has_headers(false)
+            .from_writer(vec![]);
+        for (dims, meas) in agg_state.iter() {
+            let csv_row = CsvRow {
+                dim_index: dims,
+                measures: meas,
+            };
+            wtr.serialize(csv_row)?;
         }
-        for col in mea_col_names_int {
-            query_res.mea_cols_int.insert(col.to_owned(), vec![]);
-        }
-        for col in mea_col_names_flt {
-            query_res.mea_cols_flt.insert(col.to_owned(), vec![]);
-        }
-        for col in mea_col_names_str {
-            query_res.mea_cols_str.insert(col.to_owned(), vec![]);
-        }
+        let res = String::from_utf8(wtr.into_inner()?)?;
 
-        // put in results
-        // First dimesions
-        for (dim_members, agg_values) in agg_state.iter() {
-            for (i, member) in dim_members.iter().enumerate() {
-                let (_, res_values) = query_res.dim_cols_int.get_index_mut(i)
-                    .ok_or(format_err!("no result column found!"))?;
-                res_values.push(member.clone());
-            }
-
-            for (i, agg_value) in agg_values.mea_cols_int.iter().enumerate() {
-                let (_, res_values) = query_res.mea_cols_int.get_index_mut(i)
-                    .ok_or(format_err!("no result column found!"))?;
-                res_values.push(agg_value.clone());
-            }
-            //START HERE do flt and str, the test
-            for (i, agg_value) in agg_values.mea_cols_flt.iter().enumerate() {
-                let (_, res_values) = query_res.mea_cols_flt.get_index_mut(i)
-                    .ok_or(format_err!("no result column found!"))?;
-                res_values.push(agg_value.clone());
-            }
-            for (i, agg_value) in agg_values.mea_cols_str.iter().enumerate() {
-                let (_, res_values) = query_res.mea_cols_str.get_index_mut(i)
-                    .ok_or(format_err!("no result column found!"))?;
-                res_values.push(agg_value.clone());
-            }
-        }
-
-        Ok(query_res)
+        Ok(res)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+struct CsvRow<'a> {
+    dim_index: &'a[usize],
+    measures: &'a AggMeaCols,
+}
+
+
+#[derive(Debug, Serialize)]
 struct AggMeaCols {
     pub mea_cols_int: Vec<isize>,
     pub mea_cols_flt: Vec<f64>,
@@ -349,10 +279,12 @@ mod test {
         table.import_csv(test_csv).unwrap();
         println!("{:?}", table);
 
-        table.execute_query(&Query {
+        let res = table.execute_query(&Query {
             drilldowns: vec!["dim_0".to_owned(), "dim_1".to_owned()],
             measures: vec!["mea_0".to_owned(), "mea_1".to_owned()],
         }).unwrap();
+
+        println!("{}", res);
 
         panic!();
     }
