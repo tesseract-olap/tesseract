@@ -2,4 +2,5 @@
 members = [
     "tesseract-server",
     "tesseract-engine",
+    "data-gen"
 ]
