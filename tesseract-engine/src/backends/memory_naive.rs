@@ -2,7 +2,7 @@ use csv;
 use failure::Error;
 use indexmap::IndexMap;
 
-use query::{Query, QueryResult};
+use query::BackendQuery;
 
 // basic in-memory engine
 // just stores vecs of strings
@@ -118,7 +118,7 @@ impl Table {
         Ok(())
     }
 
-    pub fn execute_query(&self, query: &Query) -> Result<String, Error> {
+    pub fn execute_query(&self, query: &BackendQuery) -> Result<String, Error> {
         // gather all cols in drilldowns and cuts
 
         let dim_cols: Vec<_> = self.dim_cols_int.iter()
@@ -279,7 +279,7 @@ mod test {
         table.import_csv(test_csv).unwrap();
         println!("{:?}", table);
 
-        let res = table.execute_query(&Query {
+        let res = table.execute_query(&BackendQuery {
             drilldowns: vec!["dim_0".to_owned(), "dim_1".to_owned()],
             measures: vec!["mea_0".to_owned(), "mea_1".to_owned()],
         }).unwrap();

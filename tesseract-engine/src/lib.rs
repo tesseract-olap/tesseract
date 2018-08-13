@@ -8,10 +8,10 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-mod backends;
+pub mod backends;
 mod schema;
 mod schema_config;
-mod query;
+pub mod query;
 
 use failure::Error;
 
