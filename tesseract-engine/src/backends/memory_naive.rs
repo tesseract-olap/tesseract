@@ -1,6 +1,7 @@
 use csv;
 use failure::Error;
 use indexmap::IndexMap;
+use xxhash2;
 
 use query::BackendQuery;
 
@@ -162,19 +163,21 @@ impl Table {
             })
             .collect();
 
-        let mut agg_state: IndexMap<Vec<usize>, AggMeaCols> = indexmap!{};
+        let mut agg_state: IndexMap<u64, AggCols> = indexmap!{};
 
         // guts
         // change to fold?
         for i in 0..self.col_len {
             let dim_members: Vec<_> = dim_cols.iter().map(|col| col[i]).collect();
+            let dim_hash = xxhash2::hash64(as_u8_slice(&dim_members), 0);
 
             let mea_cols_int_values = mea_cols_int.iter().map(|col| col[i]);
             let mea_cols_flt_values = mea_cols_flt.iter().map(|col| col[i]);
             let mea_cols_str_values = mea_cols_str.iter().map(|col| col[i].clone());
 
-            let measures = agg_state.entry(dim_members)
-                .or_insert(AggMeaCols::new(
+            let measures = agg_state.entry(dim_hash)
+                .or_insert(AggCols::new(
+                    dim_members,
                     mea_cols_int_values.len(),
                     mea_cols_flt_values.len(),
                     mea_cols_str_values.len(),
@@ -199,12 +202,8 @@ impl Table {
         let mut wtr = csv::WriterBuilder::new()
             .has_headers(false)
             .from_writer(vec![]);
-        for (dims, meas) in agg_state.iter() {
-            let csv_row = CsvRow {
-                dim_index: dims,
-                measures: meas,
-            };
-            wtr.serialize(csv_row)?;
+        for row in agg_state.values() {
+            wtr.serialize(row)?;
         }
         let res = String::from_utf8(wtr.into_inner()?)?;
 
@@ -215,29 +214,41 @@ impl Table {
 #[derive(Debug, Serialize)]
 struct CsvRow<'a> {
     dim_index: &'a[usize],
-    measures: &'a AggMeaCols,
+    measures: &'a AggCols,
 }
 
 
 #[derive(Debug, Serialize)]
-struct AggMeaCols {
+struct AggCols {
+    pub dim_members: Vec<usize>,
     pub mea_cols_int: Vec<isize>,
     pub mea_cols_flt: Vec<f64>,
     pub mea_cols_str: Vec<String>,
 }
 
-impl AggMeaCols {
+impl AggCols {
     // this initialization is for sum!
     pub fn new(
+        dim_members: Vec<usize>,
         mea_cols_int_len: usize,
         mea_cols_flt_len: usize,
         mea_cols_str_len: usize,
     ) -> Self {
-        AggMeaCols {
+        AggCols {
+            dim_members: dim_members,
             mea_cols_int: vec![0; mea_cols_int_len],
             mea_cols_flt: vec![0.; mea_cols_flt_len],
             mea_cols_str: vec!["".to_owned(); mea_cols_str_len],
         }
+    }
+}
+
+fn as_u8_slice(v: &[usize]) -> &[u8] {
+    unsafe {
+        ::std::slice::from_raw_parts(
+            v.as_ptr() as *const u8,
+            v.len() * ::std::mem::size_of::<usize>(),
+        )
     }
 }
 
