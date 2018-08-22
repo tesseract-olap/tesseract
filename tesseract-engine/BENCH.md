@@ -35,3 +35,5 @@ execute query: 0.219
 On par with monetdb! And when I did the bit-packing incorrectly, the aggregation vecs were even smaller, and the execution time was in the area of 0.15s. This leads me to believe that using dictionary encoding for the dims (to ensure that the dim members are very small, resulting in smaller bit-packed indexes) would result in queries faster than Monetdb.
 
 Next goal: 0.050s in locustdb! How much of that is because of parallelism (would easily explain 3x performance), and how much is compression?
+
+Also, note that peak memory usage is about 920MB on a 285MB data set. This can probably be improved with compression.
