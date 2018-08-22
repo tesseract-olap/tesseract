@@ -1,7 +1,6 @@
 use csv;
 use failure::Error;
-use indexmap::IndexMap;
-use xxhash2;
+use indexmap::{IndexMap, IndexSet};
 
 use query::BackendQuery;
 
@@ -163,46 +162,105 @@ impl Table {
             })
             .collect();
 
-        let mut agg_state: IndexMap<u64, AggCols> = indexmap!{};
+        // create bit-packed "index"
+        let dim_col_widths: Vec<usize> = dim_cols.iter()
+            .map(|col| (*col.iter().max().unwrap() as f64).log2().ceil() as usize)
+            .collect();
 
-        // guts
-        // change to fold?
+        println!("{:?}", dim_col_widths);
+
+        let mut dim_index: Vec<usize> = Vec::new();
         for i in 0..self.col_len {
-            let dim_members: Vec<_> = dim_cols.iter().map(|col| col[i]).collect();
-            let dim_hash = xxhash2::hash64(as_u8_slice(&dim_members), 0);
+            let mut dim_cols = dim_cols.iter();
+            let mut dim_packed_idx = dim_cols.next().unwrap()[i];
 
-            let mea_cols_int_values = mea_cols_int.iter().map(|col| col[i]);
-            let mea_cols_flt_values = mea_cols_flt.iter().map(|col| col[i]);
-            let mea_cols_str_values = mea_cols_str.iter().map(|col| col[i].clone());
-
-            let measures = agg_state.entry(dim_hash)
-                .or_insert(AggCols::new(
-                    dim_members,
-                    mea_cols_int_values.len(),
-                    mea_cols_flt_values.len(),
-                    mea_cols_str_values.len(),
-                ));
-
-
-            // for now sum aggregation is hardcoded
-            // lazy, str will just take last str value
-            for (agg_value, row_value) in measures.mea_cols_int.iter_mut().zip(mea_cols_int_values) {
-                *agg_value += row_value;
+            for (dim_col, shift) in dim_cols.zip(&dim_col_widths) {
+                ////println!("{}, {}, {}", dim_packed_idx, dim_col[i], shift);
+                dim_packed_idx += dim_col[i] << shift;
+                //println!("{}", dim_packed_idx);
             }
-            for (agg_value, row_value) in measures.mea_cols_flt.iter_mut().zip(mea_cols_flt_values) {
-                *agg_value += row_value;
-            }
-            for (agg_value, row_value) in measures.mea_cols_str.iter_mut().zip(mea_cols_str_values) {
-                *agg_value = row_value;
-            }
+            dim_index.push(dim_packed_idx);
         }
 
-        // println!("{:?}", agg_state);
+        // This is used to construct the max size of the aggregate
+        // buffer
+        // If no max, return error
+        let max_group_idx = dim_index.iter()
+            .max()
+            .ok_or(format_err!("no max?"))?;
 
+        let mut agg_state = AggState::new();
+
+        // guts
+        for col in mea_cols_int {
+            let mut cnt_buffer = vec![0; max_group_idx + 1];
+            let mut agg_buffer = vec![0; max_group_idx + 1];
+            for (i,j) in dim_index.iter().enumerate() {
+                agg_buffer[*j] += col[i];
+                cnt_buffer[*j] += 1;
+            }
+            agg_state.mea_cols_int.push(agg_buffer);
+            agg_state.cnt_cols_int.push(cnt_buffer);
+        }
+
+        for col in mea_cols_flt {
+            let mut cnt_buffer = vec![0; max_group_idx + 1];
+            let mut agg_buffer = vec![0.; max_group_idx + 1];
+            for (i,j) in dim_index.iter().enumerate() {
+                agg_buffer[*j] += col[i];
+                cnt_buffer[*j] += 1;
+            }
+            agg_state.mea_cols_flt.push(agg_buffer);
+            agg_state.cnt_cols_flt.push(cnt_buffer);
+        }
+
+        // store dims that had a count (intersected with measure)
+        // Does not return null count dims
+        // currently hardcoded to int col 0,
+        // but should do an |
+        let dims_materialized: Vec<_> = agg_state.cnt_cols_int[0].iter()
+            .enumerate()
+            .filter_map(|(i, n)| if *n > 0 { Some(i) } else { None } )
+            .collect();
+
+        // now materialize tuples and write to csv
         let mut wtr = csv::WriterBuilder::new()
             .has_headers(false)
             .from_writer(vec![]);
-        for row in agg_state.values() {
+
+        // unpack.
+        let dim_col_masks: Vec<_> = dim_col_widths.iter()
+            .map(|width| (0..*width).map(|x| 2usize.pow(x as u32)).sum::<usize>())
+            .collect();
+
+        println!("{:?}", dim_col_widths);
+        println!("{:?}", dim_col_masks);
+
+        for dim_packed_idx in dims_materialized {
+            let mea_int = agg_state.mea_cols_int.iter()
+                .map(|col| col[dim_packed_idx])
+                .collect();
+            let mea_flt = agg_state.mea_cols_flt.iter()
+                .map(|col| col[dim_packed_idx])
+                .collect();
+            let mea_str = agg_state.mea_cols_str.iter()
+                .map(|col| col[dim_packed_idx].to_owned())
+                .collect();
+
+            let mut dim_index = Vec::new();
+            let mut shift = 0;
+            for (width, mask) in dim_col_widths.iter().zip(&dim_col_masks) {
+                dim_index.push((dim_packed_idx >> shift) & mask);
+                shift = *width;
+            }
+
+            let row = CsvRow {
+                dim_index,
+                mea_int,
+                mea_flt,
+                mea_str,
+            };
+
             wtr.serialize(row)?;
         }
         let res = String::from_utf8(wtr.into_inner()?)?;
@@ -212,43 +270,36 @@ impl Table {
 }
 
 #[derive(Debug, Serialize)]
-struct CsvRow<'a> {
-    dim_index: &'a[usize],
-    measures: &'a AggCols,
+struct CsvRow {
+    dim_index: Vec<usize>,
+    mea_int: Vec<isize>,
+    mea_flt: Vec<f64>,
+    mea_str: Vec<String>,
 }
 
 
 #[derive(Debug, Serialize)]
-struct AggCols {
-    pub dim_members: Vec<usize>,
-    pub mea_cols_int: Vec<isize>,
-    pub mea_cols_flt: Vec<f64>,
-    pub mea_cols_str: Vec<String>,
+struct AggState {
+    // hack for counting, should be one per agg col
+    pub mea_cols_int: Vec<Vec<isize>>,
+    pub mea_cols_flt: Vec<Vec<f64>>,
+    pub mea_cols_str: Vec<Vec<String>>,
+    pub cnt_cols_int: Vec<Vec<usize>>,
+    pub cnt_cols_flt: Vec<Vec<usize>>,
+    pub cnt_cols_str: Vec<Vec<usize>>,
 }
 
-impl AggCols {
+impl AggState {
     // this initialization is for sum!
-    pub fn new(
-        dim_members: Vec<usize>,
-        mea_cols_int_len: usize,
-        mea_cols_flt_len: usize,
-        mea_cols_str_len: usize,
-    ) -> Self {
-        AggCols {
-            dim_members: dim_members,
-            mea_cols_int: vec![0; mea_cols_int_len],
-            mea_cols_flt: vec![0.; mea_cols_flt_len],
-            mea_cols_str: vec!["".to_owned(); mea_cols_str_len],
+    pub fn new() -> Self {
+        AggState {
+            mea_cols_int: vec![],
+            mea_cols_flt: vec![],
+            mea_cols_str: vec![],
+            cnt_cols_int: vec![],
+            cnt_cols_flt: vec![],
+            cnt_cols_str: vec![],
         }
-    }
-}
-
-fn as_u8_slice(v: &[usize]) -> &[u8] {
-    unsafe {
-        ::std::slice::from_raw_parts(
-            v.as_ptr() as *const u8,
-            v.len() * ::std::mem::size_of::<usize>(),
-        )
     }
 }
 
