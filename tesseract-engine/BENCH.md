@@ -26,3 +26,12 @@ Removed some allocations in memory-naive in the hot loop.
 execute query: 1.933
 ```
 30% improvement
+
+08/22/2018
+Changed aggregation from hashmap to vecs indexed by bit-packed dim index.
+
+execute query: 0.219
+
+On par with monetdb! And when I did the bit-packing incorrectly, the aggregation vecs were even smaller, and the execution time was in the area of 0.15s. This leads me to believe that using dictionary encoding for the dims (to ensure that the dim members are very small, resulting in smaller bit-packed indexes) would result in queries faster than Monetdb.
+
+Next goal: 0.050s in locustdb! How much of that is because of parallelism (would easily explain 3x performance), and how much is compression?
