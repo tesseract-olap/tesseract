@@ -9,7 +9,7 @@ use failure::Error;
 use std::fs;
 use std::time;
 use tesseract_engine::{
-    backends::memory_naive::Table,
+    backends::columnar::ColumnarTable,
     query::BackendQuery,
 };
 
@@ -18,7 +18,7 @@ fn main() -> Result<(), Error> {
     let test_data_path = "test-data.csv";
 
     let test_schema = fs::read_to_string(test_schema_path)?;
-    let mut table = Table::create(&test_schema).unwrap();
+    let mut table = ColumnarTable::create(&test_schema).unwrap();
     println!("{:?}\n", table);
 
     let now = time::Instant::now();

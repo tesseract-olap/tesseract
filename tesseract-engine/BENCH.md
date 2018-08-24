@@ -37,3 +37,10 @@ On par with monetdb! And when I did the bit-packing incorrectly, the aggregation
 Next goal: 0.050s in locustdb! How much of that is because of parallelism (would easily explain 3x performance), and how much is compression?
 
 Also, note that peak memory usage is about 920MB on a 285MB data set. This can probably be improved with compression.
+
+08/23/2018
+Added dictionary encoding to dims.
+
+execute query: 0.168 thereabouts. ingest time went from about 6s to 9s.
+
+at least 23% decrease in execution time.

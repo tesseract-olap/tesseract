@@ -4,39 +4,27 @@ use indexmap::{IndexMap, IndexSet};
 
 use query::BackendQuery;
 
-// basic in-memory engine
-// just stores vecs of strings
-// It's slow, but doesn't matter
-// This is just for testing out queries
-// without having to generate sql
 #[derive(Debug)]
-pub struct MemoryNaive {
-    tables: Vec<Table>,
-}
-
-impl MemoryNaive {
-    pub fn new() -> Self {
-        MemoryNaive {
-            tables: vec![],
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Table {
+pub struct ColumnarTable {
     name: String,
-    dim_cols_int: IndexMap<String, Vec<usize>>,
+
+    // an empty vec indicates that there's no
+    // dictionary encoding
+    dim_cols: IndexMap<String, Vec<usize>>,
+    dim_dictionary_encodings: IndexMap<String, Vec<usize>>,
+
     mea_cols_int: IndexMap<String, Vec<isize>>,
     mea_cols_flt: IndexMap<String, Vec<f64>>,
     mea_cols_str: IndexMap<String, Vec<String>>,
     col_len: usize,
 }
 
-impl Table {
+impl ColumnarTable {
     pub fn create(table_schema: &str) -> Result<Self, Error> {
-        let mut table = Table {
+        let mut table = ColumnarTable {
             name: "".to_owned(),
-            dim_cols_int: indexmap!{},
+            dim_cols: indexmap!{},
+            dim_dictionary_encodings: indexmap!{},
             mea_cols_int: indexmap!{},
             mea_cols_flt: indexmap!{},
             mea_cols_str: indexmap!{},
@@ -59,7 +47,7 @@ impl Table {
                     if !col_names.insert(name.to_owned()) {
                         bail!("{:?} already exists in table");
                     }
-                    let col = table.dim_cols_int.entry((*name).to_owned()).or_insert(vec![]);
+                    let col = table.dim_cols.entry((*name).to_owned()).or_insert(vec![]);
                 },
                 ["mea", name, "int"] => {
                     if !col_names.insert(name) {
@@ -99,7 +87,7 @@ impl Table {
             let record = result?;
             for (i, field) in record.into_iter().enumerate() {
                 // match col name and insert
-                if let Some(col) = self.dim_cols_int.get_mut(&header[i]) {
+                if let Some(col) = self.dim_cols.get_mut(&header[i]) {
                     col.push(field.parse()?);
                 } else if let Some(col) = self.mea_cols_int.get_mut(&header[i]) {
                     col.push(field.parse()?);
@@ -115,13 +103,45 @@ impl Table {
 
         self.col_len = records_len;
 
+        self.dictionary_encode_dims();
+
         Ok(())
+    }
+
+    fn dictionary_encode_dims(&mut self) {
+        for (col_name, mut dim_col) in self.dim_cols.iter_mut() {
+            // first create dimension members set
+            let mut dim_member_set = indexset!{};
+            for member in dim_col.iter() {
+                dim_member_set.insert(member.clone());
+            }
+            //println!("{:?}", dim_member_set);
+
+            // Then map (reverse map) from value to index in the dim_col
+            *dim_col = dim_col.into_iter()
+                .map(|member| {
+                    if let Some((i, _)) = dim_member_set.get_full(member) {
+                        i
+                    } else {
+                        // this would be a logic bug, since the member set
+                        // was just constructed from the dim col
+                        panic!("logic bug");
+                    }
+                }).collect();
+
+            // finally create a map from the index to the value
+            // as an indexable vector
+            self.dim_dictionary_encodings.insert(
+                col_name.clone(),
+                dim_member_set.into_iter().collect::<Vec<_>>(),
+            );
+        }
     }
 
     pub fn execute_query(&self, query: &BackendQuery) -> Result<String, Error> {
         // gather all cols in drilldowns and cuts
 
-        let dim_cols: Vec<_> = self.dim_cols_int.iter()
+        let dim_cols: Vec<_> = self.dim_cols.iter()
             .filter_map(|(col_name, col)| {
                 if query.drilldowns.contains(col_name) {
                     Some(col)
@@ -131,6 +151,15 @@ impl Table {
             })
             .collect();
         // println!("{:?}", dim_cols);
+        let dim_encodings: Vec<_> = self.dim_dictionary_encodings.iter()
+            .filter_map(|(col_name, col)| {
+                if query.drilldowns.contains(col_name) {
+                    Some(col)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let mea_cols_int: Vec<_> = self.mea_cols_int.iter()
             .filter_map(|(col_name, col)| {
@@ -164,7 +193,7 @@ impl Table {
 
         // create bit-packed "index"
         let dim_col_widths: Vec<usize> = dim_cols.iter()
-            .map(|col| (*col.iter().max().unwrap() as f64).log2().ceil() as usize)
+            .map(|col| (*col.iter().max().unwrap() as f64).log2().floor() as usize + 1)
             .collect();
 
         println!("{:?}", dim_col_widths);
@@ -233,8 +262,8 @@ impl Table {
             .map(|width| (0..*width).map(|x| 2usize.pow(x as u32)).sum::<usize>())
             .collect();
 
-        println!("{:?}", dim_col_widths);
-        println!("{:?}", dim_col_masks);
+        //println!("{:?}", dim_col_widths);
+        //println!("{:?}", dim_col_masks);
 
         for dim_packed_idx in dims_materialized {
             let mea_int = agg_state.mea_cols_int.iter()
@@ -252,6 +281,14 @@ impl Table {
             for (width, mask) in dim_col_widths.iter().zip(&dim_col_masks) {
                 dim_index.push((dim_packed_idx >> shift) & mask);
                 shift = *width;
+            }
+            //println!("{:?}, {:?}", dim_packed_idx, dim_index);
+
+            // hack, unencode here. Performance hit if there's lots of rows
+            for (i, mut encoded_member) in dim_index.iter_mut().enumerate() {
+                if dim_encodings[i].len() > 0 {
+                    *encoded_member = dim_encodings[i][*encoded_member];
+                }
             }
 
             let row = CsvRow {
