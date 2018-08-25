@@ -46,3 +46,10 @@ execute query: 0.168 thereabouts. ingest time went from about 6s to 9s.
 at least 23% decrease in execution time.
 
 Oops my benchmarks was off. Monetdb is in the 0.14s range, locustdb is in the 0.027s range.
+
+08/23/2018
+upped the table size. It's now 52.6million rows.
+
+locustdb is .142s
+monetdb is .57s
+tesseract is .604s (single threaded!)

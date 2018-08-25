@@ -6,6 +6,7 @@ extern crate failure;
 extern crate tesseract_engine;
 
 use failure::Error;
+use std::env;
 use std::fs;
 use std::time;
 use tesseract_engine::{
@@ -14,8 +15,9 @@ use tesseract_engine::{
 };
 
 fn main() -> Result<(), Error> {
-    let test_schema_path = "test-data.sql";
-    let test_data_path = "test-data.csv";
+    let table_name = env::args().nth(1).expect("please enter table name");
+    let test_schema_path = table_name.clone() + ".sql";
+    let test_data_path = table_name.clone() + ".csv";
 
     let test_schema = fs::read_to_string(test_schema_path)?;
     let mut table = ColumnarTable::create(&test_schema).unwrap();
@@ -27,15 +29,17 @@ fn main() -> Result<(), Error> {
     let end = now.elapsed();
     println!("import csv: {}.{}", end.as_secs(), end.subsec_millis());
 
-    let now = time::Instant::now();
-    let res = table.execute_query(&BackendQuery {
-        drilldowns: vec!["year".to_owned(), "age".to_owned()],
-        measures: vec!["population".to_owned()],
-    }).unwrap();
-    let end = now.elapsed();
+    for _ in 0..5 {
+        let now = time::Instant::now();
+        let res = table.execute_query(&BackendQuery {
+            drilldowns: vec!["year".to_owned(), "age".to_owned()],
+            measures: vec!["population".to_owned()],
+        }).unwrap();
+        let end = now.elapsed();
 
-    println!("{}", res);
-    println!("execute query: {}.{}", end.as_secs(), end.subsec_millis());
+        println!("{}", res);
+        println!("execute query: {}.{}", end.as_secs(), end.subsec_millis());
+    }
 
     Ok(())
 }
