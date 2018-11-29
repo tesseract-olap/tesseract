@@ -2,23 +2,15 @@
 authors = ["Walther Chen <walther.chen@gmail.com>"]
 name = "tesseract"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
-envy = "0.3.2"
 failure = "0.1.2"
-lazy_static = "1.1.0"
 log = "0.4.3"
 pretty_env_logger = "0.2.4"
 serde = "1.0.70"
 serde_derive = "1.0.70"
 serde_json = "1.0.24"
 serde_qs = "0.4.1"
-tesseract-engine = { path = "../tesseract-engine" }
-warp = "0.1.0"
+tesseract-core = { path = "../tesseract-core" }
 
-[patch]
-
-[patch.crates-io]
-
-[patch.crates-io.warp]
-git  = "https://github.com/seanmonstar/warp"

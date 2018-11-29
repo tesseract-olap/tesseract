@@ -1,6 +1,7 @@
+use serde_derive::Serialize;
 use std::convert::From;
 
-use ::schema_config::{
+use crate::schema_config::{
     SchemaConfig,
     DimensionConfig,
     HierarchyConfig,

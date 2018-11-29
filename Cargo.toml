@@ -1,6 +1,6 @@
 [workspace]
 members = [
+    "tesseract-core",
     "tesseract-server",
-    "tesseract-engine",
     "data-gen"
 ]

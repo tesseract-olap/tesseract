@@ -1,11 +1,11 @@
-# 1.0 milestone
-- in-memory backend (naive, maybe not even using arrow)
-- query api
-- query executor
-- figure out how to handle requests: async with cpu pool threads, etc. And how this will interact with rest server.
-- schema validations
+# Prototype goal:
+The goal is to show low latency and high concurrency.
+So, my goal is to take one profile (about 100 concurrent requests) and show better performance. Should be pretty easy, even using postgres.
 
-# Schema additions
+- need to be able to read in xml schemas.
+- need same api as previous mondrian. `/cubes`
+
+# Schema additions?
 - add table to hierarchy and cube
 - add validation layer, after doing the basic conversion? This way it's easier to track errors, and not do add-hoc conversion and error-checking at the same time.
 - check that hierarchy names don't have duplicates (Error: Duplicate name {}, which may be a result of falling back to default name for multiple non-named hierarchies)

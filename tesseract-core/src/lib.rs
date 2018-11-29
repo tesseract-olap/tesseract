@@ -1,22 +1,11 @@
-extern crate csv;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate indexmap;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-
-pub mod backends;
 mod schema;
 mod schema_config;
 pub mod query;
 
 use failure::Error;
 
-use schema::Schema;
-use schema_config::SchemaConfig;
+use self::schema::Schema;
+use self::schema_config::SchemaConfig;
 
 #[derive(Debug, Clone)]
 pub struct TesseractEngine {
