@@ -11,11 +11,57 @@
 ///
 /// Backend trait: exec() takes in a sql string, outputs a dataframe.
 
-use failure::Error;
+mod app;
+mod handlers;
+
+use actix::Addr;
+use actix_web::server;
+use clickhouse_rs::Options as ChOptions;
+use dotenv::dotenv;
+use failure::{Error, format_err};
+use std::env;
+use structopt::StructOpt;
 
 fn main() -> Result<(), Error> {
-    println!("hello tesseract");
+    // Configuration
+
+    pretty_env_logger::init();
+    dotenv().ok();
+    let opt = Opt::from_args();
+
+    let server_addr = opt.address.unwrap_or("127.0.0.1:8888".to_owned());
+    let clickhouse_db_url = env::var("CLICKHOUSE_DATABASE_URL")
+        .or(opt.clickhouse_db_url.ok_or(format_err!("")))
+        .expect("No Clickhouse DB url found");
+
+    // Initialize Clickhouse
+    let ch_options = ChOptions::new(
+        clickhouse_db_url
+            .parse()
+            .expect("Could not parse CH db url")
+    );
+
+    // Initialize Server
+    let sys = actix::System::new("tesseract");
+    server::new(move|| app::create_app(ch_options.clone()))
+        .bind(&server_addr)
+        .expect(&format!("cannot bind to {}", server_addr))
+        .start();
+
+    println!("Tesseract listening on {}", server_addr);
+
+    sys.run();
+
     Ok(())
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(name="tesseract")]
+struct Opt {
+    #[structopt(short="a", long="addr")]
+    address: Option<String>,
+    #[structopt(long="clickhouse-url")]
+    clickhouse_db_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
