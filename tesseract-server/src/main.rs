@@ -14,7 +14,6 @@
 mod app;
 mod handlers;
 
-use actix::Addr;
 use actix_web::server;
 use clickhouse_rs::Options as ChOptions;
 use dotenv::dotenv;
@@ -29,7 +28,7 @@ fn main() -> Result<(), Error> {
     dotenv().ok();
     let opt = Opt::from_args();
 
-    let server_addr = opt.address.unwrap_or("127.0.0.1:8888".to_owned());
+    let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
     let clickhouse_db_url = env::var("CLICKHOUSE_DATABASE_URL")
         .or(opt.clickhouse_db_url.ok_or(format_err!("")))
         .expect("No Clickhouse DB url found");
@@ -40,6 +39,7 @@ fn main() -> Result<(), Error> {
             .parse()
             .expect("Could not parse CH db url")
     );
+    //let ch_options = ch_options.username("tester");
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
