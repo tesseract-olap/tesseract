@@ -34,19 +34,23 @@ impl From<SchemaConfig> for Schema {
                 .collect();
 
             // special case: check for dimension_usages
-            for dim_usage in cube_config.dimension_usages {
-                for shared_dim_config in &schema_config.shared_dimensions {
-                    if dim_usage.name == shared_dim_config.name {
-                        let hierarchies = shared_dim_config.hierarchies.iter()
-                            .map(|h| h.clone().into())
-                            .collect();
+            if let Some(dim_usages) = cube_config.dimension_usages {
+                for dim_usage in dim_usages {
+                    if let Some(ref shared_dims) = schema_config.shared_dimensions {
+                        for shared_dim_config in shared_dims {
+                            if dim_usage.name == shared_dim_config.name {
+                                let hierarchies = shared_dim_config.hierarchies.iter()
+                                    .map(|h| h.clone().into())
+                                    .collect();
 
-                        dimensions.push(Dimension {
-                            name: shared_dim_config.name.clone(),
-                            foreign_key: dim_usage.foreign_key.clone(),
-                            hierarchies: hierarchies,
+                                dimensions.push(Dimension {
+                                    name: shared_dim_config.name.clone(),
+                                    foreign_key: Some(dim_usage.foreign_key.clone()),
+                                    hierarchies: hierarchies,
 
-                        });
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -79,7 +83,7 @@ pub struct Cube {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Dimension {
     pub name: String,
-    pub foreign_key: String,
+    pub foreign_key: Option<String>,
     pub hierarchies: Vec<Hierarchy>,
 }
 
@@ -100,7 +104,7 @@ impl From<DimensionConfig> for Dimension {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Hierarchy {
     pub name: String,
-    pub table: Table,
+    pub table: Option<Table>,
     pub primary_key: String,
     pub levels: Vec<Level>,
 }
@@ -122,7 +126,7 @@ impl From<HierarchyConfig> for Hierarchy {
 
         Hierarchy {
             name: hierarchy_config.name,
-            table: hierarchy_config.table.into(),
+            table: hierarchy_config.table.map(|t| t.into()),
             primary_key: primary_key,
             levels: levels,
         }
@@ -133,7 +137,7 @@ impl From<HierarchyConfig> for Hierarchy {
 pub struct Level {
     pub name: String,
     pub key_column: String,
-    pub name_column: String,
+    pub name_column: Option<String>,
 }
 
 impl From<LevelConfig> for Level {
@@ -164,7 +168,7 @@ impl From<MeasureConfig> for Measure {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Table{
     pub name: String,
-    pub schema: String,
+    pub schema: Option<String>,
 }
 
 impl From<TableConfig> for Table {
