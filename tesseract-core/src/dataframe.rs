@@ -8,11 +8,17 @@ impl DataFrame {
             columns: vec![],
         }
     }
+
+    pub fn from_vec(columns: Vec<Column>) -> Self {
+        DataFrame {
+            columns
+        }
+    }
 }
 
 pub struct Column {
-    name: String,
-    column_data: ColumnData,
+    pub name: String,
+    pub column_data: ColumnData,
 }
 
 impl Column {
@@ -21,6 +27,10 @@ impl Column {
             name,
             column_data,
         }
+    }
+
+    pub fn column_data(&mut self) ->&mut ColumnData {
+        &mut self.column_data
     }
 }
 
