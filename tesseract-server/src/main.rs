@@ -12,6 +12,7 @@
 /// Backend trait: exec() takes in a sql string, outputs a dataframe.
 
 mod app;
+mod clickhouse;
 mod handlers;
 
 use actix_web::server;
