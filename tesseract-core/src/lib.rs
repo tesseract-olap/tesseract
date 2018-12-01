@@ -6,7 +6,7 @@ mod query;
 use failure::Error;
 
 pub use self::dataframe::{DataFrame, Column, ColumnData};
-pub use self::schema::Schema;
+pub use self::schema::{Schema, Cube};
 use self::schema_config::SchemaConfig;
 pub use self::query::Query;
 
@@ -18,8 +18,11 @@ impl Schema {
         Ok(schema_config.into())
     }
 
-    pub fn cubes_metadata(&self) -> Schema {
-        self.clone()
+    pub fn cube_metadata(&self, cube_name: &str) -> Option<Cube> {
+        // Takes the first cube with the name.
+        // TODO we still have to check that the cube names are distinct
+        // before this.
+        self.cubes.iter().find(|c| c.name == cube_name).cloned()
     }
 
     pub fn sql_query(&self, query: &Query, db: &Database) -> String {
