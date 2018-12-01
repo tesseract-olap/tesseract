@@ -13,6 +13,7 @@ use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 
 use crate::app::AppState;
+use crate::clickhouse::block_to_df;
 
 pub fn aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
@@ -39,6 +40,10 @@ pub fn aggregate_handler(
         .from_err()
         .and_then(|(block, _)| {
             info!("Block: {:?}", block);
+
+            let df = block_to_df(block);
+            info!("DF: {:?}", df);
+
             Ok(HttpResponse::Ok().finish())
             //Ok(_) => Ok(HttpResponse::Ok().finish()),
             //Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
