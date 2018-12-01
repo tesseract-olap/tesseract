@@ -4,6 +4,7 @@ use actix_web::{
     App,
 };
 use clickhouse_rs:: Options as ChOptions;
+use tesseract_core::Schema;
 
 use crate::handlers::{
     index_handler,
@@ -12,10 +13,11 @@ use crate::handlers::{
 
 pub struct AppState {
     pub clickhouse_options: ChOptions,
+    pub schema: Schema,
 }
 
-pub fn create_app(clickhouse_options: ChOptions) -> App<AppState> {
-    App::with_state(AppState { clickhouse_options: clickhouse_options })
+pub fn create_app(clickhouse_options: ChOptions, schema: Schema) -> App<AppState> {
+    App::with_state(AppState { clickhouse_options, schema })
         .middleware(middleware::Logger::default())
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)

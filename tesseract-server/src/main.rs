@@ -22,6 +22,8 @@ use failure::{Error, format_err};
 use std::env;
 use structopt::StructOpt;
 
+use tesseract_core::Schema;
+
 fn main() -> Result<(), Error> {
     // Configuration
 
@@ -33,6 +35,9 @@ fn main() -> Result<(), Error> {
     let clickhouse_db_url = env::var("CLICKHOUSE_DATABASE_URL")
         .or(opt.clickhouse_db_url.ok_or(format_err!("")))
         .expect("No Clickhouse DB url found");
+    let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
+        .clone()
+        .unwrap_or("schema.json".to_owned());
 
     // Initialize Clickhouse
     let ch_options = ChOptions::new(
@@ -40,16 +45,21 @@ fn main() -> Result<(), Error> {
             .parse()
             .expect("Could not parse CH db url")
     );
-    //let ch_options = ch_options.username("tester");
+
+    // Initialize Schema
+    let schema_str = std::fs::read_to_string(&schema_path)?;
+    let schema = Schema::from_json(&schema_str)?;
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(ch_options.clone()))
+    server::new(move|| app::create_app(ch_options.clone(), schema.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
 
-    println!("Tesseract listening on {}", server_addr);
+    println!("Tesseract listening on: {}", server_addr);
+    println!("Tesseract clickhouse:   {}", server_addr);
+    println!("Tesseract schema path:  {}", server_addr);
 
     sys.run();
 
