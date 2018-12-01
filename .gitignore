@@ -3,3 +3,4 @@
 .envrc
 .env
 bench-data
+test-schema
