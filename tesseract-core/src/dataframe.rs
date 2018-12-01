@@ -12,7 +12,12 @@ impl DataFrame {
     }
 }
 
-pub enum Column {
+pub struct Column {
+    name: String,
+    column_data: ColumnData,
+}
+
+pub enum ColumnData {
     Int8(Vec<i8>),
     Int16(Vec<i16>),
     Int32(Vec<i32>),
