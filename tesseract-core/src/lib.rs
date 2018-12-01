@@ -5,7 +5,7 @@ mod query;
 
 use failure::Error;
 
-pub use self::dataframe::{DataFrame, Column};
+pub use self::dataframe::{DataFrame, Column, ColumnData};
 pub use self::schema::Schema;
 use self::schema_config::SchemaConfig;
 pub use self::query::Query;
