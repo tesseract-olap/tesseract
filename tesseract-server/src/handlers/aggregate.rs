@@ -51,9 +51,3 @@ pub struct AggregateQueryOpt {
 //    sparse: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct FlushQueryOpt {
-    pub secret: String,
-}
-
-
