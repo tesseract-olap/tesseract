@@ -58,8 +58,8 @@ fn main() -> Result<(), Error> {
         .start();
 
     println!("Tesseract listening on: {}", server_addr);
-    println!("Tesseract clickhouse:   {}", server_addr);
-    println!("Tesseract schema path:  {}", server_addr);
+    println!("Tesseract clickhouse:   {}", clickhouse_db_url);
+    println!("Tesseract schema path:  {}", schema_path);
 
     sys.run();
 
