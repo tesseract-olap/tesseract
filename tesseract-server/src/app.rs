@@ -7,7 +7,7 @@ use clickhouse_rs:: Options as ChOptions;
 
 use crate::handlers::{
     index_handler,
-    test_handler,
+    aggregate_handler,
 };
 
 pub struct AppState {
@@ -20,7 +20,7 @@ pub fn create_app(clickhouse_options: ChOptions) -> App<AppState> {
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)
         })
-        .resource("/test/{schema}/{table}", |r| {
-            r.method(Method::GET).with(test_handler)
+        .resource("/cubes/{cube}/aggregate{format}", |r| {
+            r.method(Method::GET).with(aggregate_handler)
         })
 }

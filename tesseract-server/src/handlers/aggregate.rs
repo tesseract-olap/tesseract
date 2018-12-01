@@ -1,11 +1,9 @@
 use actix_web::{
     AsyncResponder,
     FutureResponse,
-    HttpRequest,
     HttpResponse,
     Path,
     Query,
-    Result as ActixResult,
     State,
 };
 use clickhouse_rs::Client as ChClient;
@@ -15,31 +13,15 @@ use serde_derive::{Serialize, Deserialize};
 
 use crate::app::AppState;
 
-pub fn index_handler(_req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    Ok(HttpResponse::Ok().json(
-        Status {
-            status: "ok".to_owned(),
-            // TODO set this as the Cargo.toml version, after structopt added
-            version: "0.1.0".to_owned(),
-        }
-    ))
-}
-
-#[derive(Debug, Serialize)]
-struct Status {
-    status: String,
-    version: String,
-}
-
-pub fn test_handler(
-    (state, schema_table, _query): (State<AppState>, Path<(String, String)>, Query<AggregateQueryOpt>)
+pub fn aggregate_handler(
+    (state, cube_format, _query): (State<AppState>, Path<(String, String)>, Query<AggregateQueryOpt>)
     ) -> FutureResponse<HttpResponse>
 {
-    let (schema, table) = schema_table.into_inner();
-    info!("schema: {}, table: {}", schema, table);
+    let (cube, format) = cube_format.into_inner();
+    info!("cube: {}, format: {}", cube, format);
 
     // TODO put schema back in later
-    let sql = format!("select * from {} limit 10", table);
+    let sql = format!("select * from {} limit 10", cube);
     info!("{}", sql);
 
     // TODO why have to clone?
@@ -73,4 +55,5 @@ pub struct AggregateQueryOpt {
 pub struct FlushQueryOpt {
     pub secret: String,
 }
+
 
