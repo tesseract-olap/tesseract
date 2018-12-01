@@ -1,7 +1,9 @@
+mod aggregate;
 mod flush;
 mod index;
-mod aggregate;
+mod metadata;
 
-pub use self::index::index_handler;
 pub use self::aggregate::aggregate_handler;
+pub use self::index::index_handler;
+pub use self::metadata::metadata_handler;
 
