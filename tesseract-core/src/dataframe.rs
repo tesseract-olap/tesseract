@@ -1,12 +1,10 @@
 pub struct DataFrame {
-    headers: Vec<String>,
     columns: Vec<Column>,
 }
 
 impl DataFrame {
     pub fn new() -> Self {
         DataFrame {
-            headers: vec![],
             columns: vec![],
         }
     }
@@ -15,6 +13,15 @@ impl DataFrame {
 pub struct Column {
     name: String,
     column_data: ColumnData,
+}
+
+impl Column {
+    pub fn new(name: String, column_data: ColumnData) -> Self {
+        Column {
+            name,
+            column_data,
+        }
+    }
 }
 
 pub enum ColumnData {
