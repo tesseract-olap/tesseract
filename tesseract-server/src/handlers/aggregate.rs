@@ -11,6 +11,7 @@ use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
+use std::convert::From;
 use tesseract_core::Database;
 use tesseract_core::Query as TsQuery;
 
@@ -28,12 +29,22 @@ pub fn aggregate_handler(
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
-    let agg_query = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
+    let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
+    let agg_query = match agg_query_res {
+        Ok(q) => q,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
     info!("query opts:{:?}", agg_query);
 
     // TODO turn AggregateQueryOpt into Query
     // Then write the sql query thing.
-    let ts_query = TsQuery::new();
+    let ts_query: TsQuery = agg_query.into();
     let sql_result = req
         .state()
         .schema
@@ -52,7 +63,6 @@ pub fn aggregate_handler(
 
     info!("Sql query: {}", sql);
 
-    // TODO why have to clone?
     ChClient::connect(req.state().clickhouse_options.clone())
         .and_then(|c| c.ping())
         .and_then(move |c| c.query_all(&sql[..]))
@@ -83,3 +93,16 @@ pub struct AggregateQueryOpt {
 //    sparse: Option<bool>,
 }
 
+impl From<AggregateQueryOpt> for TsQuery {
+    fn from(agg_query_opt: AggregateQueryOpt) -> Self {
+        let drilldowns = agg_query_opt.drilldowns.unwrap_or(vec![]);
+        let cuts = agg_query_opt.cuts.unwrap_or(vec![]);
+        let measures = agg_query_opt.measures.unwrap_or(vec![]);
+
+        TsQuery {
+            drilldowns,
+            cuts,
+            measures,
+        }
+    }
+}
