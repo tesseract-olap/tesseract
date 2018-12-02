@@ -5,3 +5,12 @@ pub struct Query {
     pub measures: Vec<String>,
 }
 
+impl Query {
+    pub fn new() -> Self {
+        Query {
+            drilldowns: vec![],
+            cuts: vec![],
+            measures: vec![],
+        }
+    }
+}
