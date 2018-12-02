@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Construct, parse, and display full qualified names
 /// for Mondrian schema:
 /// - drilldown

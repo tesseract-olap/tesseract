@@ -1,3 +1,4 @@
+// TODO switch to using name module
 #[derive(Debug, Clone)]
 pub struct Query {
     pub drilldowns: Vec<String>,

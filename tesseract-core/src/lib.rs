@@ -1,4 +1,5 @@
 mod dataframe;
+mod names;
 mod schema;
 mod schema_config;
 mod sql;
@@ -64,12 +65,12 @@ impl Schema {
         // now feed the database metadata into the sql generator
         match db {
             Database::Clickhouse => {
-                sql::clickhouse_sql(
-                    table,
-                    cut_cols,
-                    drill_cols,
-                    mea_cols,
-                )
+                Ok(sql::clickhouse_sql(
+                    &table,
+                    &cut_cols,
+                    &drill_cols,
+                    &mea_cols,
+                ))
             }
         }
     }
