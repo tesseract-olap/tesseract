@@ -25,8 +25,8 @@ impl Schema {
         self.cubes.iter().find(|c| c.name == cube_name).cloned()
     }
 
-    pub fn sql_query(&self, query: &Query, db: &Database) -> String {
-        "".to_owned()
+    pub fn sql_query(&self, query: &Query, db: Database) -> Result<String, Error> {
+        Ok("".to_owned())
     }
 
     //pub fn post_calculations(cal: &Calculations, df: DataFrame) -> DataFrame {
