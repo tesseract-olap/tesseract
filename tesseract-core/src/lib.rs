@@ -1,13 +1,19 @@
 mod dataframe;
 mod schema;
 mod schema_config;
+mod sql;
 mod query;
 
-use failure::Error;
+use failure::{Error, format_err};
 
 pub use self::dataframe::{DataFrame, Column, ColumnData};
 pub use self::schema::{Schema, Cube};
 use self::schema_config::SchemaConfig;
+use self::sql::{
+    CutSql,
+    DrilldownSql,
+    MeasureSql,
+};
 pub use self::query::Query;
 
 
@@ -25,8 +31,47 @@ impl Schema {
         self.cubes.iter().find(|c| c.name == cube_name).cloned()
     }
 
-    pub fn sql_query(&self, query: &Query, db: Database) -> Result<String, Error> {
-        Ok("".to_owned())
+    pub fn sql_query(
+        &self,
+        cube: String,
+        query: &Query,
+        db: Database
+        ) -> Result<String, Error>
+    {
+        // First do checks, like making sure there's a measure, and that there's
+        // either a cut or drilldown
+        if query.measures.is_empty() {
+            return Err(format_err!("No measure found; please specify at least one"));
+        }
+        if query.drilldowns.is_empty() && query.cuts.is_empty(){
+            return Err(format_err!("Either a drilldown or cut is required"));
+        }
+
+        // now get the database metadata
+        let table = self.cube_table(&cube)
+            .ok_or(format_err!("No table found for cube {}", cube))?;
+
+        let cut_cols = self.cube_cut_cols(&cube, &query.cuts)
+            .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
+
+        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns)
+            .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
+
+        let mea_cols = self.cube_mea_cols(&cube, &query.measures)
+            .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
+
+
+        // now feed the database metadata into the sql generator
+        match db {
+            Database::Clickhouse => {
+                sql::clickhouse_sql(
+                    table,
+                    cut_cols,
+                    drill_cols,
+                    mea_cols,
+                )
+            }
+        }
     }
 
     //pub fn post_calculations(cal: &Calculations, df: DataFrame) -> DataFrame {
@@ -38,6 +83,21 @@ impl Schema {
 
     pub fn format_results(&self, df: DataFrame) -> String {
         "".to_owned()
+    }
+}
+
+impl Schema {
+    fn cube_table(&self, cube: &str) -> Option<String> {
+        Some("".to_owned())
+    }
+    fn cube_cut_cols(&self, cube: &str, cuts: &[String]) -> Result<Vec<CutSql>, Error> {
+        Ok(vec![])
+    }
+    fn cube_drill_cols(&self, cube: &str, drills: &[String]) -> Result<Vec<DrilldownSql>, Error> {
+        Ok(vec![])
+    }
+    fn cube_mea_cols(&self, cube: &str, mea: &[String]) -> Result<Vec<MeasureSql>, Error> {
+        Ok(vec![])
     }
 }
 
