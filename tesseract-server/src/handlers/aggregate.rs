@@ -6,11 +6,13 @@ use actix_web::{
     Path,
 };
 use clickhouse_rs::Client as ChClient;
-use futures::future::Future;
+use futures::future::{self, Future};
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
+use tesseract_core::Database;
+use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use crate::clickhouse::block_to_df;
@@ -29,9 +31,26 @@ pub fn aggregate_handler(
     let agg_query = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
     info!("query opts:{:?}", agg_query);
 
-    // TODO put schema back in later
-    let sql = format!("select * from {} limit 10", cube);
-    info!("{}", sql);
+    // TODO turn AggregateQueryOpt into Query
+    // Then write the sql query thing.
+    let ts_query = TsQuery::new();
+    let sql_result = req
+        .state()
+        .schema
+        .sql_query(&ts_query, Database::Clickhouse);
+
+    let sql = match sql_result {
+        Ok(sql) => sql,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
+    info!("Sql query: {}", sql);
 
     // TODO why have to clone?
     ChClient::connect(req.state().clickhouse_options.clone())
