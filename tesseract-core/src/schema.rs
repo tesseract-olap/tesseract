@@ -9,6 +9,7 @@ use crate::schema_config::{
     MeasureConfig,
     TableConfig,
 };
+use crate::sql::MemberType;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Schema {
@@ -46,6 +47,8 @@ impl From<SchemaConfig> for Schema {
                                 dimensions.push(Dimension {
                                     name: shared_dim_config.name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
+                                    // TODO hardcoded hack
+                                    foreign_key_type: Some(MemberType::NonText),
                                     hierarchies: hierarchies,
 
                                 });
@@ -84,6 +87,7 @@ pub struct Cube {
 pub struct Dimension {
     pub name: String,
     pub foreign_key: Option<String>,
+    pub foreign_key_type:Option<MemberType>,
     pub hierarchies: Vec<Hierarchy>,
 }
 
@@ -96,6 +100,7 @@ impl From<DimensionConfig> for Dimension {
         Dimension {
             name: dimension_config.name,
             foreign_key: dimension_config.foreign_key,
+            foreign_key_type: dimension_config.foreign_key_type,
             hierarchies: hierarchies,
         }
     }

@@ -2,6 +2,8 @@ use failure:: {Error, format_err};
 use serde_derive::Deserialize;
 use serde_json;
 
+use crate::sql::MemberType;
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct SchemaConfig {
     pub name: String,
@@ -31,6 +33,7 @@ pub struct CubeConfig {
 pub struct DimensionConfig {
     pub name: String,
     pub foreign_key: Option<String>, // does not exist for shared dims
+    pub foreign_key_type: Option<MemberType>,
     pub hierarchies: Vec<HierarchyConfig>,
 }
 

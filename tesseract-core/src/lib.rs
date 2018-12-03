@@ -19,6 +19,7 @@ use self::sql::{
     CutSql,
     DrilldownSql,
     MeasureSql,
+    MemberType,
 };
 pub use self::query::Query;
 
@@ -118,11 +119,13 @@ impl Schema {
             res.push(CutSql {
                 column,
                 members: cut.members.clone(),
+                member_type: dim.foreign_key_type.clone().unwrap_or(MemberType::NonText),
             });
         }
 
         Ok(res)
     }
+
     fn cube_drill_cols(&self, cube_name: &str, drills: &[Drilldown]) -> Result<Vec<DrilldownSql>, Error> {
         let cube = self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)

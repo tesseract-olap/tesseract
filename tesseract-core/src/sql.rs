@@ -1,4 +1,5 @@
 use itertools::join;
+use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 
 /// Error checking is done before this point. This string formatter
@@ -24,11 +25,11 @@ pub fn clickhouse_sql(
     );
 
     if cuts_num != 0 {
-        res.push_str(&format!(" where {};", cuts)[..]);
+        res.push_str(&format!(" where {}", cuts)[..]);
     }
 
     if drilldown_num != 0 {
-        res.push_str(&format!(" group by {};", drills)[..]);
+        res.push_str(&format!(" group by {}", drills)[..]);
     }
 
     res.push_str(";");
@@ -51,13 +52,27 @@ impl fmt::Display for DrilldownSql {
 pub struct CutSql {
     pub column: String,
     pub members: Vec<String>,
+    pub member_type: MemberType,
 }
 
 impl fmt::Display for CutSql {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let members = join(&self.members, ", ");
+        let members = match self.member_type {
+            MemberType::NonText => join(&self.members, ", "),
+            MemberType::Text => {
+                let quoted = self.members.iter()
+                    .map(|m| format!("'{}'", m));
+                join(quoted, ", ")
+            }
+        };
         write!(f, "{} in ({})", self.column, members)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum MemberType {
+    Text,
+    NonText,
 }
 
 pub struct MeasureSql {
@@ -80,8 +95,16 @@ mod test {
     fn test_clickhouse_sql() {
         let table = "test_table";
         let cuts = vec![
-            CutSql { column: "geo".into(), members: vec!["1".into(), "2".into()] },
-            CutSql { column: "age".into(), members: vec!["3".into()] },
+            CutSql {
+                column: "geo".into(),
+                members: vec!["1".into(), "2".into()],
+                member_type: MemberType::Text,
+            },
+            CutSql {
+                column: "age".into(),
+                members: vec!["3".into()],
+                member_type: MemberType::NonText,
+            },
         ];
         let drills = vec![
             DrilldownSql { column: "geo".into() },
@@ -94,7 +117,7 @@ mod test {
         assert_eq!(
             clickhouse_sql(table, &cuts, &drills, &meas),
             "select geo, age, sum(quantity) from test_table where \
-            geo in (1, 2) and age in (3) group by geo, age;".to_owned()
+            geo in ('1', '2') and age in (3) group by geo, age;".to_owned()
         );
     }
 }
