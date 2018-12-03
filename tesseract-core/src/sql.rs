@@ -71,7 +71,9 @@ impl fmt::Display for CutSql {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum MemberType {
+    #[serde(rename="text")]
     Text,
+    #[serde(rename="nontext")]
     NonText,
 }
 
