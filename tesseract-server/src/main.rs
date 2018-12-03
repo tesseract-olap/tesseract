@@ -1,17 +1,25 @@
 #![feature(try_from)]
-
-/// tesseract-core contains Schema;
-/// Schema is stateless; it is constructed from the schema file.
-/// Schema is held in the AppState struct to provide access from a route
-///
-/// Each route instance will apply a tesseract_core::Query to tesseract_core::Schema to get sql.
-/// The route instance then sends sql to database and gets results back in a
-/// tesseract_core::Dataframe
-///
-/// Dataframe is then applied to Schema to format result. (for now, jsonrecords only)
-///
-///
-/// Backend trait: exec() takes in a sql string, outputs a dataframe.
+//! tesseract-core contains Schema;
+//! Schema is stateless; it is constructed from the schema file.
+//! Schema is held in the AppState struct to provide access from a route
+//!
+//! Each route instance will apply a tesseract_core::Query to tesseract_core::Schema to get sql.
+//! The route instance then sends sql to database and gets results back in a
+//! tesseract_core::Dataframe
+//!
+//! Dataframe is then applied to Schema to format result. (for now, jsonrecords only)
+//!
+//!
+//! Backend trait: exec() takes in a sql string, outputs a dataframe.
+//! Because tesseract-core generates just sql (instead of taking a query and schema into a
+//! `Backend`, it allows different kinds of backends to be used. Don't have to worry about
+//! async/sync, which is the hardest difference to manage. Otherwise it would be easy to define
+//! a `Backend` trait. (Or, can I do this and define the Backend trait as defining futures,
+//! and have sync operations return a future? This might still be tricky dealing with actix,
+//! it's overall easier to leave backend handling on the server side entirely).
+//!
+//! The database is able to be declared in the schema, each fact table and dim can be from
+//! different databases. Supported: clickhouse, postgres, mysql, sqlite.
 
 mod app;
 mod clickhouse;
