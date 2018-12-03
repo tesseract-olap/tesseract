@@ -6,20 +6,15 @@ use actix_web::{
     Path,
 };
 use clickhouse_rs::Client as ChClient;
+use failure::Error;
 use futures::future::{self, Future};
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
-use std::convert::From;
+use std::convert::{TryFrom, TryInto};
 use tesseract_core::Database;
 use tesseract_core::Query as TsQuery;
-use tesseract_core::names::{
-    Cut,
-    Drilldown,
-    Measure,
-    Property,
-};
 
 use crate::app::AppState;
 use crate::clickhouse::block_to_df;
@@ -50,7 +45,18 @@ pub fn aggregate_handler(
 
     // TODO turn AggregateQueryOpt into Query
     // Then write the sql query thing.
-    let ts_query: TsQuery = agg_query.into();
+    let ts_query: Result<TsQuery, _> = agg_query.try_into();
+    let ts_query = match ts_query {
+        Ok(q) => q,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
     let sql_result = req
         .state()
         .schema
@@ -88,10 +94,10 @@ pub fn aggregate_handler(
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {
-    drilldowns: Option<Vec<Drilldown>>,
-    cuts: Option<Vec<Cut>>,
-    measures: Option<Vec<Measure>>,
-    properties: Option<Vec<Property>>,
+    drilldowns: Option<Vec<String>>,
+    cuts: Option<Vec<String>>,
+    measures: Option<Vec<String>>,
+    properties: Option<Vec<String>>,
     parents: Option<bool>,
     debug: Option<bool>,
 //    distinct: Option<bool>,
@@ -99,16 +105,36 @@ pub struct AggregateQueryOpt {
 //    sparse: Option<bool>,
 }
 
-impl From<AggregateQueryOpt> for TsQuery {
-    fn from(agg_query_opt: AggregateQueryOpt) -> Self {
-        let drilldowns = agg_query_opt.drilldowns.unwrap_or(vec![]);
-        let cuts = agg_query_opt.cuts.unwrap_or(vec![]);
-        let measures = agg_query_opt.measures.unwrap_or(vec![]);
+impl TryFrom<AggregateQueryOpt> for TsQuery {
+    type Error = Error;
 
-        TsQuery {
+    fn try_from(agg_query_opt: AggregateQueryOpt) -> Result<Self, Self::Error> {
+        let drilldowns: Result<Vec<_>, _> = agg_query_opt.drilldowns
+            .map(|ds| {
+                ds.iter().map(|d| d.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]));
+
+        let cuts: Result<Vec<_>, _> = agg_query_opt.cuts
+            .map(|cs| {
+                cs.iter().map(|c| c.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]));
+
+        let measures: Result<Vec<_>, _> = agg_query_opt.measures
+            .map(|ms| {
+                ms.iter().map(|m| m.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]));
+
+        let drilldowns = drilldowns?;
+        let cuts = cuts?;
+        let measures = measures?;
+
+        Ok(TsQuery {
             drilldowns,
             cuts,
             measures,
-        }
+        })
     }
 }
