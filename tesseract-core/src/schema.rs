@@ -154,6 +154,7 @@ impl From<LevelConfig> for Level {
 pub struct Measure{
     pub name: String,
     pub column: String,
+    pub aggregator: String,
 }
 
 impl From<MeasureConfig> for Measure {
@@ -161,6 +162,7 @@ impl From<MeasureConfig> for Measure {
         Measure {
             name: measure_config.name,
             column: measure_config.column,
+            aggregator: measure_config.aggregator,
         }
     }
 }

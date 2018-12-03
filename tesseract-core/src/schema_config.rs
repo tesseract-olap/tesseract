@@ -65,6 +65,7 @@ pub struct LevelConfig {
 pub struct MeasureConfig {
     pub name: String,
     pub column: String,
+    pub aggregator: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

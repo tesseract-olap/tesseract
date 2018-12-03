@@ -93,17 +93,79 @@ impl Schema {
 }
 
 impl Schema {
-    fn cube_table(&self, cube: &str) -> Option<String> {
-        Some("".to_owned())
+    fn cube_table(&self, cube_name: &str) -> Option<String> {
+        self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .map(|cube| cube.name.clone())
     }
-    fn cube_cut_cols(&self, cube: &str, cuts: &[Cut]) -> Result<Vec<CutSql>, Error> {
-        Ok(vec![])
+
+    fn cube_cut_cols(&self, cube_name: &str, cuts: &[Cut]) -> Result<Vec<CutSql>, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mut res = vec![];
+
+        for cut in cuts {
+            let dim = cube.dimensions.iter()
+                .find(|dim| dim.name == cut.level_name.dimension)
+                .ok_or(format_err!("could not find dimension for cut"))?;
+            // first try to use the dim's foreign key,
+            // TODO implement using lowest level key?
+            let column = dim.foreign_key
+                .clone()
+                .ok_or(format_err!("No foreign key; may implement using lowest level"))?;
+            res.push(CutSql {
+                column,
+                members: cut.members.clone(),
+            });
+        }
+
+        Ok(res)
     }
-    fn cube_drill_cols(&self, cube: &str, drills: &[Drilldown]) -> Result<Vec<DrilldownSql>, Error> {
-        Ok(vec![])
+    fn cube_drill_cols(&self, cube_name: &str, drills: &[Drilldown]) -> Result<Vec<DrilldownSql>, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mut res = vec![];
+
+        for drill in drills {
+            let dim = cube.dimensions.iter()
+                .find(|dim| dim.name == drill.0.dimension)
+                .ok_or(format_err!("could not find dimension for drill"))?;
+
+            // first try to use the dim's foreign key,
+            // TODO implement using lowest level key?
+            let column = dim.foreign_key
+                .clone()
+                .ok_or(format_err!("No foreign key; may implement using lowest level"))?;
+            res.push(DrilldownSql {
+                column,
+            });
+        }
+
+        Ok(res)
     }
-    fn cube_mea_cols(&self, cube: &str, mea: &[Measure]) -> Result<Vec<MeasureSql>, Error> {
-        Ok(vec![])
+    fn cube_mea_cols(&self, cube_name: &str, meas: &[Measure]) -> Result<Vec<MeasureSql>, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mut res = vec![];
+
+        for measure in meas {
+            let mea = cube.measures.iter()
+                .find(|m| m.name == measure.0)
+                .ok_or(format_err!("could not find dimension for drill"))?;
+
+            res.push(MeasureSql {
+                column: mea.column.clone(),
+                aggregator: mea.aggregator.clone(),
+            });
+        }
+
+        Ok(res)
     }
 }
 

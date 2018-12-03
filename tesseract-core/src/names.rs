@@ -29,9 +29,9 @@ use std::str::FromStr;
 /// Basis for other names.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct LevelName {
-    dimension: String,
-    hierarchy: String,
-    level: String,
+    pub dimension: String,
+    pub hierarchy: String,
+    pub level: String,
 }
 
 impl LevelName {
@@ -111,7 +111,7 @@ impl FromStr for LevelName {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct Drilldown(LevelName);
+pub struct Drilldown(pub LevelName);
 
 impl Drilldown {
     pub fn new<S: Into<String>>(dimension: S, hierarchy: S, level: S) -> Self {
@@ -144,7 +144,7 @@ impl FromStr for Drilldown {
 /// Naive impl, does not check that [Measure]. is NOT
 /// prepended. But does remove brackets on FromStr
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct Measure(String);
+pub struct Measure(pub String);
 
 impl Measure {
     pub fn new<S: Into<String>>(measure: S) -> Self {
@@ -171,11 +171,10 @@ impl FromStr for Measure {
 /// Note: FromStr impl aggressively left trims ampersands
 /// from the beginning of member list and from the
 /// beginning of each member
-// TODO change cut and property to LevelName
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Cut {
-    level_name: LevelName,
-    members: Vec<String>,
+    pub level_name: LevelName,
+    pub members: Vec<String>,
 }
 
 impl Cut {
