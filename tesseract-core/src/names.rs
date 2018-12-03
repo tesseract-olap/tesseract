@@ -21,12 +21,13 @@
 // etc.
 
 use failure::{Error, bail, format_err, ensure};
+use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
 /// Fully qualified name of Dimension, Hierarchy, and Level
 /// Basis for other names.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct LevelName {
     dimension: String,
     hierarchy: String,
@@ -109,7 +110,7 @@ impl FromStr for LevelName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Drilldown(LevelName);
 
 impl Drilldown {
@@ -142,7 +143,7 @@ impl FromStr for Drilldown {
 
 /// Naive impl, does not check that [Measure]. is NOT
 /// prepended. But does remove brackets on FromStr
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Measure(String);
 
 impl Measure {
@@ -171,7 +172,7 @@ impl FromStr for Measure {
 /// from the beginning of member list and from the
 /// beginning of each member
 // TODO change cut and property to LevelName
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Cut {
     level_name: LevelName,
     members: Vec<String>,
@@ -285,7 +286,7 @@ impl FromStr for Cut {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Property {
     level_name: LevelName,
     property: String,

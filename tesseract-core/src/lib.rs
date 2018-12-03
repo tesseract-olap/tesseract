@@ -1,5 +1,5 @@
 mod dataframe;
-mod names;
+pub mod names;
 mod schema;
 mod schema_config;
 mod sql;
@@ -8,6 +8,11 @@ mod query;
 use failure::{Error, format_err};
 
 pub use self::dataframe::{DataFrame, Column, ColumnData};
+use self::names::{
+    Cut,
+    Drilldown,
+    Measure,
+};
 pub use self::schema::{Schema, Cube};
 use self::schema_config::SchemaConfig;
 use self::sql::{
@@ -34,7 +39,7 @@ impl Schema {
 
     pub fn sql_query(
         &self,
-        cube: String,
+        cube: &str,
         query: &Query,
         db: Database
         ) -> Result<String, Error>
@@ -91,13 +96,13 @@ impl Schema {
     fn cube_table(&self, cube: &str) -> Option<String> {
         Some("".to_owned())
     }
-    fn cube_cut_cols(&self, cube: &str, cuts: &[String]) -> Result<Vec<CutSql>, Error> {
+    fn cube_cut_cols(&self, cube: &str, cuts: &[Cut]) -> Result<Vec<CutSql>, Error> {
         Ok(vec![])
     }
-    fn cube_drill_cols(&self, cube: &str, drills: &[String]) -> Result<Vec<DrilldownSql>, Error> {
+    fn cube_drill_cols(&self, cube: &str, drills: &[Drilldown]) -> Result<Vec<DrilldownSql>, Error> {
         Ok(vec![])
     }
-    fn cube_mea_cols(&self, cube: &str, mea: &[String]) -> Result<Vec<MeasureSql>, Error> {
+    fn cube_mea_cols(&self, cube: &str, mea: &[Measure]) -> Result<Vec<MeasureSql>, Error> {
         Ok(vec![])
     }
 }
