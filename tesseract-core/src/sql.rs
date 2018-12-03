@@ -11,23 +11,27 @@ pub fn clickhouse_sql(
     ) -> String
 {
     let drilldown_num = drills.len();
+    let cuts_num = cuts.len();
 
     let drills = join(drills.iter().map(|d| d.to_string()), ", ");
     let cuts = join(cuts.iter().map(|c| c.to_string()), " and ");
     let meas = join(meas.iter().map(|m| m.to_string()), ", ");
 
-    let mut res = format!("select {}, {} from {} where {}",
+    let mut res = format!("select {}, {} from {}",
         drills,
         meas,
         table,
-        cuts,
     );
+
+    if cuts_num != 0 {
+        res.push_str(&format!(" where {};", cuts)[..]);
+    }
 
     if drilldown_num != 0 {
         res.push_str(&format!(" group by {};", drills)[..]);
-    } else {
-        res.push_str(";");
     }
+
+    res.push_str(";");
 
     res
 }
@@ -67,6 +71,7 @@ impl fmt::Display for MeasureSql {
     }
 }
 
+// TODO test having not cuts or drilldowns
 #[cfg(test)]
 mod test {
     use super::*;
