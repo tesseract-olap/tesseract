@@ -14,6 +14,12 @@ use serde_qs as qs;
 use std::convert::From;
 use tesseract_core::Database;
 use tesseract_core::Query as TsQuery;
+use tesseract_core::names::{
+    Cut,
+    Drilldown,
+    Measure,
+    Property,
+};
 
 use crate::app::AppState;
 use crate::clickhouse::block_to_df;
@@ -48,7 +54,7 @@ pub fn aggregate_handler(
     let sql_result = req
         .state()
         .schema
-        .sql_query(&ts_query, Database::Clickhouse);
+        .sql_query(&cube, &ts_query, Database::Clickhouse);
 
     let sql = match sql_result {
         Ok(sql) => sql,
@@ -82,10 +88,10 @@ pub fn aggregate_handler(
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {
-    drilldowns: Option<Vec<String>>,
-    cuts: Option<Vec<String>>,
-    measures: Option<Vec<String>>,
-    properties: Option<Vec<String>>,
+    drilldowns: Option<Vec<Drilldown>>,
+    cuts: Option<Vec<Cut>>,
+    measures: Option<Vec<Measure>>,
+    properties: Option<Vec<Property>>,
     parents: Option<bool>,
     debug: Option<bool>,
 //    distinct: Option<bool>,
