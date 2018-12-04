@@ -1,6 +1,5 @@
 use itertools::join;
 use serde_derive::{Deserialize, Serialize};
-use std::fmt;
 
 use crate::schema::Table;
 
@@ -18,7 +17,7 @@ pub fn clickhouse_sql(
 
     let drills = join(drills.iter().map(|d| d.col_string()), ", ");
     let cuts = join(cuts.iter().map(|c| c.members_string()), " and ");
-    let meas = join(meas.iter().map(|m| m.to_string()), ", ");
+    let meas = join(meas.iter().map(|m| m.agg_col_string()), ", ");
 
     let mut res = format!("select {}, {} from {}",
         drills,
@@ -98,9 +97,9 @@ pub struct MeasureSql {
     pub column: String,
 }
 
-impl fmt::Display for MeasureSql {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({})", self.aggregator, self.column)
+impl MeasureSql {
+    fn agg_col_string(&self) -> String {
+        format!("{}({})", self.aggregator, self.column)
     }
 }
 
