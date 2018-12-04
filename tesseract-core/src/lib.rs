@@ -120,6 +120,11 @@ impl Schema {
                 .find(|lvl| lvl.name == cut.level_name.level)
                 .ok_or(format_err!("could not find level for cut"))?;
 
+            // table currently required in hierarchy
+            let table = hier.table
+                .clone()
+                .ok_or(format_err!("table is currently required in hierarchy"))?;
+
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
             let primary_key = hier.primary_key.clone();
@@ -131,6 +136,7 @@ impl Schema {
             let column = level.key_column.clone();
 
             res.push(CutSql {
+                table,
                 primary_key,
                 foreign_key,
                 column,
@@ -160,6 +166,11 @@ impl Schema {
                 .find(|lvl| lvl.name == drill.0.level)
                 .ok_or(format_err!("could not find hierarchy for drill"))?;
 
+            // table currently required in hierarchy
+            let table = hier.table
+                .clone()
+                .ok_or(format_err!("table is currently required in hierarchy"))?;
+
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
             let primary_key = hier.primary_key.clone();
@@ -172,6 +183,7 @@ impl Schema {
             let name_column = level.name_column.clone();
 
             res.push(DrilldownSql {
+                table,
                 primary_key,
                 foreign_key,
                 key_column,

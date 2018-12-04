@@ -2,6 +2,8 @@ use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 
+use crate::schema::Table;
+
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 pub fn clickhouse_sql(
@@ -15,7 +17,7 @@ pub fn clickhouse_sql(
     let cuts_num = cuts.len();
 
     let drills = join(drills.iter().map(|d| d.col_string()), ", ");
-    let cuts = join(cuts.iter().map(|c| c.to_string()), " and ");
+    let cuts = join(cuts.iter().map(|c| c.members_string()), " and ");
     let meas = join(meas.iter().map(|m| m.to_string()), ", ");
 
     let mut res = format!("select {}, {} from {}",
@@ -43,6 +45,7 @@ pub struct TableSql {
 }
 
 pub struct DrilldownSql {
+    pub table: Table,
     pub primary_key: String,
     pub foreign_key: String,
     pub key_column: String,
@@ -60,6 +63,7 @@ impl DrilldownSql {
 }
 
 pub struct CutSql {
+    pub table: Table,
     pub primary_key: String,
     pub foreign_key: String,
     pub column: String,
@@ -67,8 +71,8 @@ pub struct CutSql {
     pub member_type: MemberType,
 }
 
-impl fmt::Display for CutSql {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl CutSql {
+    fn members_string(&self) -> String {
         let members = match self.member_type {
             MemberType::NonText => join(&self.members, ", "),
             MemberType::Text => {
@@ -77,7 +81,7 @@ impl fmt::Display for CutSql {
                 join(quoted, ", ")
             }
         };
-        write!(f, "{} in ({})", self.column, members)
+        format!("{}", members)
     }
 }
 
@@ -98,6 +102,39 @@ impl fmt::Display for MeasureSql {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}({})", self.aggregator, self.column)
     }
+}
+
+/// Collects a drilldown and cut together to create a subquery for the dimension table
+/// Does not check for matching name, because that had to have been done
+/// before submitting to this fn.
+fn dim_subquery_string(drill: Option<DrilldownSql>, cut: Option<CutSql>) -> String {
+    match drill {
+        Some(drill) => {
+            let mut res = format!("select {} from {}",
+                drill.col_string(),
+                drill.table.full_name(),
+            );
+            if let Some(cut) = cut {
+                res.push_str(&format!(" where {} in ({})",
+                    cut.column,
+                    cut.members_string(),
+                )[..]);
+            }
+            return res;
+        },
+        None => {
+            if let Some(cut) = cut {
+                return format!("select {} from {} where {} in ({})",
+                    cut.primary_key,
+                    cut.table.full_name(),
+                    cut.column,
+                    cut.members_string(),
+                );
+            }
+        }
+    }
+
+    "".to_owned()
 }
 
 // TODO test having not cuts or drilldowns

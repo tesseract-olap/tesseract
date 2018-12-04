@@ -189,4 +189,13 @@ impl From<TableConfig> for Table {
     }
 }
 
+impl Table {
+    pub fn full_name(&self) -> String {
+        if let Some(ref schema) = self.schema {
+            format!("{}.{}", schema, self.name)
+        } else {
+            self.name.to_owned()
+        }
+    }
+}
 
