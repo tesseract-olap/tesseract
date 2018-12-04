@@ -6,50 +6,59 @@ use crate::schema::Table;
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 pub fn clickhouse_sql(
-    table: &TableSql,
-    cuts: &[CutSql],
-    drills: &[DrilldownSql],
-    meas: &[MeasureSql],
+    table: TableSql,
+    mut cuts: Vec<CutSql>,
+    mut drills: Vec<DrilldownSql>,
+    meas: Vec<MeasureSql>,
     ) -> String
 {
-    let drilldown_num = drills.len();
-    let cuts_num = cuts.len();
-
     // First section, get drill/cut combos lined up.
     //
     // First "zip" drill and cut into DimSubquery
+    // - pop drill, attempt to match with cut (remove cut if used (sounds sketchy, but could swap
+    // with empty struct))
+    // - go through remaining cuts (if had swapped empty struct, go through ones that aren't empty)
     //
     // Then, the order is:
     // - any dimension that has the same primary key as the
     // - doesn't matter
+    //
+    // So just swap the primary key DimSubquery to the head
 
+    let mut dim_subqueries = vec![];
+
+    while let Some(drill) = drills.pop() {
+        if let Some(idx) = cuts.iter().position(|c| c.table == drill.table) {
+            let cut = cuts.swap_remove(idx);
+
+            dim_subqueries.push(
+                dim_subquery(Some(drill),Some(cut))
+            );
+        } else {
+            dim_subqueries.push(
+                dim_subquery(Some(drill), None)
+            );
+        }
+    }
+
+    for cut in cuts {
+        dim_subqueries.push(
+            dim_subquery(None, Some(cut))
+        );
+    }
+
+    if let Some(primary_key) = table.primary_key {
+        if let Some(idx) = dim_subqueries.iter().position(|d| d.foreign_key == primary_key) {
+            dim_subqueries.swap(0, idx);
+        }
+    }
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
 
 
     // Finally, wrap with final agg and result
 
-    let drills = join(drills.iter().map(|d| d.col_string()), ", ");
-    let cuts = join(cuts.iter().map(|c| c.members_string()), " and ");
-    let meas = join(meas.iter().map(|m| m.agg_col_string()), ", ");
-
-    let mut res = format!("select {}, {} from {}",
-        drills,
-        meas,
-        table.name,
-    );
-
-    if cuts_num != 0 {
-        res.push_str(&format!(" where {}", cuts)[..]);
-    }
-
-    if drilldown_num != 0 {
-        res.push_str(&format!(" group by {}", drills)[..]);
-    }
-
-    res.push_str(";");
-
-    res
+    "".to_owned()
 }
 
 pub struct TableSql {
@@ -125,7 +134,7 @@ struct DimSubquery {
 /// Collects a drilldown and cut together to create a subquery for the dimension table
 /// Does not check for matching name, because that had to have been done
 /// before submitting to this fn.
-fn dim_subquery_string(drill: Option<DrilldownSql>, cut: Option<CutSql>) -> DimSubquery {
+fn dim_subquery(drill: Option<DrilldownSql>, cut: Option<CutSql>) -> DimSubquery {
     match drill {
         Some(drill) => {
             let mut sql = format!("select {} from {}",

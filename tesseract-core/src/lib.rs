@@ -73,10 +73,10 @@ impl Schema {
         match db {
             Database::Clickhouse => {
                 Ok(sql::clickhouse_sql(
-                    &table,
-                    &cut_cols,
-                    &drill_cols,
-                    &mea_cols,
+                    table,
+                    cut_cols,
+                    drill_cols,
+                    mea_cols,
                 ))
             }
         }
