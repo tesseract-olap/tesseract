@@ -176,6 +176,7 @@ impl From<MeasureConfig> for Measure {
 pub struct Table{
     pub name: String,
     pub schema: Option<String>,
+    pub primary_key: Option<String>,
 }
 
 impl From<TableConfig> for Table {
@@ -183,6 +184,7 @@ impl From<TableConfig> for Table {
         Table {
             name: table_config.name,
             schema: table_config.schema,
+            primary_key: table_config.primary_key,
         }
     }
 }

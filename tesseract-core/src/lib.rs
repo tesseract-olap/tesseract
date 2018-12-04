@@ -20,6 +20,7 @@ use self::sql::{
     DrilldownSql,
     MeasureSql,
     MemberType,
+    TableSql,
 };
 pub use self::query::Query;
 
@@ -84,20 +85,21 @@ impl Schema {
     //pub fn post_calculations(cal: &Calculations, df: DataFrame) -> DataFrame {
     //}
 
-    pub fn add_dim_metadata(&self, query: &Query, df: DataFrame) -> DataFrame {
-        DataFrame::new()
-    }
-
-    pub fn format_results(&self, df: DataFrame) -> String {
+    pub fn format_results(&self, _df: DataFrame) -> String {
         "".to_owned()
     }
 }
 
 impl Schema {
-    fn cube_table(&self, cube_name: &str) -> Option<String> {
+    fn cube_table(&self, cube_name: &str) -> Option<TableSql> {
         self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
-            .map(|cube| cube.name.clone())
+            .map(|cube| {
+                TableSql {
+                    name: cube.name.clone(),
+                    primary_key: cube.table.primary_key.clone(),
+                }
+            })
     }
 
     fn cube_cut_cols(&self, cube_name: &str, cuts: &[Cut]) -> Result<Vec<CutSql>, Error> {
@@ -111,12 +113,26 @@ impl Schema {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == cut.level_name.dimension)
                 .ok_or(format_err!("could not find dimension for cut"))?;
-            // first try to use the dim's foreign key,
-            // TODO implement using lowest level key?
-            let column = dim.foreign_key
+            let hier = dim.hierarchies.iter()
+                .find(|hier| hier.name == cut.level_name.hierarchy)
+                .ok_or(format_err!("could not find hierarchy for cut"))?;
+            let level = hier.levels.iter()
+                .find(|lvl| lvl.name == cut.level_name.level)
+                .ok_or(format_err!("could not find level for cut"))?;
+
+            // primary key is currently required in hierarchy. because inline dim is not yet
+            // allowed
+            let primary_key = hier.primary_key.clone();
+
+            let foreign_key = dim.foreign_key
                 .clone()
-                .ok_or(format_err!("No foreign key; may implement using lowest level"))?;
+                .ok_or(format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
+
+            let column = level.key_column.clone();
+
             res.push(CutSql {
+                primary_key,
+                foreign_key,
                 column,
                 members: cut.members.clone(),
                 member_type: dim.foreign_key_type.clone().unwrap_or(MemberType::NonText),
@@ -137,14 +153,29 @@ impl Schema {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == drill.0.dimension)
                 .ok_or(format_err!("could not find dimension for drill"))?;
+            let hier = dim.hierarchies.iter()
+                .find(|hier| hier.name == drill.0.hierarchy)
+                .ok_or(format_err!("could not find hierarchy for drill"))?;
+            let level = hier.levels.iter()
+                .find(|lvl| lvl.name == drill.0.level)
+                .ok_or(format_err!("could not find hierarchy for drill"))?;
 
-            // first try to use the dim's foreign key,
-            // TODO implement using lowest level key?
-            let column = dim.foreign_key
+            // primary key is currently required in hierarchy. because inline dim is not yet
+            // allowed
+            let primary_key = hier.primary_key.clone();
+
+            let foreign_key = dim.foreign_key
                 .clone()
-                .ok_or(format_err!("No foreign key; may implement using lowest level"))?;
+                .ok_or(format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
+
+            let key_column = level.key_column.clone();
+            let name_column = level.name_column.clone();
+
             res.push(DrilldownSql {
-                column,
+                primary_key,
+                foreign_key,
+                key_column,
+                name_column,
             });
         }
 

@@ -75,6 +75,7 @@ pub struct MeasureConfig {
 pub struct TableConfig {
     pub name: String,
     pub schema: Option<String>,
+    pub primary_key: Option<String>,
 }
 
 
