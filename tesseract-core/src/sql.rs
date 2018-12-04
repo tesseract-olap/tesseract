@@ -53,12 +53,48 @@ pub fn clickhouse_sql(
         }
     }
 
-    // Now second half, feed DimSubquery into the multiple joins with fact table
+    // Now set up table table query
+    // Group by is hardcoded in because there's an assumption that at least one
+    // dim exists
 
+    let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
+    let dim_idx_cols = join(dim_idx_cols, ", ");
+
+    let mea_cols = meas
+        .iter()
+        .enumerate()
+        .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
+    let mea_cols = join(mea_cols, ", ");
+
+    let fact_sql = format!("select {}, {} from {} group by {}",
+        dim_idx_cols,
+        mea_cols,
+        table.name,
+        dim_idx_cols,
+    );
+
+    // Now second half, feed DimSubquery into the multiple joins with fact table
+    // TODO allow for differently named cols to be joined on. (using an alias for as)
+
+    let mut sub_queries = fact_sql;
+    for dim_subquery in dim_subqueries {
+        sub_queries = format!("({}) all inner join ({}) using {}", dim_subquery.sql, sub_queries, dim_subquery.foreign_key);
+    }
 
     // Finally, wrap with final agg and result
+    let final_drill_cols = drills.iter().map(|drill| drill.col_string());
+    let final_drill_cols = join(final_drill_cols, ", ");
 
-    "".to_owned()
+    let final_mea_cols = (0..meas.len()).map(|i| format!("m{}", i));
+    let final_mea_cols = join(final_mea_cols, ", ");
+
+    format!("select {}, {} from ({}) group by {} order by {} asc;",
+        final_drill_cols,
+        final_mea_cols,
+        sub_queries,
+        final_drill_cols,
+        final_drill_cols,
+    )
 }
 
 pub struct TableSql {
