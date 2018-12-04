@@ -15,6 +15,20 @@ pub fn clickhouse_sql(
     let drilldown_num = drills.len();
     let cuts_num = cuts.len();
 
+    // First section, get drill/cut combos lined up.
+    //
+    // First "zip" drill and cut into DimSubquery
+    //
+    // Then, the order is:
+    // - any dimension that has the same primary key as the
+    // - doesn't matter
+
+
+    // Now second half, feed DimSubquery into the multiple joins with fact table
+
+
+    // Finally, wrap with final agg and result
+
     let drills = join(drills.iter().map(|d| d.col_string()), ", ");
     let cuts = join(cuts.iter().map(|c| c.members_string()), " and ");
     let meas = join(meas.iter().map(|m| m.agg_col_string()), ", ");
@@ -103,37 +117,53 @@ impl MeasureSql {
     }
 }
 
+struct DimSubquery {
+    sql: String,
+    foreign_key: String,
+}
+
 /// Collects a drilldown and cut together to create a subquery for the dimension table
 /// Does not check for matching name, because that had to have been done
 /// before submitting to this fn.
-fn dim_subquery_string(drill: Option<DrilldownSql>, cut: Option<CutSql>) -> String {
+fn dim_subquery_string(drill: Option<DrilldownSql>, cut: Option<CutSql>) -> DimSubquery {
     match drill {
         Some(drill) => {
-            let mut res = format!("select {} from {}",
+            let mut sql = format!("select {} from {}",
                 drill.col_string(),
                 drill.table.full_name(),
             );
             if let Some(cut) = cut {
-                res.push_str(&format!(" where {} in ({})",
+                sql.push_str(&format!(" where {} in ({})",
                     cut.column,
                     cut.members_string(),
                 )[..]);
             }
-            return res;
+            return DimSubquery {
+                sql,
+                foreign_key: drill.foreign_key,
+            };
         },
         None => {
             if let Some(cut) = cut {
-                return format!("select {} from {} where {} in ({})",
+                let sql = format!("select {} from {} where {} in ({})",
                     cut.primary_key,
                     cut.table.full_name(),
                     cut.column,
                     cut.members_string(),
                 );
+
+                return DimSubquery {
+                    sql,
+                    foreign_key: cut.foreign_key,
+                }
             }
         }
     }
 
-    "".to_owned()
+    DimSubquery {
+        sql: "".to_owned(),
+        foreign_key: "".to_owned(),
+    }
 }
 
 // TODO test having not cuts or drilldowns
