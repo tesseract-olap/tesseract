@@ -14,7 +14,7 @@ use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use std::time::Instant;
-use tesseract_core::format::format_csv;
+use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Database;
 use tesseract_core::Query as TsQuery;
 
@@ -25,7 +25,7 @@ pub fn aggregate_default_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
     ) -> FutureResponse<HttpResponse>
 {
-    let cube_format = (cube.into_inner(), ".csv".to_owned());
+    let cube_format = (cube.into_inner(), "csv".to_owned());
     do_aggregate(req, cube_format)
 }
 
@@ -42,7 +42,20 @@ pub fn do_aggregate(
     ) -> FutureResponse<HttpResponse>
 {
     let (cube, format) = cube_format;
-    info!("cube: {}, format: {}", cube, format);
+
+    let format = format.parse::<FormatType>();
+    let format = match format {
+        Ok(f) => f,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
+    info!("cube: {}, format: {:?}", cube, format);
 
     let query = req.query_string();
     lazy_static!{
@@ -106,7 +119,7 @@ pub fn do_aggregate(
 
             let df = block_to_df(block)?;
 
-            match format_csv(&headers, df) {
+            match format_records(&headers, df, format) {
                 Ok(res) => Ok(HttpResponse::Ok().body(res)),
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }

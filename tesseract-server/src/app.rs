@@ -34,7 +34,7 @@ pub fn create_app(clickhouse_options: ChOptions, schema: Schema) -> App<AppState
         .resource("/cubes/{cube}/aggregate", |r| {
             r.method(Method::GET).with(aggregate_default_handler)
         })
-        .resource("/cubes/{cube}/aggregate{format}", |r| {
+        .resource("/cubes/{cube}/aggregate.{format}", |r| {
             r.method(Method::GET).with(aggregate_handler)
         })
 }
