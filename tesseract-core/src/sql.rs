@@ -7,9 +7,9 @@ use crate::schema::Table;
 /// accepts any input
 pub fn clickhouse_sql(
     table: TableSql,
-    mut cuts: Vec<CutSql>,
-    mut drills: Vec<DrilldownSql>,
-    meas: Vec<MeasureSql>,
+    cuts: &[CutSql],
+    drills: &[DrilldownSql],
+    meas: &[MeasureSql],
     ) -> String
 {
     // Before first section, need to separate out inline dims.
@@ -28,13 +28,29 @@ pub fn clickhouse_sql(
     //
     // So just swap the primary key DimSubquery to the head
 
-    let original_drills = drills.clone();
+    let mut ext_drills: Vec<_> = drills.iter()
+        .filter(|d| d.table.name != table.name)
+        .collect();
+
+    let mut ext_cuts: Vec<_> = cuts.iter()
+        .filter(|c| c.table.name != table.name)
+        .collect();
+
+    let inline_drills: Vec<_> = drills.iter()
+        .filter(|d| d.table.name != table.name)
+        .collect();
+
+    let inline_cuts: Vec<_> = cuts.iter()
+        .filter(|c| c.table.name != table.name)
+        .collect();
 
     let mut dim_subqueries = vec![];
 
-    while let Some(drill) = drills.pop() {
-        if let Some(idx) = cuts.iter().position(|c| c.table == drill.table) {
-            let cut = cuts.swap_remove(idx);
+    // external drill and cuts section
+
+    while let Some(drill) = ext_drills.pop() {
+        if let Some(idx) = ext_cuts.iter().position(|c| c.table == drill.table) {
+            let cut = ext_cuts.swap_remove(idx);
 
             dim_subqueries.push(
                 dim_subquery(Some(drill),Some(cut))
@@ -46,7 +62,7 @@ pub fn clickhouse_sql(
         }
     }
 
-    for cut in cuts {
+    for cut in ext_cuts {
         dim_subqueries.push(
             dim_subquery(None, Some(cut))
         );
@@ -73,11 +89,34 @@ pub fn clickhouse_sql(
         .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
     let mea_cols = join(mea_cols, ", ");
 
-    let fact_sql = format!("select {}, {} from {} group by {}",
-        dim_idx_cols,
-        mea_cols,
-        table.name,
-        dim_idx_cols,
+    let mut fact_sql = format!("select {}", dim_idx_cols,);
+
+    if !inline_drills.is_empty() {
+        let inline_dim_cols = inline_drills.iter().map(|d| d.col_string());
+        let inline_dim_cols = join(inline_dim_cols, ", ");
+
+        fact_sql.push_str(
+            &format!(", {}", inline_dim_cols)
+        );
+    }
+
+    fact_sql.push_str(
+        &format!(", {} from {}", mea_cols, table.name)
+    );
+
+    if !inline_cuts.is_empty() {
+        let inline_cut_clause = inline_cuts
+            .iter()
+            .map(|c| format!(" {} in ({})", c.column, c.members_string()));
+        let inline_cut_clause = join(inline_cut_clause, "and ");
+
+        fact_sql.push_str(
+            &format!(" where {}", inline_cut_clause)
+        );
+    }
+
+    fact_sql.push_str(
+        &format!(" group by {}", dim_idx_cols)
     );
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
@@ -89,7 +128,7 @@ pub fn clickhouse_sql(
     }
 
     // Finally, wrap with final agg and result
-    let final_drill_cols = original_drills.iter().map(|drill| drill.col_string());
+    let final_drill_cols = drills.iter().map(|drill| drill.col_string());
     let final_drill_cols = join(final_drill_cols, ", ");
 
     let final_mea_cols = (0..meas.len()).map(|i| format!("m{}", i));
@@ -194,7 +233,7 @@ struct DimSubquery {
 /// Collects a drilldown and cut together to create a subquery for the dimension table
 /// Does not check for matching name, because that had to have been done
 /// before submitting to this fn.
-fn dim_subquery(drill: Option<DrilldownSql>, cut: Option<CutSql>) -> DimSubquery {
+fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubquery {
     match drill {
         Some(drill) => {
             let mut sql = format!("select {} from {}",
@@ -203,27 +242,27 @@ fn dim_subquery(drill: Option<DrilldownSql>, cut: Option<CutSql>) -> DimSubquery
             );
             if let Some(cut) = cut {
                 sql.push_str(&format!(" where {} in ({})",
-                    cut.column,
+                    cut.column.clone(),
                     cut.members_string(),
                 )[..]);
             }
             return DimSubquery {
                 sql,
-                foreign_key: drill.foreign_key,
+                foreign_key: drill.foreign_key.clone(),
             };
         },
         None => {
             if let Some(cut) = cut {
                 let sql = format!("select {} from {} where {} in ({})",
-                    cut.primary_key,
+                    cut.primary_key.clone(),
                     cut.table.full_name(),
-                    cut.column,
+                    cut.column.clone(),
                     cut.members_string(),
                 );
 
                 return DimSubquery {
                     sql,
-                    foreign_key: cut.foreign_key,
+                    foreign_key: cut.foreign_key.clone(),
                 }
             }
         }
@@ -310,7 +349,7 @@ mod test {
         ];
 
         assert_eq!(
-            clickhouse_sql(table, cuts, drills, meas),
+            clickhouse_sql(table, &cuts, &drills, &meas),
             "".to_owned()
         );
     }

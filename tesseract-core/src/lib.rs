@@ -75,9 +75,9 @@ impl Schema {
             Database::Clickhouse => {
                 Ok(sql::clickhouse_sql(
                     table,
-                    cut_cols,
-                    drill_cols,
-                    mea_cols,
+                    &cut_cols,
+                    &drill_cols,
+                    &mea_cols,
                 ))
             }
         }
@@ -121,10 +121,10 @@ impl Schema {
                 .find(|lvl| lvl.name == cut.level_name.level)
                 .ok_or(format_err!("could not find level for cut"))?;
 
-            // table currently required in hierarchy
+            // No table (means inline table) will replace with fact table
             let table = hier.table
                 .clone()
-                .ok_or(format_err!("table is currently required in hierarchy"))?;
+                .unwrap_or(cube.table.clone());
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
@@ -171,10 +171,10 @@ impl Schema {
                 .ok_or(format_err!("could not find hierarchy for drill"))?;
             let levels = &hier.levels;
 
-            // table currently required in hierarchy
+            // No table (means inline table) will replace with fact table
             let table = hier.table
                 .clone()
-                .ok_or(format_err!("table is currently required in hierarchy"))?;
+                .unwrap_or(cube.table.clone());
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
