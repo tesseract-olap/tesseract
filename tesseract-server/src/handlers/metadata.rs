@@ -22,3 +22,12 @@ pub fn metadata_handler(
     }
 }
 
+pub fn metadata_all_handler(
+    req: HttpRequest<AppState>
+    ) -> ActixResult<HttpResponse>
+{
+    info!("Metadata for all");
+
+    Ok(HttpResponse::Ok().json(req.state().schema.clone()))
+}
+

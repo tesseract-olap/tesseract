@@ -10,6 +10,7 @@ use crate::handlers::{
     aggregate_handler,
     index_handler,
     metadata_handler,
+    metadata_all_handler,
 };
 
 pub struct AppState {
@@ -22,6 +23,9 @@ pub fn create_app(clickhouse_options: ChOptions, schema: Schema) -> App<AppState
         .middleware(middleware::Logger::default())
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)
+        })
+        .resource("/cubes", |r| {
+            r.method(Method::GET).with(metadata_all_handler)
         })
         .resource("/cubes/{cube}", |r| {
             r.method(Method::GET).with(metadata_handler)
