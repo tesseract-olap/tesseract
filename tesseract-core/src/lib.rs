@@ -45,7 +45,6 @@ impl Schema {
         cube: &str,
         query: &Query,
         db: Database,
-        parents: bool,
         ) -> Result<String, Error>
     {
         // First do checks, like making sure there's a measure, and that there's
@@ -64,7 +63,7 @@ impl Schema {
         let cut_cols = self.cube_cut_cols(&cube, &query.cuts)
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
 
-        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, parents)
+        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, query.parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
 
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
