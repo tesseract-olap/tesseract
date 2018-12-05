@@ -1,5 +1,5 @@
 use csv;
-use failure::Error;
+use failure::{Error, format_err};
 
 use crate::dataframe::{DataFrame, ColumnData};
 
@@ -7,6 +7,20 @@ pub enum FormatType{
     Csv,
     JsonRecords,
 }
+
+impl std::str::FromStr for FormatType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "csv" => Ok(FormatType::Csv),
+            "jsonrecords" => Ok(FormatType::JsonRecords),
+            _ => Err(format_err!("{} is not a supported format", s)),
+        }
+    }
+}
+
+
 
 pub fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
     let mut wtr = csv::WriterBuilder::new()
