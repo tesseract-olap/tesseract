@@ -130,11 +130,13 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
         let drilldowns = drilldowns?;
         let cuts = cuts?;
         let measures = measures?;
+        let parents = agg_query_opt.parents.unwrap_or(false);
 
         Ok(TsQuery {
             drilldowns,
             cuts,
             measures,
+            parents,
         })
     }
 }
