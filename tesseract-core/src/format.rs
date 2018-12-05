@@ -21,9 +21,14 @@ impl std::str::FromStr for FormatType {
     }
 }
 
+pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType) -> Result<String, Error> {
+    match format_type {
+        FormatType::Csv => Ok(format_csv(headers, df)?),
+        _ => Ok(format_csv(headers, df)?),
+    }
+}
 
-
-pub fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
+fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
     let mut wtr = csv::WriterBuilder::new()
         .from_writer(vec![]);
 
