@@ -12,6 +12,9 @@ pub fn clickhouse_sql(
     meas: Vec<MeasureSql>,
     ) -> String
 {
+    // Before first section, need to separate out inline dims.
+    // These are the ones that have the same dim table as fact table.
+    //
     // First section, get drill/cut combos lined up.
     //
     // First "zip" drill and cut into DimSubquery
@@ -24,6 +27,8 @@ pub fn clickhouse_sql(
     // - doesn't matter
     //
     // So just swap the primary key DimSubquery to the head
+
+    let original_drills = drills.clone();
 
     let mut dim_subqueries = vec![];
 
@@ -56,6 +61,8 @@ pub fn clickhouse_sql(
     // Now set up table table query
     // Group by is hardcoded in because there's an assumption that at least one
     // dim exists
+    //
+    // This is also the section wher inline dims and cuts get put
 
     let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
     let dim_idx_cols = join(dim_idx_cols, ", ");
@@ -82,7 +89,7 @@ pub fn clickhouse_sql(
     }
 
     // Finally, wrap with final agg and result
-    let final_drill_cols = drills.iter().map(|drill| drill.col_string());
+    let final_drill_cols = original_drills.iter().map(|drill| drill.col_string());
     let final_drill_cols = join(final_drill_cols, ", ");
 
     let final_mea_cols = (0..meas.len()).map(|i| format!("m{}", i));
@@ -97,11 +104,13 @@ pub fn clickhouse_sql(
     )
 }
 
+#[derive(Debug, Clone)]
 pub struct TableSql {
     pub name: String,
     pub primary_key: Option<String>,
 }
 
+#[derive(Debug, Clone)]
 pub struct DrilldownSql {
     pub table: Table,
     pub primary_key: String,
@@ -126,11 +135,13 @@ impl DrilldownSql {
 
 // TODO make level column an enum, to deal better with
 // levels with only key column and no name column?
+#[derive(Debug, Clone)]
 pub struct LevelColumn {
     pub key_column: String,
     pub name_column: Option<String>,
 }
 
+#[derive(Debug, Clone)]
 pub struct CutSql {
     pub table: Table,
     pub primary_key: String,
@@ -162,6 +173,7 @@ pub enum MemberType {
     NonText,
 }
 
+#[derive(Debug, Clone)]
 pub struct MeasureSql {
     pub aggregator: String,
     pub column: String,
@@ -173,6 +185,7 @@ impl MeasureSql {
     }
 }
 
+#[derive(Debug, Clone)]
 struct DimSubquery {
     sql: String,
     foreign_key: String,
