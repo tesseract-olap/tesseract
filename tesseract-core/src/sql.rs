@@ -37,11 +37,11 @@ pub fn clickhouse_sql(
         .collect();
 
     let inline_drills: Vec<_> = drills.iter()
-        .filter(|d| d.table.name != table.name)
+        .filter(|d| d.table.name == table.name)
         .collect();
 
     let inline_cuts: Vec<_> = cuts.iter()
-        .filter(|c| c.table.name != table.name)
+        .filter(|c| c.table.name == table.name)
         .collect();
 
     let mut dim_subqueries = vec![];
@@ -131,7 +131,7 @@ pub fn clickhouse_sql(
     let final_drill_cols = drills.iter().map(|drill| drill.col_string());
     let final_drill_cols = join(final_drill_cols, ", ");
 
-    let final_mea_cols = (0..meas.len()).map(|i| format!("m{}", i));
+    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{})", mea.aggregator, i));
     let final_mea_cols = join(final_mea_cols, ", ");
 
     format!("select {}, {} from ({}) group by {} order by {} asc;",
@@ -310,7 +310,7 @@ mod test {
             DrilldownSql {
                 foreign_key: "date_id".into(),
                 primary_key: "date_id".into(),
-                table: Table { name: "".into(), schema: None, primary_key: None },
+                table: Table { name: "sales".into(), schema: None, primary_key: None },
                 level_columns: vec![
                     LevelColumn {
                         key_column: "year".into(),
