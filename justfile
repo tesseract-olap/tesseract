@@ -10,5 +10,8 @@ serve-debug:
 serve-release-debug:
     watchexec -r -s SIGKILL 'cargo build --release && RUST_LOG=debug ./target/release/tesseract'
 
+deploy host:
+    cargo build --release && scp target/release/tesseract {{host}}:~/.
+
 check:
     watchexec cargo check
