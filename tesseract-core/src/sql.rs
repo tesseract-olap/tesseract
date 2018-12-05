@@ -314,15 +314,15 @@ mod test {
                 level_columns: vec![
                     LevelColumn {
                         key_column: "year".into(),
-                        name_column: Some("year".into()),
+                        name_column: None,
                     },
                     LevelColumn {
                         key_column: "month".into(),
-                        name_column: Some("month".into()),
+                        name_column: None,
                     },
                     LevelColumn {
                         key_column: "day".into(),
-                        name_column: Some("day".into()),
+                        name_column: None,
                     },
                 ],
             },
