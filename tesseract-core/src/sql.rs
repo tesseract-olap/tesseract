@@ -370,7 +370,7 @@ mod test {
 
         assert_eq!(
             clickhouse_sql(table, &cuts, &drills, &meas),
-            "".to_owned()
+            "select year, month, day, product_group_label, product_group_id, product_label, product_id_raw, sum(m0) from (select year, month, day, product_id, product_group_label, product_group_id, product_label, product_id_raw, m0 from (select product_group_label, product_group_id, product_label, product_id_raw, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales group by year, month, day, product_id) using product_id) group by year, month, day, product_group_label, product_group_id, product_label, product_id_raw order by year, month, day, product_group_label, product_group_id, product_label, product_id_raw asc;".to_owned()
         );
     }
 
