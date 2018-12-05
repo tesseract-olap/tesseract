@@ -3,6 +3,7 @@ use failure::{Error, format_err};
 
 use crate::dataframe::{DataFrame, ColumnData};
 
+#[derive(Debug, Clone)]
 pub enum FormatType{
     Csv,
     JsonRecords,
