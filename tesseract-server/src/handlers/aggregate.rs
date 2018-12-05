@@ -13,6 +13,7 @@ use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
+use std::time::Instant;
 use tesseract_core::Database;
 use tesseract_core::Query as TsQuery;
 
@@ -75,15 +76,18 @@ pub fn aggregate_handler(
 
     info!("Sql query: {}", sql);
 
+    let time_start = Instant::now();
     ChClient::connect(req.state().clickhouse_options.clone())
         .and_then(|c| c.ping())
         .and_then(move |c| c.query_all(&sql[..]))
         .from_err()
-        .and_then(|(block, _)| {
-            info!("Block: {:?}", block);
+        .and_then(move |(block, _)| {
+            let timing = time_start.elapsed();
+            info!("Time for sql execution: {}.{}", timing.as_secs(), timing.subsec_millis());
+            //info!("Block: {:?}", block);
 
             let df = block_to_df(block);
-            info!("DF: {:?}", df);
+            //info!("DF: {:?}", df);
 
             Ok(HttpResponse::Ok().finish())
             //Ok(_) => Ok(HttpResponse::Ok().finish()),

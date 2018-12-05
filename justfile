@@ -7,5 +7,8 @@ serve-release:
 serve-debug:
     watchexec -r -s SIGKILL 'cargo build && RUST_LOG=debug ./target/debug/tesseract'
 
+serve-release-debug:
+    watchexec -r -s SIGKILL 'cargo build --release && RUST_LOG=debug ./target/release/tesseract'
+
 check:
     watchexec cargo check
