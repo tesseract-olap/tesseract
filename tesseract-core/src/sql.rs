@@ -106,18 +106,27 @@ pub struct DrilldownSql {
     pub table: Table,
     pub primary_key: String,
     pub foreign_key: String,
-    pub key_column: String,
-    pub name_column: Option<String>,
+    pub level_columns: Vec<LevelColumn>,
 }
 
 impl DrilldownSql {
     fn col_string(&self) -> String {
-        if let Some(ref name_col) = self.name_column {
-            format!("{}, {}", name_col, self.key_column)
-        } else {
-            self.key_column.clone()
-        }
+        let cols = self.level_columns.iter()
+            .map(|l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("{}, {}", name_col, l.key_column)
+                } else {
+                    l.key_column.clone()
+                }
+            });
+
+        join(cols, ", ")
     }
+}
+
+pub struct LevelColumn {
+    pub key_column: String,
+    pub name_column: Option<String>,
 }
 
 pub struct CutSql {

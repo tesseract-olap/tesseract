@@ -21,6 +21,7 @@ use self::sql::{
     MeasureSql,
     MemberType,
     TableSql,
+    LevelColumn,
 };
 pub use self::query::Query;
 
@@ -43,7 +44,8 @@ impl Schema {
         &self,
         cube: &str,
         query: &Query,
-        db: Database
+        db: Database,
+        parents: bool,
         ) -> Result<String, Error>
     {
         // First do checks, like making sure there's a measure, and that there's
@@ -62,7 +64,7 @@ impl Schema {
         let cut_cols = self.cube_cut_cols(&cube, &query.cuts)
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
 
-        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns)
+        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
 
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
@@ -148,7 +150,13 @@ impl Schema {
         Ok(res)
     }
 
-    fn cube_drill_cols(&self, cube_name: &str, drills: &[Drilldown]) -> Result<Vec<DrilldownSql>, Error> {
+    fn cube_drill_cols(
+        &self,
+        cube_name: &str,
+        drills: &[Drilldown],
+        parents: bool,
+        ) -> Result<Vec<DrilldownSql>, Error>
+    {
         let cube = self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
             .ok_or(format_err!("Could not find cube"))?;
@@ -162,9 +170,7 @@ impl Schema {
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == drill.0.hierarchy)
                 .ok_or(format_err!("could not find hierarchy for drill"))?;
-            let level = hier.levels.iter()
-                .find(|lvl| lvl.name == drill.0.level)
-                .ok_or(format_err!("could not find hierarchy for drill"))?;
+            let levels = &hier.levels;
 
             // table currently required in hierarchy
             let table = hier.table
@@ -179,15 +185,34 @@ impl Schema {
                 .clone()
                 .ok_or(format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
 
-            let key_column = level.key_column.clone();
-            let name_column = level.name_column.clone();
+            // logic for getting level columns.
+            // if parents = true, then get all columns down to level
+            // if not,then just level
+            let level_idx = hier.levels.iter()
+                .position(|lvl| lvl.name == drill.0.level)
+                .ok_or(format_err!("could not find hierarchy for drill"))?;
+
+            let mut level_columns = vec![];
+
+            if parents {
+                for i in 0..=level_idx {
+                    level_columns.push(LevelColumn {
+                        key_column: levels[i].key_column.clone(),
+                        name_column: levels[i].name_column.clone(),
+                    });
+                }
+            } else {
+                level_columns.push(LevelColumn {
+                    key_column: levels[level_idx].key_column.clone(),
+                    name_column: levels[level_idx].name_column.clone(),
+                });
+            }
 
             res.push(DrilldownSql {
                 table,
                 primary_key,
                 foreign_key,
-                key_column,
-                name_column,
+                level_columns,
             });
         }
 
