@@ -47,7 +47,7 @@ impl Schema {
         cube: &str,
         query: &Query,
         db: Database,
-        ) -> Result<String, Error>
+        ) -> Result<(String, Vec<String>), Error>
     {
         // First do checks, like making sure there's a measure, and that there's
         // either a cut or drilldown
@@ -71,15 +71,26 @@ impl Schema {
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
 
+        // getting headers, not for sql but needed for formatting
+        let drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, query.parents)
+            .map_err(|err| format_err!("Error getting drill heaers: {}", err))?;
+
+        let mea_headers = self.cube_mea_headers(&cube, &query.measures)
+            .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
+
+        let headers = [&drill_headers[..], &mea_headers[..]].concat();
 
         // now feed the database metadata into the sql generator
         match db {
             Database::Clickhouse => {
-                Ok(sql::clickhouse_sql(
+                Ok((
+                    sql::clickhouse_sql(
                     table,
                     &cut_cols,
                     &drill_cols,
                     &mea_cols,
+                    ),
+                    headers,
                 ))
             }
         }
@@ -219,6 +230,7 @@ impl Schema {
 
         Ok(res)
     }
+
     fn cube_mea_cols(&self, cube_name: &str, meas: &[Measure]) -> Result<Vec<MeasureSql>, Error> {
         let cube = self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
@@ -235,6 +247,74 @@ impl Schema {
                 column: mea.column.clone(),
                 aggregator: mea.aggregator.clone(),
             });
+        }
+
+        Ok(res)
+    }
+
+    fn cube_drill_headers(
+        &self,
+        cube_name: &str,
+        drills: &[Drilldown],
+        parents: bool,
+        ) -> Result<Vec<String>, Error>
+    {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mut level_headers = vec![];
+
+        for drill in drills {
+            let dim = cube.dimensions.iter()
+                .find(|dim| dim.name == drill.0.dimension)
+                .ok_or(format_err!("could not find dimension for drill"))?;
+            let hier = dim.hierarchies.iter()
+                .find(|hier| hier.name == drill.0.hierarchy)
+                .ok_or(format_err!("could not find hierarchy for drill"))?;
+            let levels = &hier.levels;
+
+            // logic for getting level names.
+            // if parents = true, then get all columns down to level
+            // if not,then just level name
+            let level_idx = hier.levels.iter()
+                .position(|lvl| lvl.name == drill.0.level)
+                .ok_or(format_err!("could not find hierarchy for drill"))?;
+
+
+            // In this section, need to watch out for whether there's both a
+            // key column and a name column and add ID to the first if necessary
+            if parents {
+                for i in 0..=level_idx {
+                    if levels[i].name_column.is_some() {
+                        level_headers.push(levels[i].name.clone() + " ID");
+                    }
+                    level_headers.push(levels[i].name.clone());
+                }
+            } else {
+                if levels[level_idx].name_column.is_some() {
+                    level_headers.push(levels[level_idx].name.clone() + " ID");
+                }
+                level_headers.push(levels[level_idx].name.clone());
+            }
+        }
+
+        Ok(level_headers)
+    }
+
+    fn cube_mea_headers(&self, cube_name: &str, meas: &[Measure]) -> Result<Vec<String>, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mut res = vec![];
+
+        for measure in meas {
+            let mea = cube.measures.iter()
+                .find(|m| m.name == measure.0)
+                .ok_or(format_err!("could not find measure in cube"))?;
+
+            res.push(mea.name.clone());
         }
 
         Ok(res)

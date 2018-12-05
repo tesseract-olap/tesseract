@@ -64,7 +64,7 @@ pub fn aggregate_handler(
         .schema
         .sql_query(&cube, &ts_query, Database::Clickhouse);
 
-    let sql = match sql_result {
+    let (sql, headers) = match sql_result {
         Ok(sql) => sql,
         Err(err) => {
             return Box::new(
@@ -76,6 +76,7 @@ pub fn aggregate_handler(
     };
 
     info!("Sql query: {}", sql);
+    info!("Headers: {:?}", headers);
 
     let time_start = Instant::now();
     ChClient::connect(req.state().clickhouse_options.clone())
@@ -88,7 +89,6 @@ pub fn aggregate_handler(
             debug!("Block: {:?}", block);
 
             let df = block_to_df(block)?;
-            let headers = vec![];
 
             match format_csv(&headers, df) {
                 Ok(res) => Ok(HttpResponse::Ok().body(res)),

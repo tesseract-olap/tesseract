@@ -8,7 +8,7 @@ pub fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
         .from_writer(vec![]);
 
     // write header
-    //wtr.write_record(headers)?;
+    wtr.write_record(headers)?;
 
     let mut row_buf = vec![];
 
