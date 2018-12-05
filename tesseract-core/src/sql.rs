@@ -177,7 +177,7 @@ impl DrilldownSql {
         let cols = self.level_columns.iter()
             .map(|l| {
                 if let Some(ref name_col) = l.name_column {
-                    format!("{}, {}", name_col, l.key_column)
+                    format!("{}, {}", l.key_column, name_col)
                 } else {
                     l.key_column.clone()
                 }
