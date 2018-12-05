@@ -115,7 +115,9 @@ pub fn clickhouse_sql(
     // TODO allow for differently named cols to be joined on. (using an alias for as)
 
     let mut sub_queries = fact_sql;
-    let mut current_dim_cols = vec![];
+
+    // initialize current dim cols with inline drills and idx cols (all dim cols)
+    let mut current_dim_cols = vec![all_dim_cols];
 
     for dim_subquery in dim_subqueries {
         // This section needed to accumulate the dim cols that are being selected over
@@ -250,8 +252,9 @@ struct DimSubquery {
 fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubquery {
     match drill {
         Some(drill) => {
-            let mut sql = format!("select {} from {}",
+            let mut sql = format!("select {}, {} from {}",
                 drill.col_string(),
+                drill.primary_key.clone(),
                 drill.table.full_name(),
             );
             if let Some(cut) = cut {
