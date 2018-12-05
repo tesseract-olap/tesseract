@@ -11,6 +11,7 @@ pub struct Query {
     pub cuts: Vec<Cut>,
     pub drilldowns: Vec<Drilldown>,
     pub measures: Vec<Measure>,
+    pub parents: bool,
 }
 
 impl Query {
@@ -19,6 +20,7 @@ impl Query {
             drilldowns: vec![],
             cuts: vec![],
             measures: vec![],
+            parents: false,
         }
     }
 }
