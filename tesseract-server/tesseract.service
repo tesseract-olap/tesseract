@@ -1,0 +1,17 @@
+[Unit]
+Description=tesseract olap server
+After=network.target
+
+[Service]
+User=deploy
+Group=deploy
+Type=simple
+RemainAfterExit=yes
+Environment=RUST_LOG=info
+Environment=CLICKHOUSE_DATABASE_URL=127.0.0.1:9000
+Environment=TESSERACT_SCHEMA_PATH=schema.json
+ExecStart=tesseract
+TimeoutSec=600
+
+[Install]
+WantedBy=multi-user.target
