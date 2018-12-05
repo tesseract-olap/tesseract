@@ -9,7 +9,7 @@ mod query;
 use failure::{Error, format_err};
 
 pub use self::dataframe::{DataFrame, Column, ColumnData};
-use self::format::format_csv;
+use self::format::{format_csv, FormatType};
 use self::names::{
     Cut,
     Drilldown,
@@ -99,8 +99,11 @@ impl Schema {
     //pub fn post_calculations(cal: &Calculations, df: DataFrame) -> DataFrame {
     //}
 
-    pub fn format_results(&self, headers: &[String], df: DataFrame) -> Result<String, Error> {
-        Ok(format_csv(headers, df)?)
+    pub fn format_results(&self, headers: &[String], df: DataFrame, format_type: FormatType) -> Result<String, Error> {
+        match format_type {
+            FormatType::Csv => Ok(format_csv(headers, df)?),
+            _ => Ok(format_csv(headers, df)?),
+        }
     }
 }
 

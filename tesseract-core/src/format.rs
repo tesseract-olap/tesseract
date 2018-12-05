@@ -3,6 +3,11 @@ use failure::Error;
 
 use crate::dataframe::{DataFrame, ColumnData};
 
+pub enum FormatType{
+    Csv,
+    JsonRecords,
+}
+
 pub fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
     let mut wtr = csv::WriterBuilder::new()
         .from_writer(vec![]);
