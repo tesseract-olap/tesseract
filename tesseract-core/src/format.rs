@@ -1,5 +1,7 @@
 use csv;
 use failure::{Error, format_err};
+use serde_json::json;
+use std::collections::HashMap;
 
 use crate::dataframe::{DataFrame, ColumnData};
 
@@ -24,7 +26,7 @@ impl std::str::FromStr for FormatType {
 pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType) -> Result<String, Error> {
     match format_type {
         FormatType::Csv => Ok(format_csv(headers, df)?),
-        _ => Ok(format_csv(headers, df)?),
+        FormatType::JsonRecords => Ok(format_jsonrecords(headers, df)?),
     }
 }
 
@@ -64,4 +66,40 @@ fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
     let res = String::from_utf8(wtr.into_inner()?)?;
 
     Ok(res)
+}
+
+fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error> {
+    // each HashMap is a row
+    let mut rows = vec![];
+
+
+    // write data
+    for row_idx in 0..df.len() {
+        let mut row = HashMap::new();
+        for col_idx in 0..df.columns.len() {
+            let val = match df.columns[col_idx].column_data {
+                ColumnData::Int8(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Int16(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Int32(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Int64(ref ns) => ns[row_idx].to_string(),
+                ColumnData::UInt8(ref ns) => ns[row_idx].to_string(),
+                ColumnData::UInt16(ref ns) => ns[row_idx].to_string(),
+                ColumnData::UInt32(ref ns) => ns[row_idx].to_string(),
+                ColumnData::UInt64(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Float32(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Float64(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Text(ref ss) => ss[row_idx].to_string(),
+            };
+
+            row.insert(&headers[col_idx], val);
+        }
+
+        rows.push(row);
+    }
+
+    let res = json!({
+        "data": rows,
+    });
+
+    Ok(res.to_string())
 }
