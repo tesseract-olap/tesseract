@@ -46,8 +46,7 @@ fn main() -> Result<(), Error> {
         .or(opt.clickhouse_db_url.ok_or(format_err!("")))
         .expect("No Clickhouse DB url found");
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
-        .clone()
-        .unwrap_or("schema.json".to_owned());
+        .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
     // Initialize Clickhouse
     let ch_options = ChOptions::new(
@@ -57,7 +56,8 @@ fn main() -> Result<(), Error> {
     );
 
     // Initialize Schema
-    let schema_str = std::fs::read_to_string(&schema_path)?;
+    let schema_str = std::fs::read_to_string(&schema_path)
+        .map_err(|_| format_err!("Schema file not found at {}", schema_path))?;
     let schema = Schema::from_json(&schema_str)?;
 
     // Initialize Server
