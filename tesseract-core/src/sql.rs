@@ -124,6 +124,8 @@ impl DrilldownSql {
     }
 }
 
+// TODO make level column an enum, to deal better with
+// levels with only key column and no name column?
 pub struct LevelColumn {
     pub key_column: String,
     pub name_column: Option<String>,
@@ -226,49 +228,77 @@ mod test {
     use super::*;
 
     #[test]
+    /// Tests:
+    /// - basic sql generation
+    /// - join dim table or inline
+    /// - first join dim that matches fact table primary key
+    /// - cuts on multi-level dim
+    /// - parents
+    ///
+    /// TODO:
+    /// - unique
     fn test_clickhouse_sql() {
-        let table = "test_table";
+        let table = TableSql {
+            name: "sales".into(),
+            primary_key: Some("product_id".into()),
+        };
         let cuts = vec![
             CutSql {
-                column: "age".into(),
+                foreign_key: "product_id".into(),
+                primary_key: "product_id".into(),
+                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+                column: "product_group_id".into(),
                 members: vec!["3".into()],
                 member_type: MemberType::NonText,
             },
         ];
         let drills = vec![
-            DrilldownSql { column: "geo".into() },
-            DrilldownSql { column: "age".into() },
+            // this dim is inline, so should use the fact table
+            // also has parents, so has 
+            DrilldownSql {
+                foreign_key: "date_id".into(),
+                primary_key: "date_id".into(),
+                table: Table { name: "".into(), schema: None, primary_key: None },
+                level_columns: vec![
+                    LevelColumn {
+                        key_column: "year".into(),
+                        name_column: Some("year".into()),
+                    },
+                    LevelColumn {
+                        key_column: "month".into(),
+                        name_column: Some("month".into()),
+                    },
+                    LevelColumn {
+                        key_column: "day".into(),
+                        name_column: Some("day".into()),
+                    },
+                ],
+            },
+            // this comes second, but should join first because of primary key match
+            // on fact table
+            DrilldownSql {
+                foreign_key: "product_id".into(),
+                primary_key: "product_id".into(),
+                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+                level_columns: vec![
+                    LevelColumn {
+                        key_column: "product_group_id".into(),
+                        name_column: Some("product_group_label".into()),
+                    },
+                    LevelColumn {
+                        key_column: "product_id_raw".into(),
+                        name_column: Some("product_label".into()),
+                    },
+                ],
+            },
         ];
         let meas = vec![
             MeasureSql { aggregator: "sum".into(), column: "quantity".into() }
         ];
 
         assert_eq!(
-            clickhouse_sql(table, &cuts, &drills, &meas),
-            "
-            select geo_id, geo_label, product_id, product_label, sum(mea0)
-            from
-            (
-                (
-                    select geo_id, geo_label from dim_geo
-                )
-                all inner join
-                (
-
-                    (
-                        select product_cat_id, product_cat_label, product_id from dim_product
-                        where product_cat_id = 11
-                    )
-                    all inner join
-                    (
-                        select geo_id, product_id, sum(quantity) as mea0 from sales
-                        group by geo, product_id)
-                    ) using product_id
-                ) using geo_id
-            )
-            group by geo_id, geo_label, product_id, product_label
-            order by geo_id, geo_label, product_id, product_label asc
-            ;".to_owned()
+            clickhouse_sql(table, cuts, drills, meas),
+            "".to_owned()
         );
     }
 
@@ -276,11 +306,17 @@ mod test {
     fn cutsql_membertype() {
         let cuts = vec![
             CutSql {
+                foreign_key: "".into(),
+                primary_key: "".into(),
+                table: Table { name: "".into(), schema: None, primary_key: None },
                 column: "geo".into(),
                 members: vec!["1".into(), "2".into()],
                 member_type: MemberType::Text,
             },
             CutSql {
+                foreign_key: "".into(),
+                primary_key: "".into(),
+                table: Table { name: "".into(), schema: None, primary_key: None },
                 column: "age".into(),
                 members: vec!["3".into()],
                 member_type: MemberType::NonText,
@@ -288,12 +324,12 @@ mod test {
         ];
 
         assert_eq!(
-            format!("{}", cuts[0]),
-            "where geo in ('1', '2')",
+            cuts[0].members_string(),
+            "'1', '2'",
         );
         assert_eq!(
-            format!("{}", cuts[1]),
-            "where age in (3)",
+            cuts[1].members_string(),
+            "3",
         );
     }
 }
