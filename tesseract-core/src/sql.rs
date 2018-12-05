@@ -80,25 +80,17 @@ pub fn clickhouse_sql(
     //
     // This is also the section wher inline dims and cuts get put
 
-    let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
-    let dim_idx_cols = join(dim_idx_cols, ", ");
-
     let mea_cols = meas
         .iter()
         .enumerate()
         .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
     let mea_cols = join(mea_cols, ", ");
 
-    let mut fact_sql = format!("select {}", dim_idx_cols,);
+    let inline_dim_cols = inline_drills.iter().map(|d| d.col_string());
+    let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
+    let all_dim_cols = join(inline_dim_cols.chain(dim_idx_cols), ", ");
 
-    if !inline_drills.is_empty() {
-        let inline_dim_cols = inline_drills.iter().map(|d| d.col_string());
-        let inline_dim_cols = join(inline_dim_cols, ", ");
-
-        fact_sql.push_str(
-            &format!(", {}", inline_dim_cols)
-        );
-    }
+    let mut fact_sql = format!("select {}", all_dim_cols);
 
     fact_sql.push_str(
         &format!(", {} from {}", mea_cols, table.name)
@@ -116,15 +108,36 @@ pub fn clickhouse_sql(
     }
 
     fact_sql.push_str(
-        &format!(" group by {}", dim_idx_cols)
+        &format!(" group by {}", all_dim_cols)
     );
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
     // TODO allow for differently named cols to be joined on. (using an alias for as)
 
     let mut sub_queries = fact_sql;
+    let mut current_dim_cols = vec![];
+
     for dim_subquery in dim_subqueries {
-        sub_queries = format!("({}) all inner join ({}) using {}", dim_subquery.sql, sub_queries, dim_subquery.foreign_key);
+        // This section needed to accumulate the dim cols that are being selected over
+        // the recursive joins.
+        if let Some(cols) = dim_subquery.dim_cols {
+            current_dim_cols.push(cols);
+        }
+
+        let sub_queries_dim_cols = if !current_dim_cols.is_empty() {
+            format!("{}, ", join(current_dim_cols.iter(), ", "))
+        } else {
+            "".to_owned()
+        };
+
+        // Now construct subquery
+        sub_queries = format!("select {}{} from ({}) all inner join ({}) using {}",
+            sub_queries_dim_cols,
+            join((0..meas.len()).map(|i| format!("m{}", i)), ", "),
+            dim_subquery.sql,
+            sub_queries,
+            dim_subquery.foreign_key
+        );
     }
 
     // Finally, wrap with final agg and result
@@ -228,6 +241,7 @@ impl MeasureSql {
 struct DimSubquery {
     sql: String,
     foreign_key: String,
+    dim_cols: Option<String>,
 }
 
 /// Collects a drilldown and cut together to create a subquery for the dimension table
@@ -249,6 +263,7 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
             return DimSubquery {
                 sql,
                 foreign_key: drill.foreign_key.clone(),
+                dim_cols: Some(drill.col_string()),
             };
         },
         None => {
@@ -263,6 +278,7 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
                 return DimSubquery {
                     sql,
                     foreign_key: cut.foreign_key.clone(),
+                    dim_cols: None,
                 }
             }
         }
@@ -271,6 +287,7 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
     DimSubquery {
         sql: "".to_owned(),
         foreign_key: "".to_owned(),
+        dim_cols: None,
     }
 }
 
@@ -384,4 +401,6 @@ mod test {
             "3",
         );
     }
+
+    // TODO test: drilldowns%5B%5D=Date.Year&measures%5B%5D=Quantity, which has only inline dim
 }
