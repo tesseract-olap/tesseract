@@ -8,6 +8,7 @@ use tesseract_core::Schema;
 
 use crate::handlers::{
     aggregate_handler,
+    aggregate_default_handler,
     index_handler,
     metadata_handler,
     metadata_all_handler,
@@ -29,6 +30,9 @@ pub fn create_app(clickhouse_options: ChOptions, schema: Schema) -> App<AppState
         })
         .resource("/cubes/{cube}", |r| {
             r.method(Method::GET).with(metadata_handler)
+        })
+        .resource("/cubes/{cube}/aggregate", |r| {
+            r.method(Method::GET).with(aggregate_default_handler)
         })
         .resource("/cubes/{cube}/aggregate{format}", |r| {
             r.method(Method::GET).with(aggregate_handler)

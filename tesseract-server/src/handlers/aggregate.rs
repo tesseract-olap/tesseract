@@ -21,11 +21,27 @@ use tesseract_core::Query as TsQuery;
 use crate::app::AppState;
 use crate::clickhouse::block_to_df;
 
+pub fn aggregate_default_handler(
+    (req, cube): (HttpRequest<AppState>, Path<String>)
+    ) -> FutureResponse<HttpResponse>
+{
+    let cube_format = (cube.into_inner(), ".csv".to_owned());
+    do_aggregate(req, cube_format)
+}
+
 pub fn aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
     ) -> FutureResponse<HttpResponse>
 {
-    let (cube, format) = cube_format.into_inner();
+    do_aggregate(req, cube_format.into_inner())
+}
+
+pub fn do_aggregate(
+    req: HttpRequest<AppState>,
+    cube_format: (String, String),
+    ) -> FutureResponse<HttpResponse>
+{
+    let (cube, format) = cube_format;
     info!("cube: {}, format: {}", cube, format);
 
     let query = req.query_string();
