@@ -1,7 +1,7 @@
 use csv;
 use failure::{Error, format_err};
+use indexmap::IndexMap;
 use serde_json::json;
-use std::collections::HashMap;
 
 use crate::dataframe::{DataFrame, ColumnData};
 
@@ -75,7 +75,7 @@ fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error
 
     // write data
     for row_idx in 0..df.len() {
-        let mut row = HashMap::new();
+        let mut row = IndexMap::new();
         for col_idx in 0..df.columns.len() {
             let val = match df.columns[col_idx].column_data {
                 ColumnData::Int8(ref ns) => ns[row_idx].to_string(),
