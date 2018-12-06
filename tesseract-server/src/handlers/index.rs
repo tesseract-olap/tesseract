@@ -4,6 +4,7 @@ use actix_web::{
     Result as ActixResult,
 };
 use serde_derive::Serialize;
+use structopt::clap::crate_version;
 
 use crate::app::AppState;
 
@@ -12,7 +13,7 @@ pub fn index_handler(_req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
         Status {
             status: "ok".to_owned(),
             // TODO set this as the Cargo.toml version, after structopt added
-            version: "0.1.0".to_owned(),
+            tesseract_version: crate_version!().to_owned(),
         }
     ))
 }
@@ -20,5 +21,5 @@ pub fn index_handler(_req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 #[derive(Debug, Serialize)]
 struct Status {
     status: String,
-    version: String,
+    tesseract_version: String,
 }
