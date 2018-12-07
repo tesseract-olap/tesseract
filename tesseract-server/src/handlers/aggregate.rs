@@ -112,7 +112,7 @@ pub fn do_aggregate(
         .and_then(|c| c.ping())
         .and_then(move |c| c.query_all(&sql[..]))
         .from_err()
-        .and_then(move |(block, _)| {
+        .and_then(move |(_, block)| {
             let timing = time_start.elapsed();
             info!("Time for sql execution: {}.{}", timing.as_secs(), timing.subsec_millis());
             debug!("Block: {:?}", block);
