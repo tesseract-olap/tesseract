@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "tesseract-clickhouse",
     "tesseract-core",
     "tesseract-server",
     "data-gen"

@@ -1,3 +1,4 @@
+mod backend;
 mod dataframe;
 pub mod format;
 pub mod names;
@@ -8,6 +9,7 @@ mod query;
 
 use failure::{Error, format_err};
 
+pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
 use self::names::{
     Cut,

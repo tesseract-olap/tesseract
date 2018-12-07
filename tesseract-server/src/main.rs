@@ -22,16 +22,15 @@
 //! different databases. Supported: clickhouse, postgres, mysql, sqlite.
 
 mod app;
-mod clickhouse;
 mod handlers;
 
 use actix_web::server;
-use clickhouse_rs::Options as ChOptions;
 use dotenv::dotenv;
 use failure::{Error, format_err};
 use std::env;
 use structopt::StructOpt;
 
+use tesseract_clickhouse::Clickhouse;
 use tesseract_core::Schema;
 
 fn main() -> Result<(), Error> {
@@ -42,18 +41,33 @@ fn main() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
-    let clickhouse_db_url = env::var("CLICKHOUSE_DATABASE_URL")
-        .or(opt.clickhouse_db_url.ok_or(format_err!("")))
-        .expect("No Clickhouse DB url found");
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
-    // Initialize Clickhouse
-    let ch_options = ChOptions::new(
-        clickhouse_db_url
-            .parse()
-            .expect("Could not parse CH db url")
-    );
+    // DB options: For now, only one db at a time, and only
+    // clickhouse or mysql
+    // They're set to conflict with each other in cli opts
+    let mut db_url = String::new();
+
+    let clickhouse_db = env::var("CLICKHOUSE_DATABASE_URL")
+        .or(opt.clickhouse_db_url.ok_or(format_err!("")))
+        .and_then(|url| {
+            let db = Clickhouse::from_addr(&url);
+            db_url = url;
+            db
+        });
+
+    let mysql_db= env::var("MYSQL_DATABASE_URL")
+        .or(opt.mysql_db_url.ok_or(format_err!("")))
+        .and_then(|url| {
+            // TODO replace with mysql backend here
+            let db = Clickhouse::from_addr(&url);
+            db_url = url;
+            db
+        });
+
+    let db = clickhouse_db.or(mysql_db)
+        .expect("No database url found");
 
     // Initialize Schema
     let schema_str = std::fs::read_to_string(&schema_path)
@@ -62,13 +76,13 @@ fn main() -> Result<(), Error> {
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(ch_options.clone(), schema.clone()))
+    server::new(move|| app::create_app(db.clone(), schema.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
 
     println!("Tesseract listening on: {}", server_addr);
-    println!("Tesseract clickhouse:   {}", clickhouse_db_url);
+    println!("Tesseract database:   {}", db_url);
     println!("Tesseract schema path:  {}", schema_path);
 
     sys.run();
@@ -81,8 +95,13 @@ fn main() -> Result<(), Error> {
 struct Opt {
     #[structopt(short="a", long="addr")]
     address: Option<String>,
+
     #[structopt(long="clickhouse-url")]
+    #[structopt(conflicts_with="mysql-url")]
     clickhouse_db_url: Option<String>,
+
+    #[structopt(long="mysql-url")]
+    mysql_db_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -20,5 +20,8 @@ serde_json = "1.0.24"
 serde_qs = "0.4.1"
 structopt = "0.2.13"
 
+[dependencies.tesseract-clickhouse]
+path = "../tesseract-clickhouse"
+
 [dependencies.tesseract-core]
 path = "../tesseract-core"

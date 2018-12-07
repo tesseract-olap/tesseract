@@ -1,0 +1,14 @@
+[package]
+authors = ["Walther Chen <walther.chen@gmail.com>"]
+edition = "2018"
+name = "tesseract-clickhouse"
+version = "0.1.0"
+
+[dependencies]
+clickhouse-rs = "0.1.1"
+failure = "0.1.2"
+futures = "0.1.25"
+log = "0.4.3"
+
+[dependencies.tesseract-core]
+path = "../tesseract-core"

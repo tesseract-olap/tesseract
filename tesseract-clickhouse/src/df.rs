@@ -142,3 +142,4 @@ pub fn block_to_df(block: Block) -> Result<DataFrame, Error> {
 
     Ok(DataFrame::from_vec(df))
 }
+

@@ -3,8 +3,7 @@ use actix_web::{
     middleware,
     App,
 };
-use clickhouse_rs:: Options as ChOptions;
-use tesseract_core::Schema;
+use tesseract_core::{Backend, Schema};
 
 use crate::handlers::{
     aggregate_handler,
@@ -14,13 +13,13 @@ use crate::handlers::{
     metadata_all_handler,
 };
 
-pub struct AppState {
-    pub clickhouse_options: ChOptions,
+pub struct AppState<B: 'static + Backend> {
+    pub backend: B,
     pub schema: Schema,
 }
 
-pub fn create_app(clickhouse_options: ChOptions, schema: Schema) -> App<AppState> {
-    App::with_state(AppState { clickhouse_options, schema })
+pub fn create_app<B: Backend>(backend: B, schema: Schema) -> App<AppState<B>> {
+    App::with_state(AppState { backend, schema })
         .middleware(middleware::Logger::default())
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)
