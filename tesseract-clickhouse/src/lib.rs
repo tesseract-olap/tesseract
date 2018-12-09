@@ -46,5 +46,10 @@ impl Backend for Clickhouse {
 
         Box::new(fut)
     }
+
+    // https://users.rust-lang.org/t/solved-is-it-possible-to-clone-a-boxed-trait-object/1714/4
+    fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
+        Box::new((*self).clone())
+    }
 }
 

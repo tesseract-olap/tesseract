@@ -47,6 +47,17 @@ fn main() -> Result<(), Error> {
     // DB options: For now, only one db at a time, and only
     // clickhouse or mysql
     // They're set to conflict with each other in cli opts
+    //
+    // Also, casting to trait object:
+    // https://stackoverflow.com/questions/38294911/how-do-i-cast-a-literal-value-to-a-trait-object
+    //
+    // Also, it needs to be safe to send between threads, so add trait bounds
+    // Send + Sync.
+    // https://users.rust-lang.org/t/sending-trait-objects-between-threads/2374
+    //
+    // Also, it needs to be clonable to move into the closure that is
+    // used to initialize actix-web, so there's a litle boilerplate
+    // to implement https://users.rust-lang.org/t/solved-is-it-possible-to-clone-a-boxed-trait-object/1714/4
     let mut db_url = String::new();
 
     let clickhouse_db = env::var("CLICKHOUSE_DATABASE_URL")
@@ -55,16 +66,18 @@ fn main() -> Result<(), Error> {
             let db = Clickhouse::from_addr(&url);
             db_url = url;
             db
-        });
+        })
+        .map(|db| Box::new(db) as Box<dyn Backend + Send + Sync>);
 
-    let mysql_db= env::var("MYSQL_DATABASE_URL")
+    let mysql_db = env::var("MYSQL_DATABASE_URL")
         .or(opt.mysql_db_url.ok_or(format_err!("")))
         .and_then(|url| {
             // TODO replace with mysql backend here
-            let db = Clickhouse::from_addr(&url);
+            let db = MySql::from_addr(&url);
             db_url = url;
             db
-        });
+        })
+        .map(|db| Box::new(db) as Box<dyn Backend + Send + Sync>);
 
     let db = clickhouse_db.or(mysql_db)
         .expect("No database url found");
@@ -111,3 +124,32 @@ struct EnvVars {
     pub schema_filepath: Option<String>,
 }
 
+// TODO delete below:
+// This is just for testing the trait object
+
+use tesseract_core::{Backend, DataFrame};
+use futures::future::Future;
+
+#[derive(Clone)]
+pub struct MySql {}
+
+impl MySql {
+    fn from_addr(s: &str) -> Result<Self, Error> {
+        Ok(MySql{})
+    }
+}
+
+impl Backend for MySql {
+    fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>>
+    {
+        Box::new(
+            futures::future::result(
+                Ok(DataFrame::new())
+            )
+        )
+    }
+
+    fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
+        Box::new((*self).clone())
+    }
+}

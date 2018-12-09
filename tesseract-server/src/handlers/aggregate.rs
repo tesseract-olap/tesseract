@@ -14,27 +14,27 @@ use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Database;
-use tesseract_core::{Backend, Query as TsQuery};
+use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 
-pub fn aggregate_default_handler<B: Backend>(
-    (req, cube): (HttpRequest<AppState<B>>, Path<String>)
+pub fn aggregate_default_handler(
+    (req, cube): (HttpRequest<AppState>, Path<String>)
     ) -> FutureResponse<HttpResponse>
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
     do_aggregate(req, cube_format)
 }
 
-pub fn aggregate_handler<B: Backend>(
-    (req, cube_format): (HttpRequest<AppState<B>>, Path<(String, String)>)
+pub fn aggregate_handler(
+    (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
     ) -> FutureResponse<HttpResponse>
 {
     do_aggregate(req, cube_format.into_inner())
 }
 
-pub fn do_aggregate<B: Backend>(
-    req: HttpRequest<AppState<B>>,
+pub fn do_aggregate(
+    req: HttpRequest<AppState>,
     cube_format: (String, String),
     ) -> FutureResponse<HttpResponse>
 {

@@ -5,12 +5,11 @@ use actix_web::{
     Result as ActixResult
 };
 use log::*;
-use tesseract_core::Backend;
 
 use crate::app::AppState;
 
-pub fn metadata_handler<B: Backend>(
-    (req, cube): (HttpRequest<AppState<B>>, Path<String>)
+pub fn metadata_handler(
+    (req, cube): (HttpRequest<AppState>, Path<String>)
     ) -> ActixResult<HttpResponse>
 {
     info!("Metadata for cube: {}", cube);
@@ -23,8 +22,8 @@ pub fn metadata_handler<B: Backend>(
     }
 }
 
-pub fn metadata_all_handler<B: Backend>(
-    req: HttpRequest<AppState<B>>
+pub fn metadata_all_handler(
+    req: HttpRequest<AppState>
     ) -> ActixResult<HttpResponse>
 {
     info!("Metadata for all");

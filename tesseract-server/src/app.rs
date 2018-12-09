@@ -13,12 +13,12 @@ use crate::handlers::{
     metadata_all_handler,
 };
 
-pub struct AppState<B: 'static + Backend> {
-    pub backend: B,
+pub struct AppState {
+    pub backend: Box<dyn Backend + Sync + Send>,
     pub schema: Schema,
 }
 
-pub fn create_app<B: Backend>(backend: B, schema: Schema) -> App<AppState<B>> {
+pub fn create_app(backend: Box<dyn Backend + Sync + Send>, schema: Schema) -> App<AppState> {
     App::with_state(AppState { backend, schema })
         .middleware(middleware::Logger::default())
         .resource("/", |r| {

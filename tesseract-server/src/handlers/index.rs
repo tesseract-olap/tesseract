@@ -5,11 +5,10 @@ use actix_web::{
 };
 use serde_derive::Serialize;
 use structopt::clap::crate_version;
-use tesseract_core::Backend;
 
 use crate::app::AppState;
 
-pub fn index_handler<B: Backend>(_req: HttpRequest<AppState<B>>) -> ActixResult<HttpResponse> {
+pub fn index_handler(_req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(
         Status {
             status: "ok".to_owned(),
