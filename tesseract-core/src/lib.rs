@@ -74,7 +74,7 @@ impl Schema {
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
 
         // getting headers, not for sql but needed for formatting
-        let drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, query.parents)
+        let drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
             .map_err(|err| format_err!("Error getting drill heaers: {}", err))?;
 
         let mea_headers = self.cube_mea_headers(&cube, &query.measures)
@@ -289,10 +289,14 @@ impl Schema {
         Ok(res)
     }
 
+    /// order should mirror DrillSql col_string,
+    /// which should be levels first and then properties after
+    /// (for each drilldown)
     fn cube_drill_headers(
         &self,
         cube_name: &str,
         drills: &[Drilldown],
+        properties: &[Property],
         parents: bool,
         ) -> Result<Vec<String>, Error>
     {
@@ -334,6 +338,31 @@ impl Schema {
                 }
                 level_headers.push(levels[level_idx].name.clone());
             }
+
+            // for this drill, get related properties.
+            // - filter by properties for this drilldown
+            // - for each property, get the level
+            let property_columns: Result<Vec<_>, _>= properties.iter()
+                .filter(|p| p.level_name == drill.0)
+                .map(|p| {
+                    levels.iter()
+                        .find(|lvl| lvl.name == p.level_name.level)
+                        .and_then(|lvl| {
+                            if let Some(ref properties) = lvl.properties {
+                                properties.iter()
+                                    .find(|schema_p| schema_p.name == p.property)
+
+                            } else {
+                                None
+                            }
+                        })
+                        .map(|p| p.name.clone())
+                        .ok_or(format_err!("cannot find property for {}", p))
+                })
+                .collect();
+            let property_columns = property_columns?;
+
+            level_headers.extend(property_columns);
         }
 
         Ok(level_headers)
