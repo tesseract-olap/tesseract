@@ -62,6 +62,7 @@ pub struct LevelConfig {
     pub name: String,
     pub key_column: String,
     pub name_column: Option<String>,
+    pub properties: Option<Vec<PropertyConfig>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -78,4 +79,9 @@ pub struct TableConfig {
     pub primary_key: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct PropertyConfig {
+    pub name: String,
+    pub column: String,
+}
 
