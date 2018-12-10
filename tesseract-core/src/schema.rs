@@ -8,6 +8,7 @@ use crate::schema_config::{
     LevelConfig,
     MeasureConfig,
     TableConfig,
+    PropertyConfig,
 };
 use crate::sql::MemberType;
 
@@ -143,14 +144,23 @@ pub struct Level {
     pub name: String,
     pub key_column: String,
     pub name_column: Option<String>,
+    pub properties: Option<Vec<Property>>,
 }
 
 impl From<LevelConfig> for Level {
     fn from(level_config: LevelConfig) -> Self {
+        let properties = level_config.properties
+            .map(|ps| {
+                ps.into_iter()
+                    .map(|p| p.into())
+                    .collect()
+            });
+
         Level {
             name: level_config.name,
             key_column: level_config.key_column,
             name_column: level_config.name_column,
+            properties,
         }
     }
 }
@@ -195,6 +205,21 @@ impl Table {
             format!("{}.{}", schema, self.name)
         } else {
             self.name.to_owned()
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Property{
+    pub name: String,
+    pub column: String,
+}
+
+impl From<PropertyConfig> for Property {
+    fn from(property_config: PropertyConfig) -> Self {
+        Property {
+            name: property_config.name,
+            column: property_config.column,
         }
     }
 }

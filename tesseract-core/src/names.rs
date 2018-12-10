@@ -287,8 +287,8 @@ impl FromStr for Cut {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Property {
-    level_name: LevelName,
-    property: String,
+    pub level_name: LevelName,
+    pub property: String,
 }
 
 impl Property {
