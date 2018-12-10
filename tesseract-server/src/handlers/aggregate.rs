@@ -152,16 +152,24 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             })
             .unwrap_or(Ok(vec![]));
 
+        let properties: Result<Vec<_>, _> = agg_query_opt.properties
+            .map(|ms| {
+                ms.iter().map(|m| m.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]));
+
         let drilldowns = drilldowns?;
         let cuts = cuts?;
         let measures = measures?;
         let parents = agg_query_opt.parents.unwrap_or(false);
+        let properties = properties?;
 
         Ok(TsQuery {
             drilldowns,
             cuts,
             measures,
             parents,
+            properties,
         })
     }
 }
