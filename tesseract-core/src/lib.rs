@@ -108,7 +108,7 @@ impl Schema {
             .find(|cube| &cube.name == &cube_name)
             .map(|cube| {
                 TableSql {
-                    name: cube.name.clone(),
+                    name: cube.table.name.clone(),
                     primary_key: cube.table.primary_key.clone(),
                 }
             })
