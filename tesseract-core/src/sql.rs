@@ -352,6 +352,7 @@ mod test {
                         name_column: None,
                     },
                 ],
+                property_columns: vec![],
             },
             // this comes second, but should join first because of primary key match
             // on fact table
@@ -369,6 +370,7 @@ mod test {
                         name_column: Some("product_label".into()),
                     },
                 ],
+                property_columns: vec![],
             },
         ];
         let meas = vec![
@@ -377,7 +379,7 @@ mod test {
 
         assert_eq!(
             clickhouse_sql(table, &cuts, &drills, &meas),
-            "select year, month, day, product_group_label, product_group_id, product_label, product_id_raw, sum(m0) from (select year, month, day, product_id, product_group_label, product_group_id, product_label, product_id_raw, m0 from (select product_group_label, product_group_id, product_label, product_id_raw, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales group by year, month, day, product_id) using product_id) group by year, month, day, product_group_label, product_group_id, product_label, product_id_raw order by year, month, day, product_group_label, product_group_id, product_label, product_id_raw asc;".to_owned()
+            "select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc;".to_owned()
         );
     }
 
@@ -409,6 +411,31 @@ mod test {
         assert_eq!(
             cuts[1].members_string(),
             "3",
+        );
+    }
+
+    #[test]
+    fn drilldown_with_properties() {
+        let drill = DrilldownSql {
+            foreign_key: "product_id".into(),
+            primary_key: "product_id".into(),
+            table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+            level_columns: vec![
+                LevelColumn {
+                    key_column: "product_group_id".into(),
+                    name_column: Some("product_group_label".into()),
+                },
+                LevelColumn {
+                    key_column: "product_id_raw".into(),
+                    name_column: Some("product_label".into()),
+                },
+            ],
+            property_columns: vec!["hexcode".to_owned(), "form".to_owned()],
+        };
+
+        assert_eq!(
+            drill.col_string(),
+            "product_group_id, product_group_label, product_id_raw, product_label, hexcode, form".to_owned(),
         );
     }
 
