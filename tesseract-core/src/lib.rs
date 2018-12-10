@@ -15,6 +15,7 @@ use self::names::{
     Cut,
     Drilldown,
     Measure,
+    Property,
 };
 pub use self::schema::{Schema, Cube};
 use self::schema_config::SchemaConfig;
@@ -66,7 +67,7 @@ impl Schema {
         let cut_cols = self.cube_cut_cols(&cube, &query.cuts)
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
 
-        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, query.parents)
+        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, &query.properties, query.parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
 
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
@@ -170,10 +171,13 @@ impl Schema {
         Ok(res)
     }
 
+    // TODO as currently written, properties that don't get picked up by a drilldown
+    // will just silently fail.
     fn cube_drill_cols(
         &self,
         cube_name: &str,
         drills: &[Drilldown],
+        properties: &[Property],
         parents: bool,
         ) -> Result<Vec<DrilldownSql>, Error>
     {
@@ -183,6 +187,7 @@ impl Schema {
 
         let mut res = vec![];
 
+        // now iterate throw drill/property tuples
         for drill in drills {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == drill.0.dimension)
@@ -191,6 +196,29 @@ impl Schema {
                 .find(|hier| hier.name == drill.0.hierarchy)
                 .ok_or(format_err!("could not find hierarchy for drill"))?;
             let levels = &hier.levels;
+
+            // for this drill, get related properties.
+            // - filter by properties for this drilldown
+            // - for each property, get the level
+            let property_columns: Result<Vec<_>, _>= properties.iter()
+                .filter(|p| p.level_name == drill.0)
+                .map(|p| {
+                    levels.iter()
+                        .find(|lvl| lvl.name == p.level_name.level)
+                        .and_then(|lvl| {
+                            if let Some(ref properties) = lvl.properties {
+                                properties.iter()
+                                    .find(|schema_p| schema_p.name == p.property)
+
+                            } else {
+                                None
+                            }
+                        })
+                        .map(|p| p.column.clone())
+                        .ok_or(format_err!("cannot find property for {}", p))
+                })
+                .collect();
+            let property_columns = property_columns?;
 
             // No table (means inline table) will replace with fact table
             let table = hier.table
@@ -208,7 +236,7 @@ impl Schema {
             // logic for getting level columns.
             // if parents = true, then get all columns down to level
             // if not,then just level
-            let level_idx = hier.levels.iter()
+            let level_idx = levels.iter()
                 .position(|lvl| lvl.name == drill.0.level)
                 .ok_or(format_err!("could not find hierarchy for drill"))?;
 
@@ -233,6 +261,7 @@ impl Schema {
                 primary_key,
                 foreign_key,
                 level_columns,
+                property_columns,
             });
         }
 
