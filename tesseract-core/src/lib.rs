@@ -59,6 +59,15 @@ impl Schema {
         if query.drilldowns.is_empty() && query.cuts.is_empty(){
             return Err(format_err!("Either a drilldown or cut is required"));
         }
+        // also check that properties have a matching drilldown
+        for property in &query.properties {
+            let has_drill = query.drilldowns.iter()
+                .any(|d| d.0 == property.level_name);
+
+            if !has_drill {
+                return Err(format_err!("Property {} has no matching drilldown", property));
+            }
+        }
 
         // now get the database metadata
         let table = self.cube_table(&cube)
