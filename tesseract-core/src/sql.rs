@@ -259,6 +259,13 @@ struct DimSubquery {
 fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubquery {
     match drill {
         Some(drill) => {
+            // TODO
+            // - make primary key optional and propagate.
+            // if primary key exists
+            // if primary key == lowest level col,
+            // Or will just making an alias for the primary key work?
+            // Then don't add primary key here.
+            // Also, make primary key optional?
             let mut sql = format!("select {}, {} from {}",
                 drill.col_string(),
                 drill.primary_key.clone(),
