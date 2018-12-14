@@ -93,6 +93,17 @@ impl Schema {
                     ),
                     headers,
                 ))
+            },
+            Database::MySql => {
+                Ok((
+                    sql::clickhouse_sql(
+                    table,
+                    &cut_cols,
+                    &drill_cols,
+                    &mea_cols,
+                    ),
+                    headers,
+                ))
             }
         }
     }
@@ -320,4 +331,5 @@ impl Schema {
 
 pub enum Database {
     Clickhouse,
+    MySql
 }

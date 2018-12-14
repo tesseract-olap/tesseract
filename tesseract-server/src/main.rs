@@ -29,6 +29,9 @@ use dotenv::dotenv;
 use failure::{Error, format_err};
 use std::env;
 use structopt::StructOpt;
+use tesseract_mysql::MySql;
+
+use tesseract_core::{Backend};
 
 use tesseract_clickhouse::Clickhouse;
 use tesseract_core::Schema;
@@ -122,34 +125,4 @@ struct EnvVars {
     pub flush_secret: Option<String>,
     pub database_url: String,
     pub schema_filepath: Option<String>,
-}
-
-// TODO delete below:
-// This is just for testing the trait object
-
-use tesseract_core::{Backend, DataFrame};
-use futures::future::Future;
-
-#[derive(Clone)]
-pub struct MySql {}
-
-impl MySql {
-    fn from_addr(s: &str) -> Result<Self, Error> {
-        Ok(MySql{})
-    }
-}
-
-impl Backend for MySql {
-    fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>>
-    {
-        Box::new(
-            futures::future::result(
-                Ok(DataFrame::new())
-            )
-        )
-    }
-
-    fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
-        Box::new((*self).clone())
-    }
 }
