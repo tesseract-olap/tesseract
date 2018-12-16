@@ -65,13 +65,12 @@ pub fn queryresult_to_df(query_result: QueryResult) -> Result<DataFrame, Error> 
                     ColumnData::Float64(vec![]),
                 ))
             },
-            s => bail!("mysql sql type not supported: {:?}", s),
+            unknown => bail!("MySQL type not supported: {:?}", unknown),
         }
     }
 
     query_result.for_each(|x| {
         let row = x.unwrap();
-        // for (col_idx, mut col) in tcolumn_list.iter().enumerate() {
         for col_idx in 0..tcolumn_list.len() {
             let column_data = tcolumn_list
                 .get_mut(col_idx)
