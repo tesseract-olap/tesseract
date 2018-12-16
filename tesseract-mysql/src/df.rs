@@ -47,13 +47,7 @@ pub fn queryresult_to_df(query_result: QueryResult) -> Result<DataFrame, Error> 
                     ColumnData::UInt64(vec![]),
                 ))
             },
-            MYSQL_TYPE_VARCHAR => {
-                tcolumn_list.push(Column::new(
-                    col_name.to_string(),
-                    ColumnData::Text(vec![]),
-                ))
-            },
-            MYSQL_TYPE_VAR_STRING => {
+            MYSQL_TYPE_VARCHAR | MYSQL_TYPE_VAR_STRING=> {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
                     ColumnData::Text(vec![]),
