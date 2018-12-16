@@ -27,8 +27,6 @@ impl Backend for MySql {
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
         println!("TRYING {:?}", sql);
 
-        // TODO in reality we should setup the pool in the constructor and not for each query!
-        // let pool = my::Pool::new(self.options.to_string()).unwrap();
         let query_result = self.pool.prep_exec(sql.to_string(), ()).unwrap();
 
         // done() let's us convert a regular function into a future
