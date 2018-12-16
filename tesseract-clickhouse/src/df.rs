@@ -2,7 +2,7 @@
 
 use failure::{Error, bail};
 
-use clickhouse_rs::Block;
+use clickhouse_rs::{Block, SqlType};
 use tesseract_core::{DataFrame, Column, ColumnData};
 
 // from source code of clickhouse_rs
@@ -24,74 +24,74 @@ pub fn block_to_df(block: Block) -> Result<DataFrame, Error> {
     let mut df = vec![];
 
     for col in block.columns() {
-        match &*col.sql_type().to_string() {
-            "UInt8" => {
+        match col.sql_type() {
+            SqlType::UInt8 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::UInt8(vec![]),
                 ))
             },
-            "UInt16" => {
+            SqlType::UInt16 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::UInt16(vec![]),
                 ))
             },
-            "UInt32" => {
+            SqlType::UInt32 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::UInt32(vec![]),
                 ))
             },
-            "UInt64" => {
+            SqlType::UInt64 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::UInt64(vec![]),
                 ))
             },
-            "Int8" => {
+            SqlType::Int8 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::Int8(vec![]),
                 ))
             },
-            "Int16" => {
+            SqlType::Int16 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::Int16(vec![]),
                 ))
             },
-            "Int32" => {
+            SqlType::Int32 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::Int32(vec![]),
                 ))
             },
-            "Int64" => {
+            SqlType::Int64 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::Int64(vec![]),
                 ))
             },
-            "String" => {
+            SqlType::String => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::Text(vec![]),
                 ))
             },
-            "Float32" => {
+            SqlType::Float32 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::Float32(vec![]),
                 ))
             },
-            "Float64" => {
+            SqlType::Float64 => {
                 df.push(Column::new(
                     col.name().to_owned(),
                     ColumnData::Float64(vec![]),
                 ))
             },
-            s => bail!("clickhouse sql type not supported: {}", s),
+            s => bail!("{} is not supported by tesseract", s),
         }
     }
 
