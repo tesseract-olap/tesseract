@@ -24,13 +24,13 @@ pub fn queryresult_to_df(query_result: QueryResult) -> Result<DataFrame, Error> 
             MYSQL_TYPE_TINY => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
-                    ColumnData::UInt8(vec![]),
+                    ColumnData::Int8(vec![]),
                 ))
             },
             MYSQL_TYPE_SHORT => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
-                    ColumnData::UInt16(vec![]),
+                    ColumnData::Int16(vec![]),
                 ))
             },
             // confusing but TYPE_LONG is regular integer (32-bit)
@@ -38,13 +38,13 @@ pub fn queryresult_to_df(query_result: QueryResult) -> Result<DataFrame, Error> 
             MYSQL_TYPE_LONG => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
-                    ColumnData::UInt32(vec![]),
+                    ColumnData::Int32(vec![]),
                 ))
             },
             MYSQL_TYPE_LONGLONG => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
-                    ColumnData::UInt64(vec![]),
+                    ColumnData::Int64(vec![]),
                 ))
             },
             MYSQL_TYPE_VARCHAR | MYSQL_TYPE_VAR_STRING=> {
