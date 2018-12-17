@@ -35,6 +35,7 @@ pub fn clickhouse_sql(
     let mut ext_cuts: Vec<_> = cuts.iter()
         .filter(|c| c.table.name != table.name)
         .collect();
+    let ext_cuts_for_inline = ext_cuts.clone();
 
     let inline_drills: Vec<_> = drills.iter()
         .filter(|d| d.table.name == table.name)
@@ -62,7 +63,7 @@ pub fn clickhouse_sql(
         }
     }
 
-    for cut in ext_cuts {
+    for cut in &ext_cuts {
         dim_subqueries.push(
             dim_subquery(None, Some(cut))
         );
@@ -74,7 +75,7 @@ pub fn clickhouse_sql(
         }
     }
 
-    // Now set up table table query
+    // Now set up fact table query
     // Group by is hardcoded in because there's an assumption that at least one
     // dim exists
     //
@@ -96,14 +97,28 @@ pub fn clickhouse_sql(
         &format!(", {} from {}", mea_cols, table.name)
     );
 
-    if !inline_cuts.is_empty() {
+    if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
         let inline_cut_clause = inline_cuts
             .iter()
-            .map(|c| format!(" {} in ({})", c.column, c.members_string()));
-        let inline_cut_clause = join(inline_cut_clause, "and ");
+            .map(|c| format!("{} in ({})", c.column, c.members_string()));
+
+        let ext_cut_clause = ext_cuts_for_inline
+            .iter()
+            .map(|c| {
+                format!("{} in (select {} from {} where {} in ({}))",
+                    c.foreign_key,
+                    c.primary_key,
+                    c.table.full_name(),
+                    c.column,
+                    c.members_string(),
+                    )
+            });
+
+
+        let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "and ");
 
         fact_sql.push_str(
-            &format!(" where {}", inline_cut_clause)
+            &format!(" where {}", cut_clause)
         );
     }
 
