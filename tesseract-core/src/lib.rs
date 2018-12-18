@@ -111,6 +111,12 @@ impl Schema {
                 .collect();
             let top_sort_columns = top_sort_columns?;
 
+            // check that by_dimension is in query.drilldowns
+            query.drilldowns.iter()
+                .map(|d| &d.0)
+                .find(|name| **name == t.by_dimension)
+                .ok_or(format_err!("Top by_dimension must be in drilldowns"))?;
+
             Some(TopSql {
                 n: t.n,
                 by_column: self.get_dim_col(&cube, &t.by_dimension)?,
