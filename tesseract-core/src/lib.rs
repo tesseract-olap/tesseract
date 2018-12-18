@@ -219,8 +219,6 @@ impl Schema {
         Ok(res)
     }
 
-    // TODO as currently written, properties that don't get picked up by a drilldown
-    // will just silently fail.
     fn cube_drill_cols(
         &self,
         cube_name: &str,
@@ -286,7 +284,7 @@ impl Schema {
             // if not,then just level
             let level_idx = levels.iter()
                 .position(|lvl| lvl.name == drill.0.level)
-                .ok_or(format_err!("could not find hierarchy for drill"))?;
+                .ok_or(format_err!("could not find level for drill"))?;
 
             let mut level_columns = vec![];
 
