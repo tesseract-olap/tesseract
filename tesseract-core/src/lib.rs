@@ -183,13 +183,13 @@ impl Schema {
         for cut in cuts {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == cut.level_name.dimension)
-                .ok_or(format_err!("could not find dimension for cut"))?;
+                .ok_or(format_err!("could not find dimension for cut {}", cut.level_name))?;
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == cut.level_name.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for cut"))?;
+                .ok_or(format_err!("could not find hierarchy for cut {}", cut.level_name))?;
             let level = hier.levels.iter()
                 .find(|lvl| lvl.name == cut.level_name.level)
-                .ok_or(format_err!("could not find level for cut"))?;
+                .ok_or(format_err!("could not find level for cut {}", cut.level_name))?;
 
             // No table (means inline table) will replace with fact table
             let table = hier.table
@@ -237,10 +237,10 @@ impl Schema {
         for drill in drills {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == drill.0.dimension)
-                .ok_or(format_err!("could not find dimension for drill"))?;
+                .ok_or(format_err!("could not find dimension for drill {}", drill.0))?;
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == drill.0.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for drill"))?;
+                .ok_or(format_err!("could not find hierarchy for drill {}", drill.0))?;
             let levels = &hier.levels;
 
             // for this drill, get related properties.
@@ -284,7 +284,7 @@ impl Schema {
             // if not,then just level
             let level_idx = levels.iter()
                 .position(|lvl| lvl.name == drill.0.level)
-                .ok_or(format_err!("could not find level for drill"))?;
+                .ok_or(format_err!("could not find level for drill {}", drill.0))?;
 
             let mut level_columns = vec![];
 
@@ -324,7 +324,7 @@ impl Schema {
         for measure in meas {
             let mea = cube.measures.iter()
                 .find(|m| m.name == measure.0)
-                .ok_or(format_err!("could not find dimension for drill"))?;
+                .ok_or(format_err!("could not find measure for {}", measure.0))?;
 
             res.push(MeasureSql {
                 column: mea.column.clone(),
