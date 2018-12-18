@@ -2,6 +2,7 @@ use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::schema::Table;
+use crate::query::{LimitQuery, SortDirection};
 
 /// Error checking is done before this point. This string formatter
 /// accepts any input
@@ -10,6 +11,9 @@ pub fn clickhouse_sql(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    top: &Option<TopSql>,
+    sort: &Option<SortSql>,
+    limit: &Option<LimitSql>,
     ) -> String
 {
     // Before first section, need to separate out inline dims.
@@ -161,16 +165,68 @@ pub fn clickhouse_sql(
     let final_drill_cols = drills.iter().map(|drill| drill.col_string());
     let final_drill_cols = join(final_drill_cols, ", ");
 
-    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{})", mea.aggregator, i));
+    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{}) as final_m{}", mea.aggregator, i, i));
     let final_mea_cols = join(final_mea_cols, ", ");
 
-    format!("select {}, {} from ({}) group by {} order by {} asc;",
+    // This is the final result of the groupings.
+    let mut final_sql = format!("select {}, {} from ({}) group by {}",
         final_drill_cols,
         final_mea_cols,
         sub_queries,
         final_drill_cols,
-        final_drill_cols,
-    )
+    );
+
+    // Now that final groupings are done, do wrapping options
+    // like top, filter, sort
+    if let Some(top) = top {
+        final_sql = format!("select * from ({}) order by {} {} limit {} by {}",
+            final_sql,
+            join(&top.sort_columns, ", "),
+            top.sort_direction.sql_string(),
+            top.n,
+            top.by_column,
+        );
+    }
+
+    // There's a final wrapper clause no matter what.
+    // - it sorts by final_drill_cols
+    // - unless there's a specific sort, which just goes to head of cols
+    // - or if there's a top, sort by the by_dim col.
+    // - limits
+    let limit_sql = {
+        if let Some(limit) = limit {
+            format!("limit {}", limit.n)
+        } else {
+            "".to_string()
+        }
+    };
+
+    let sort_sql = {
+        if let Some(sort) = sort {
+            format!("order by {}, {} {}",
+                sort.column,
+                final_drill_cols,
+                sort.direction.sql_string()
+            )
+        } else if let Some(top) = top {
+            format!("order by {} asc, {}",
+                top.by_column,
+                join(top.sort_columns.iter().map(|c| format!("{} desc", c)), ", "),
+            )
+        } else {
+            // default uses just final drill cols
+            format!("order by {} asc",
+                final_drill_cols,
+            )
+        }
+    };
+    final_sql = format!("select * from ({}) {} {}",
+        final_sql,
+        sort_sql,
+        limit_sql,
+    );
+
+    final_sql
 }
 
 #[derive(Debug, Clone)]
@@ -259,6 +315,33 @@ impl MeasureSql {
     fn agg_col_string(&self) -> String {
         format!("{}({})", self.aggregator, self.column)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct TopSql {
+    pub n: u64,
+    pub by_column: String,
+    pub sort_columns: Vec<String>,
+    pub sort_direction: SortDirection,
+}
+
+#[derive(Debug, Clone)]
+pub struct LimitSql {
+    pub n: u64,
+}
+
+impl From<LimitQuery> for LimitSql {
+    fn from(l: LimitQuery) -> Self {
+        LimitSql {
+            n: l.n,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SortSql {
+    pub direction: SortDirection,
+    pub column: String,
 }
 
 #[derive(Debug, Clone)]

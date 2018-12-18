@@ -1,4 +1,6 @@
 #![feature(try_from)]
+#![feature(transpose_result)]
+
 //! tesseract-core contains Schema;
 //! Schema is stateless; it is constructed from the schema file.
 //! Schema is held in the AppState struct to provide access from a route

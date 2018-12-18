@@ -16,6 +16,7 @@ use self::names::{
     Drilldown,
     Measure,
     Property,
+    LevelName,
 };
 pub use self::schema::{Schema, Cube};
 use self::schema_config::SchemaConfig;
@@ -26,6 +27,8 @@ use self::sql::{
     MemberType,
     TableSql,
     LevelColumn,
+    TopSql,
+    SortSql,
 };
 pub use self::query::Query;
 
@@ -91,6 +94,44 @@ impl Schema {
 
         let headers = [&drill_headers[..], &mea_headers[..]].concat();
 
+        // Options for sorting and limiting
+
+        let limit = query.limit.clone().map(|l| l.into());
+
+        let top = if let Some(ref t) = query.top {
+            // don't want the actual measure column,
+            // want the index so that we can use `m0` etc.
+            let top_sort_columns: Result<Vec<_>, _> = t.sort_measures.iter()
+                .map(|m| {
+                    query.measures.iter()
+                        .position(|col| col == m )
+                        .map(|idx| format!("final_m{}", idx))
+                        .ok_or(format_err!("measure for Top must be in measures"))
+                })
+                .collect();
+            let top_sort_columns = top_sort_columns?;
+
+            Some(TopSql {
+                n: t.n,
+                by_column: self.get_dim_col(&cube, &t.by_dimension)?,
+                sort_columns: top_sort_columns,
+                sort_direction: t.sort_direction.clone(),
+            })
+        } else {
+            None
+        };
+
+        let sort = if let Some(ref s) = query.sort {
+            let sort_column = self.get_mea_col(&cube, &s.measure)?;
+
+            Some(SortSql {
+                direction: s.direction.clone(),
+                column: sort_column,
+            })
+        } else {
+            None
+        };
+
         // now feed the database metadata into the sql generator
         match db {
             Database::Clickhouse => {
@@ -100,6 +141,9 @@ impl Schema {
                     &cut_cols,
                     &drill_cols,
                     &mea_cols,
+                    &top,
+                    &sort,
+                    &limit,
                     ),
                     headers,
                 ))
@@ -382,6 +426,40 @@ impl Schema {
         }
 
         Ok(res)
+    }
+
+    fn get_dim_col(&self, cube_name: &str, level_name: &LevelName) -> Result<String, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let dim = cube.dimensions.iter()
+            .find(|dim| dim.name == level_name.dimension)
+            .ok_or(format_err!("could not find dimension for level name"))?;
+        let hier = dim.hierarchies.iter()
+            .find(|hier| hier.name == level_name.hierarchy)
+            .ok_or(format_err!("could not find hierarchy for level name"))?;
+        let level = hier.levels.iter()
+            .find(|lvl| lvl.name == level_name.level)
+            .ok_or(format_err!("could not find level for level name"))?;
+
+        let column = level.key_column.clone();
+
+        Ok(column)
+    }
+
+    fn get_mea_col(&self, cube_name: &str, measure: &Measure) -> Result<String, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mea = cube.measures.iter()
+            .find(|m| m.name == measure.0)
+            .ok_or(format_err!("could not find level for level name"))?;
+
+        let column = mea.column.clone();
+
+        Ok(column)
     }
 }
 
