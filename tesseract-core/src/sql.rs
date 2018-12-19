@@ -358,6 +358,8 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
     match drill {
         Some(drill) => {
             // TODO
+            // - oops, primary key is mandatory in schema, if not in
+            // schema-config, then it takes the lowest level's key_column
             // - make primary key optional and propagate.
             // if primary key exists
             // if primary key == lowest level col,

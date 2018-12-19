@@ -212,7 +212,7 @@ impl Schema {
                 foreign_key,
                 column,
                 members: cut.members.clone(),
-                member_type: dim.foreign_key_type.clone().unwrap_or(MemberType::NonText),
+                member_type: level.key_type.clone().unwrap_or(MemberType::NonText),
             });
         }
 
