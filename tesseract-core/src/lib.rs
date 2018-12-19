@@ -29,6 +29,7 @@ use self::sql::{
     LevelColumn,
     TopSql,
     SortSql,
+    RcaSql,
 };
 pub use self::query::Query;
 
@@ -138,7 +139,24 @@ impl Schema {
             None
         };
 
-        let rca = None;
+        // TODO check that no overlapping dim or mea cols between rca and others
+        let rca = if let Some(ref rca) = query.rca {
+            let drill_1 = self.cube_drill_cols(&cube, &[rca.drill_1.clone()], &query.properties, query.parents)?;
+            let drill_2 = self.cube_drill_cols(&cube, &[rca.drill_2.clone()], &query.properties, query.parents)?;
+
+            let mea = self.cube_mea_cols(&cube, &[rca.mea.clone()])?
+                .get(0)
+                .ok_or(format_err!("no measure found for rca"))?
+                .clone();
+
+            Some(RcaSql {
+                drill_1,
+                drill_2,
+                mea,
+            })
+        } else {
+            None
+        };
 
         // now feed the database metadata into the sql generator
         match db {

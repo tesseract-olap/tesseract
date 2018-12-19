@@ -19,6 +19,7 @@ pub struct Query {
     pub top: Option<TopQuery>,
     pub sort: Option<SortQuery>,
     pub limit: Option<LimitQuery>,
+    pub rca: Option<RcaQuery>,
 }
 
 impl Query {
@@ -32,6 +33,7 @@ impl Query {
             top: None,
             sort: None,
             limit: None,
+            rca: None,
         }
     }
 }
@@ -135,4 +137,11 @@ impl FromStr for SortDirection {
             _ => bail!("Could not parse sort direction"),
         })
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct RcaQuery {
+    pub drill_1: Drilldown,
+    pub drill_2: Drilldown,
+    pub mea: Measure,
 }

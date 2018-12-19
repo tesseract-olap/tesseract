@@ -157,10 +157,10 @@ pub struct SortSql {
 #[derive(Debug, Clone)]
 pub struct RcaSql {
     // level col for dim 1
-    pub drill_1: DrilldownSql,
+    pub drill_1: Vec<DrilldownSql>,
     // level col for dim 2
-    pub drill_2: DrilldownSql,
-    pub mea_sql: MeasureSql,
+    pub drill_2: Vec<DrilldownSql>,
+    pub mea: MeasureSql,
 }
 
 #[derive(Debug, Clone)]

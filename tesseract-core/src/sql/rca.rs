@@ -25,16 +25,16 @@ pub fn calculate(
     let mut c_drills = drills.to_vec();
     let     d_drills = drills.to_vec();
 
-    a_drills.push(rca.drill_1.clone());
-    a_drills.push(rca.drill_2.clone());
+    a_drills.extend_from_slice(&rca.drill_1);
+    a_drills.extend_from_slice(&rca.drill_2);
 
-    b_drills.push(rca.drill_2.clone());
+    b_drills.extend_from_slice(&rca.drill_2);
 
-    c_drills.push(rca.drill_1.clone());
+    c_drills.extend_from_slice(&rca.drill_1);
 
     // prepend the rca sql to meas
     let all_meas = {
-        let mut temp = vec![rca.mea_sql.clone()];
+        let mut temp = vec![rca.mea.clone()];
         temp.extend_from_slice(meas);
         temp
     };
