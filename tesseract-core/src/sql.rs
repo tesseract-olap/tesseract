@@ -45,7 +45,7 @@ pub struct TableSql {
     pub primary_key: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DrilldownSql {
     pub table: Table,
     pub primary_key: String,
@@ -77,7 +77,7 @@ impl DrilldownSql {
 
 // TODO make level column an enum, to deal better with
 // levels with only key column and no name column?
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LevelColumn {
     pub key_column: String,
     pub name_column: Option<String>,
