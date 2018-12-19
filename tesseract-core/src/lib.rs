@@ -138,6 +138,8 @@ impl Schema {
             None
         };
 
+        let rca = None;
+
         // now feed the database metadata into the sql generator
         match db {
             Database::Clickhouse => {
@@ -150,6 +152,7 @@ impl Schema {
                     &top,
                     &sort,
                     &limit,
+                    &rca,
                     ),
                     headers,
                 ))

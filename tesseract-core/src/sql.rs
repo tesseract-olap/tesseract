@@ -1,11 +1,15 @@
 mod options;
 mod primary_agg;
+mod rca;
 
 use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::schema::Table;
-use crate::sql::{options::wrap_options, primary_agg::primary_agg};
+use crate::sql::{
+    options::wrap_options,
+    primary_agg::primary_agg,
+};
 use crate::query::{LimitQuery, SortDirection};
 
 /// Error checking is done before this point. This string formatter
@@ -15,13 +19,20 @@ pub fn clickhouse_sql(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    // TODO put Filters and Calculations into own structs
     top: &Option<TopSql>,
     sort: &Option<SortSql>,
     limit: &Option<LimitSql>,
+    rca: &Option<RcaSql>,
     ) -> String
 {
-
-    let (primary_aggregation, final_drill_cols) = primary_agg(table, cuts, drills, meas);
+    let (primary_aggregation, final_drill_cols) = {
+        if let Some(rca) = rca {
+            rca::calculate(table, cuts, drills, meas, rca)
+        } else {
+            primary_agg(table, cuts, drills, meas)
+        }
+    };
 
     let final_sql = wrap_options(primary_aggregation, &final_drill_cols, top, sort, limit);
 
@@ -141,6 +152,15 @@ impl From<LimitQuery> for LimitSql {
 pub struct SortSql {
     pub direction: SortDirection,
     pub column: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RcaSql {
+    // level col for dim 1
+    pub d1_col: String,
+    // level col for dim 2
+    pub d2_col: String,
+    pub mea_col: String,
 }
 
 #[derive(Debug, Clone)]
@@ -284,8 +304,8 @@ mod test {
         ];
 
         assert_eq!(
-            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None),
-            "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc".to_owned()
+            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None),
+            "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
         );
     }
 
