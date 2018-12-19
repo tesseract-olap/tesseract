@@ -1,4 +1,4 @@
-use clickhouse_rs::{Client, Options};
+use clickhouse_rs::{Options, Pool};
 use failure::Error;
 use futures::future::Future;
 use log::{debug, info};
@@ -11,7 +11,7 @@ use self::df::block_to_df;
 
 #[derive(Clone)]
 pub struct Clickhouse {
-    options: Options
+    pool: Pool,
 }
 
 impl Clickhouse {
@@ -22,8 +22,10 @@ impl Clickhouse {
                 .expect("Could not parse Clickhouse db url")
         );
 
+        let pool = Pool::new(options);
+
         Ok(Clickhouse {
-            options,
+            pool,
         })
     }
 }
@@ -32,7 +34,8 @@ impl Backend for Clickhouse {
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
         let time_start = Instant::now();
 
-        let fut = Client::connect(self.options.clone())
+        let fut = self.pool
+            .get_handle()
             .and_then(|c| c.ping())
             .and_then(move |c| c.query_all(&sql[..]))
             .from_err()
