@@ -1,0 +1,181 @@
+use itertools::join;
+
+use super::{
+    TableSql,
+    CutSql,
+    DrilldownSql,
+    MeasureSql,
+    dim_subquery,
+};
+
+/// Error checking is done before this point. This string formatter
+/// accepts any input
+pub fn primary_agg(
+    table: &TableSql,
+    cuts: &[CutSql],
+    drills: &[DrilldownSql],
+    meas: &[MeasureSql],
+    ) -> (String, String)
+{
+    // Before first section, need to separate out inline dims.
+    // These are the ones that have the same dim table as fact table.
+    //
+    // First section, get drill/cut combos lined up.
+    //
+    // First "zip" drill and cut into DimSubquery
+    // - pop drill, attempt to match with cut (remove cut if used (sounds sketchy, but could swap
+    // with empty struct))
+    // - go through remaining cuts (if had swapped empty struct, go through ones that aren't empty)
+    //
+    // Then, the order is:
+    // - any dimension that has the same primary key as the
+    // - doesn't matter
+    //
+    // So just swap the primary key DimSubquery to the head
+
+    let mut ext_drills: Vec<_> = drills.iter()
+        .filter(|d| d.table.name != table.name)
+        .collect();
+
+    let mut ext_cuts: Vec<_> = cuts.iter()
+        .filter(|c| c.table.name != table.name)
+        .collect();
+    let ext_cuts_for_inline = ext_cuts.clone();
+
+    let inline_drills: Vec<_> = drills.iter()
+        .filter(|d| d.table.name == table.name)
+        .collect();
+
+    let inline_cuts: Vec<_> = cuts.iter()
+        .filter(|c| c.table.name == table.name)
+        .collect();
+
+    let mut dim_subqueries = vec![];
+
+    // external drill and cuts section
+
+    while let Some(drill) = ext_drills.pop() {
+        if let Some(idx) = ext_cuts.iter().position(|c| c.table == drill.table) {
+            let cut = ext_cuts.swap_remove(idx);
+
+            dim_subqueries.push(
+                dim_subquery(Some(drill),Some(cut))
+            );
+        } else {
+            dim_subqueries.push(
+                dim_subquery(Some(drill), None)
+            );
+        }
+    }
+
+    for cut in &ext_cuts {
+        dim_subqueries.push(
+            dim_subquery(None, Some(cut))
+        );
+    }
+
+    if let Some(ref primary_key) = table.primary_key {
+        if let Some(idx) = dim_subqueries.iter().position(|d| d.foreign_key == *primary_key) {
+            dim_subqueries.swap(0, idx);
+        }
+    }
+
+    // Now set up fact table query
+    // Group by is hardcoded in because there's an assumption that at least one
+    // dim exists
+    //
+    // This is also the section wher inline dims and cuts get put
+
+    let mea_cols = meas
+        .iter()
+        .enumerate()
+        .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
+    let mea_cols = join(mea_cols, ", ");
+
+    let inline_dim_cols = inline_drills.iter().map(|d| d.col_string());
+    let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
+    let all_dim_cols = join(inline_dim_cols.chain(dim_idx_cols), ", ");
+
+    let mut fact_sql = format!("select {}", all_dim_cols);
+
+    fact_sql.push_str(
+        &format!(", {} from {}", mea_cols, table.name)
+    );
+
+    if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
+        let inline_cut_clause = inline_cuts
+            .iter()
+            .map(|c| format!("{} in ({})", c.column, c.members_string()));
+
+        let ext_cut_clause = ext_cuts_for_inline
+            .iter()
+            .map(|c| {
+                format!("{} in (select {} from {} where {} in ({}))",
+                    c.foreign_key,
+                    c.primary_key,
+                    c.table.full_name(),
+                    c.column,
+                    c.members_string(),
+                    )
+            });
+
+
+        let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "and ");
+
+        fact_sql.push_str(
+            &format!(" where {}", cut_clause)
+        );
+    }
+
+    fact_sql.push_str(
+        &format!(" group by {}", all_dim_cols)
+    );
+
+    // Now second half, feed DimSubquery into the multiple joins with fact table
+    // TODO allow for differently named cols to be joined on. (using an alias for as)
+
+    let mut sub_queries = fact_sql;
+
+    // initialize current dim cols with inline drills and idx cols (all dim cols)
+    let mut current_dim_cols = vec![all_dim_cols];
+
+    for dim_subquery in dim_subqueries {
+        // This section needed to accumulate the dim cols that are being selected over
+        // the recursive joins.
+        if let Some(cols) = dim_subquery.dim_cols {
+            current_dim_cols.push(cols);
+        }
+
+        let sub_queries_dim_cols = if !current_dim_cols.is_empty() {
+            format!("{}, ", join(current_dim_cols.iter(), ", "))
+        } else {
+            "".to_owned()
+        };
+
+        // Now construct subquery
+        sub_queries = format!("select {}{} from ({}) all inner join ({}) using {}",
+            sub_queries_dim_cols,
+            join((0..meas.len()).map(|i| format!("m{}", i)), ", "),
+            dim_subquery.sql,
+            sub_queries,
+            dim_subquery.foreign_key
+        );
+    }
+
+    // Finally, wrap with final agg and result
+    let final_drill_cols = drills.iter().map(|drill| drill.col_string());
+    let final_drill_cols = join(final_drill_cols, ", ");
+
+    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{}) as final_m{}", mea.aggregator, i, i));
+    let final_mea_cols = join(final_mea_cols, ", ");
+
+    // This is the final result of the groupings.
+    let final_sql = format!("select {}, {} from ({}) group by {}",
+        final_drill_cols,
+        final_mea_cols,
+        sub_queries,
+        final_drill_cols,
+    );
+
+    (final_sql, final_drill_cols)
+}

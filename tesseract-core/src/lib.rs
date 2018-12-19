@@ -143,7 +143,7 @@ impl Schema {
             Database::Clickhouse => {
                 Ok((
                     sql::clickhouse_sql(
-                    table,
+                    &table,
                     &cut_cols,
                     &drill_cols,
                     &mea_cols,
