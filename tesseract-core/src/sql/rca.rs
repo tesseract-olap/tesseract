@@ -32,6 +32,11 @@ pub fn calculate(
 
     c_drills.extend_from_slice(&rca.drill_1);
 
+    println!("a: {:?}", a_drills);
+    println!("b: {:?}", b_drills);
+    println!("c: {:?}", c_drills);
+    println!("d: {:?}", d_drills);
+
     // prepend the rca sql to meas
     let all_meas = {
         let mut temp = vec![rca.mea.clone()];
@@ -81,6 +86,7 @@ pub fn calculate(
     let (c, c_final_drills) = primary_agg(table, &c_cuts, &c_drills, &all_meas);
     let (d, d_final_drills) = primary_agg(table, &d_cuts, &d_drills, &all_meas);
 
+
     // replace final_m0 with letter name.
     // I put the rca measure at the beginning of the drills, so it should
     // always be m0
@@ -91,19 +97,19 @@ pub fn calculate(
 
     // now do the final join
 
-    let mut final_sql = format!("select * from ({} all inner join {}) using {}",
+    let mut final_sql = format!("select * from ({}) all inner join ({}) using {}",
         a,
         b,
         b_final_drills,
     );
 
-    final_sql = format!("select * from ({} all inner join {}) using {}",
+    final_sql = format!("select * from ({}) all inner join ({}) using {}",
         c,
         final_sql,
         c_final_drills
     );
 
-    final_sql = format!("select * from ({} all inner join {}) using {}",
+    final_sql = format!("select * from ({}) all inner join ({}) using {}",
         d,
         final_sql,
         d_final_drills,
@@ -114,87 +120,132 @@ pub fn calculate(
         final_sql,
     );
 
+    // SPECIAL CASE
+    // Hack to deal with no drills on d
+    // Later, make this better
+    final_sql = final_sql.replace("select , ", "select ");
+    final_sql = final_sql.replace("group by )", ")");
+
+
     (final_sql, a_final_drills)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use super::super::*;
 
     #[test]
-    /// Tests:
-    /// - basic sql generation
-    /// - join dim table or inline
-    /// - first join dim that matches fact table primary key
-    /// - cuts on multi-level dim
-    /// - parents
-    ///
-    /// TODO:
-    /// - unique
     fn test_rca_sql() {
         let table = TableSql {
             name: "sales".into(),
             primary_key: Some("product_id".into()),
         };
-        let cuts = vec![
-            CutSql {
-                foreign_key: "product_id".into(),
-                primary_key: "product_id".into(),
-                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
-                column: "product_group_id".into(),
-                members: vec!["3".into()],
-                member_type: MemberType::NonText,
-            },
-        ];
-        let drills = vec![
-            // this dim is inline, so should use the fact table
-            // also has parents, so has 
-            DrilldownSql {
-                foreign_key: "date_id".into(),
-                primary_key: "date_id".into(),
-                table: Table { name: "sales".into(), schema: None, primary_key: None },
-                level_columns: vec![
-                    LevelColumn {
-                        key_column: "year".into(),
-                        name_column: None,
-                    },
-                    LevelColumn {
-                        key_column: "month".into(),
-                        name_column: None,
-                    },
-                    LevelColumn {
-                        key_column: "day".into(),
-                        name_column: None,
-                    },
-                ],
-                property_columns: vec![],
-            },
-            // this comes second, but should join first because of primary key match
-            // on fact table
-            DrilldownSql {
-                foreign_key: "product_id".into(),
-                primary_key: "product_id".into(),
-                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
-                level_columns: vec![
-                    LevelColumn {
-                        key_column: "product_group_id".into(),
-                        name_column: Some("product_group_label".into()),
-                    },
-                    LevelColumn {
-                        key_column: "product_id_raw".into(),
-                        name_column: Some("product_label".into()),
-                    },
-                ],
-                property_columns: vec![],
-            },
-        ];
-        let meas = vec![
-            MeasureSql { aggregator: "sum".into(), column: "quantity".into() }
-        ];
+        //let cuts = vec![
+        //    CutSql {
+        //        foreign_key: "product_id".into(),
+        //        primary_key: "product_id".into(),
+        //        table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+        //        column: "product_group_id".into(),
+        //        members: vec!["3".into()],
+        //        member_type: MemberType::NonText,
+        //    },
+        //];
+        //let drills = vec![
+        //    // this dim is inline, so should use the fact table
+        //    // also has parents, so has 
+        //    DrilldownSql {
+        //        foreign_key: "date_id".into(),
+        //        primary_key: "date_id".into(),
+        //        table: Table { name: "sales".into(), schema: None, primary_key: None },
+        //        level_columns: vec![
+        //            LevelColumn {
+        //                key_column: "year".into(),
+        //                name_column: None,
+        //            },
+        //            LevelColumn {
+        //                key_column: "month".into(),
+        //                name_column: None,
+        //            },
+        //            LevelColumn {
+        //                key_column: "day".into(),
+        //                name_column: None,
+        //            },
+        //        ],
+        //        property_columns: vec![],
+        //    },
+        //    // this comes second, but should join first because of primary key match
+        //    // on fact table
+        //    DrilldownSql {
+        //        foreign_key: "product_id".into(),
+        //        primary_key: "product_id".into(),
+        //        table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+        //        level_columns: vec![
+        //            LevelColumn {
+        //                key_column: "product_group_id".into(),
+        //                name_column: Some("product_group_label".into()),
+        //            },
+        //            LevelColumn {
+        //                key_column: "product_id_raw".into(),
+        //                name_column: Some("product_label".into()),
+        //            },
+        //        ],
+        //        property_columns: vec![],
+        //    },
+        //];
+        //let meas = vec![
+        //    MeasureSql { aggregator: "sum".into(), column: "quantity".into() }
+        //];
+
+        let drill_1 = vec![DrilldownSql {
+            foreign_key: "date_id".into(),
+            primary_key: "date_id".into(),
+            table: Table { name: "sales".into(), schema: None, primary_key: None },
+            level_columns: vec![
+                LevelColumn {
+                    key_column: "year".into(),
+                    name_column: None,
+                },
+                LevelColumn {
+                    key_column: "month".into(),
+                    name_column: None,
+                },
+                LevelColumn {
+                    key_column: "day".into(),
+                    name_column: None,
+                },
+            ],
+            property_columns: vec![],
+        }];
+
+        let drill_2 = vec![DrilldownSql {
+            foreign_key: "product_id".into(),
+            primary_key: "product_id".into(),
+            table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+            level_columns: vec![
+                LevelColumn {
+                    key_column: "product_group_id".into(),
+                    name_column: Some("product_group_label".into()),
+                },
+                LevelColumn {
+                    key_column: "product_id_raw".into(),
+                    name_column: Some("product_label".into()),
+                },
+            ],
+            property_columns: vec![],
+        }];
+
+        let mea = MeasureSql { aggregator: "sum".into(), column: "quantity".into() };
+
+        let rca = RcaSql {
+            drill_1,
+            drill_2,
+            mea,
+        };
 
         assert_eq!(
-            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None),
-            "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
+            clickhouse_sql(&table, &[], &[], &[], &None, &None, &None, &Some(rca)),
+            "".to_owned()
         );
     }
 }
