@@ -46,7 +46,10 @@ pub fn calculate(
                 times, \
                 all_m_in_group, \
                 m_diff \
-            from ({}) \
+            from ({} \
+                order by \
+                    {} \
+            ) \
             group by \
                 {} \
         ) \
@@ -59,6 +62,7 @@ pub fn calculate(
         growth.mea,
         all_drill_cols_except_growth,
         final_sql,
+        growth.time_drill.col_string(),
         all_drill_cols_except_growth,
     );
 
