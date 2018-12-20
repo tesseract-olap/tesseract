@@ -158,6 +158,8 @@ impl Schema {
             None
         };
 
+        let growth = None;
+
         // now feed the database metadata into the sql generator
         match db {
             Database::Clickhouse => {
@@ -171,6 +173,7 @@ impl Schema {
                     &sort,
                     &limit,
                     &rca,
+                    &growth,
                     ),
                     headers,
                 ))

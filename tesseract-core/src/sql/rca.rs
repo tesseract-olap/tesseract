@@ -244,7 +244,7 @@ mod test {
         };
 
         assert_eq!(
-            clickhouse_sql(&table, &[], &[], &[], &None, &None, &None, &Some(rca)),
+            clickhouse_sql(&table, &[], &[], &[], &None, &None, &None, &Some(rca), &None),
             "".to_owned()
         );
     }

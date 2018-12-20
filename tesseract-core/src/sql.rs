@@ -1,3 +1,4 @@
+mod growth;
 mod options;
 mod primary_agg;
 mod rca;
@@ -24,9 +25,10 @@ pub fn clickhouse_sql(
     sort: &Option<SortSql>,
     limit: &Option<LimitSql>,
     rca: &Option<RcaSql>,
+    growth: &Option<GrowthSql>,
     ) -> String
 {
-    let (primary_aggregation, final_drill_cols) = {
+    let (mut final_sql, mut final_drill_cols) = {
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rca)
         } else {
@@ -34,7 +36,13 @@ pub fn clickhouse_sql(
         }
     };
 
-    let final_sql = wrap_options(primary_aggregation, &final_drill_cols, top, sort, limit);
+    if let Some(growth) = growth {
+        let (sql, drill_cols) = growth::calculate(final_sql, &final_drill_cols, growth);
+        final_sql = sql;
+        final_drill_cols = drill_cols;
+    }
+
+    final_sql = wrap_options(final_sql, &final_drill_cols, top, sort, limit);
 
     final_sql
 }
@@ -160,6 +168,12 @@ pub struct RcaSql {
     pub drill_1: Vec<DrilldownSql>,
     // level col for dim 2
     pub drill_2: Vec<DrilldownSql>,
+    pub mea: MeasureSql,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrowthSql {
+    pub time_drill: DrilldownSql,
     pub mea: MeasureSql,
 }
 
@@ -304,7 +318,7 @@ mod test {
         ];
 
         assert_eq!(
-            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None),
+            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
             "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
         );
     }

@@ -1,9 +1,10 @@
+use itertools::join;
+
 use super::{
     LimitSql,
     SortSql,
     TopSql,
 };
-use itertools::join;
 
 pub fn wrap_options(
     final_sql: String,
