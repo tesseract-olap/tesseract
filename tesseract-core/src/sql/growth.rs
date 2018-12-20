@@ -34,7 +34,7 @@ pub fn calculate(
             {}, \
             final_times, \
             final_m, \
-            final_m_diff \
+            (final_m_diff / (final_m - final_m_diff)) as growth \
         from (\
             with \
                 groupArray({}) as times, \
@@ -68,7 +68,7 @@ pub fn calculate(
 
     // Externally, remember to switch out order of time cols. Internally, don't care, number
     // is the same
-    let final_drill_cols = format!("{}, final_times, final_m, final_m_diff", all_drill_cols_except_growth);
+    let final_drill_cols = format!("{}, final_times, final_m, growth", all_drill_cols_except_growth);
 
     (final_sql, final_drill_cols)
 }
