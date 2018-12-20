@@ -174,7 +174,7 @@ pub struct RcaSql {
 #[derive(Debug, Clone)]
 pub struct GrowthSql {
     pub time_drill: DrilldownSql,
-    pub mea: MeasureSql,
+    pub mea: String,
 }
 
 #[derive(Debug, Clone)]

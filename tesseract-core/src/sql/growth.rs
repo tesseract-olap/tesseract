@@ -18,7 +18,7 @@ pub fn calculate(
         }
     }
 
-    growth_cols.push(growth.mea.column.clone());
+    growth_cols.push(growth.mea.clone());
 
     // slow for now, but it's a small string
     for col in growth_cols {
@@ -26,10 +26,6 @@ pub fn calculate(
     }
 
     all_drill_cols_except_growth = all_drill_cols_except_growth.trim().trim_matches(',').to_owned();
-
-    // Externally, remember to switch out order of time cols. Internally, don't care, number
-    // is the same
-    let final_drill_cols = format!("{}, {}_growth", final_drill_cols, growth.mea.column);
 
     // Group by everything besides the time cols
 
@@ -60,11 +56,15 @@ pub fn calculate(
             times as final_times",
         all_drill_cols_except_growth,
         growth.time_drill.col_string(),
-        growth.mea.column,
+        growth.mea,
         all_drill_cols_except_growth,
         final_sql,
         all_drill_cols_except_growth,
     );
+
+    // Externally, remember to switch out order of time cols. Internally, don't care, number
+    // is the same
+    let final_drill_cols = format!("{}, final_times, final_m, final_m_diff", all_drill_cols_except_growth);
 
     (final_sql, final_drill_cols)
 }

@@ -91,10 +91,24 @@ impl Schema {
         let drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
             .map_err(|err| format_err!("Error getting drill heaers: {}", err))?;
 
-        let mea_headers = self.cube_mea_headers(&cube, &query.measures)
+        let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
 
-        let headers = [&drill_headers[..], &mea_headers[..]].concat();
+        // TODO this assumes only one growth query at a time
+        let headers = if let Some(ref growth) = query.growth {
+            let g_mea_idx = query.measures.iter()
+                    .position(|mea| *mea == growth.mea )
+                    .ok_or(format_err!("measure for Growth must be in measures"))?;
+
+            let last_idx = mea_headers.len() - 1;
+
+            mea_headers.swap(g_mea_idx, last_idx);
+            mea_headers.push(format!("{} Growth", growth.mea.0));
+
+            [&drill_headers[..], &mea_headers[..]].concat()
+        } else {
+            [&drill_headers[..], &mea_headers[..]].concat()
+        };
 
         // Options for sorting and limiting
 
@@ -162,13 +176,14 @@ impl Schema {
         let growth = if let Some(ref growth) = query.growth {
             let time_drill = self.cube_drill_cols(&cube, &[growth.time_drill.clone()], &query.properties, query.parents)?
                 .get(0)
-                .ok_or(format_err!("no measure found for rca"))?
+                .ok_or(format_err!("no measure found for growth"))?
                 .clone();
 
-            let mea = self.cube_mea_cols(&cube, &[growth.mea.clone()])?
-                .get(0)
-                .ok_or(format_err!("no measure found for rca"))?
-                .clone();
+            // just want the measure id, not the actual measure col
+            let mea = query.measures.iter()
+                    .position(|mea| *mea == growth.mea )
+                    .map(|idx| format!("final_m{}", idx))
+                    .ok_or(format_err!("measure for Growth must be in measures"))?;
 
             Some(GrowthSql {
                 time_drill,
