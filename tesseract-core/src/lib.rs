@@ -87,29 +87,6 @@ impl Schema {
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
 
-        // getting headers, not for sql but needed for formatting
-        let drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
-            .map_err(|err| format_err!("Error getting drill heaers: {}", err))?;
-
-        let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
-            .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
-
-        // TODO this assumes only one growth query at a time
-        let headers = if let Some(ref growth) = query.growth {
-            let g_mea_idx = query.measures.iter()
-                    .position(|mea| *mea == growth.mea )
-                    .ok_or(format_err!("measure for Growth must be in measures"))?;
-
-            let last_idx = mea_headers.len() - 1;
-
-            mea_headers.swap(g_mea_idx, last_idx);
-            mea_headers.push(format!("{} Growth", growth.mea.0));
-
-            [&drill_headers[..], &mea_headers[..]].concat()
-        } else {
-            [&drill_headers[..], &mea_headers[..]].concat()
-        };
-
         // Options for sorting and limiting
 
         let limit = query.limit.clone().map(|l| l.into());
@@ -192,6 +169,48 @@ impl Schema {
         } else {
             None
         };
+
+        // getting headers, not for sql but needed for formatting
+        let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
+            .map_err(|err| format_err!("Error getting drill headers: {}", err))?;
+
+        let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
+            .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
+
+        // TODO this assumes only one growth query at a time
+        let headers = if let Some(ref growth) = query.growth {
+            // swapping around measure headers. growth mea moves to back.
+            let g_mea_idx = query.measures.iter()
+                    .position(|mea| *mea == growth.mea )
+                    .ok_or(format_err!("measure for Growth must be in measures"))?;
+
+            let moved_mea = mea_headers.remove(g_mea_idx);
+            mea_headers.push(moved_mea);
+            mea_headers.push(format!("{} Growth", growth.mea.0));
+
+            // swapping around drilldown headers. Move time to back
+            let time_headers = self.cube_drill_headers(&cube, &[growth.time_drill.clone()], &[], query.parents)
+                .map_err(|err| format_err!("Error getting time drill headers for Growth: {}", err))?;
+
+            let time_header_idxs: Result<Vec<_>,_> = time_headers.iter()
+                .map(|th| {
+                    drill_headers.iter()
+                        .position(|h| h == th)
+                        .ok_or(format_err!("Growth, cannot find time header {} in drill headers", th))
+                })
+                .collect();
+            let time_header_idxs = time_header_idxs?;
+
+            for idx in time_header_idxs {
+                let moved_hdr = drill_headers.remove(idx);
+                drill_headers.push(moved_hdr);
+            }
+
+            [&drill_headers[..], &mea_headers[..]].concat()
+        } else {
+            [&drill_headers[..], &mea_headers[..]].concat()
+        };
+
 
         // now feed the database metadata into the sql generator
         match db {
