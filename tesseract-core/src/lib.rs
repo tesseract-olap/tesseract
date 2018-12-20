@@ -30,6 +30,7 @@ use self::sql::{
     TopSql,
     SortSql,
     RcaSql,
+    GrowthSql,
 };
 pub use self::query::Query;
 
@@ -158,7 +159,24 @@ impl Schema {
             None
         };
 
-        let growth = None;
+        let growth = if let Some(ref growth) = query.growth {
+            let time_drill = self.cube_drill_cols(&cube, &[growth.time_drill.clone()], &query.properties, query.parents)?
+                .get(0)
+                .ok_or(format_err!("no measure found for rca"))?
+                .clone();
+
+            let mea = self.cube_mea_cols(&cube, &[growth.mea.clone()])?
+                .get(0)
+                .ok_or(format_err!("no measure found for rca"))?
+                .clone();
+
+            Some(GrowthSql {
+                time_drill,
+                mea,
+            })
+        } else {
+            None
+        };
 
         // now feed the database metadata into the sql generator
         match db {

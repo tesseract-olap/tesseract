@@ -20,6 +20,7 @@ pub struct Query {
     pub sort: Option<SortQuery>,
     pub limit: Option<LimitQuery>,
     pub rca: Option<RcaQuery>,
+    pub growth: Option<GrowthQuery>,
 }
 
 impl Query {
@@ -34,6 +35,7 @@ impl Query {
             sort: None,
             limit: None,
             rca: None,
+            growth: None,
         }
     }
 }
@@ -144,4 +146,30 @@ pub struct RcaQuery {
     pub drill_1: Drilldown,
     pub drill_2: Drilldown,
     pub mea: Measure,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrowthQuery {
+    pub time_drill: Drilldown,
+    pub mea: Measure,
+}
+
+impl FromStr for GrowthQuery {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.split(",").collect::<Vec<_>>()[..] {
+            [time_drill, measure] => {
+                let time_drill = time_drill.parse::<Drilldown>()?;
+                let mea = measure.parse::<Measure>()?;
+
+                Ok(GrowthQuery {
+                    time_drill,
+                    mea
+                })
+            },
+            _ => bail!("Could not parse a sort query"),
+        }
+
+    }
 }
