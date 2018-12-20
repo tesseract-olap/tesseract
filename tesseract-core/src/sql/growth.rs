@@ -1,3 +1,11 @@
+//! Links for how I calculated growth in clickhouse:
+//!
+//! A gist which shows runningdifference by group (using arrays)
+//! https://gist.github.com/filimonov/2ff5f083c2f874eceebde8877721afc4
+//!
+//! Near the bottom of this issue, there is a link to how array Join is used
+//! to bring the groupArray back to full rows.
+//! https://github.com/yandex/ClickHouse/issues/1469
 use super::GrowthSql;
 
 pub fn calculate(
