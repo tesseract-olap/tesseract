@@ -186,6 +186,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             top,
             sort,
             limit,
+            rca: None,
         })
     }
 }
