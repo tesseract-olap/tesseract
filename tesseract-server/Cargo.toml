@@ -2,7 +2,7 @@
 authors = ["Walther Chen <walther.chen@gmail.com>"]
 edition = "2018"
 name = "tesseract"
-version = "0.2.0"
+version = "0.3.0"
 
 [dependencies]
 actix = "0.7.7"
