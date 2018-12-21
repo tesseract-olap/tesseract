@@ -7,7 +7,7 @@ mod schema_config;
 mod sql;
 mod query;
 
-use failure::{Error, format_err};
+use failure::{Error, format_err, bail};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -71,6 +71,16 @@ impl Schema {
 
             if !has_drill {
                 return Err(format_err!("Property {} has no matching drilldown", property));
+            }
+        }
+
+        // for growth, check if time dim and mea are in drilldown and measures
+        if let Some(ref growth) = query.growth {
+            if !query.drilldowns.contains(&growth.time_drill) {
+                bail!("Growth time drilldown {} is not in drilldowns", growth.time_drill);
+            }
+            if !query.measures.contains(&growth.mea) {
+                bail!("Growth measure {} is not in measures", growth.mea);
             }
         }
 
