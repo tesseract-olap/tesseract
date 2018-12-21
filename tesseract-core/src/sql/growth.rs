@@ -107,7 +107,8 @@ pub fn calculate(
             {final_times}, \
             {final_other_meas} \
             final_m, \
-            (final_m_diff / (final_m - final_m_diff)) as growth \
+            (final_m_diff / (final_m - final_m_diff)) as growth, \
+            final_m_diff
         from (\
             with \
                 {grouparray_times}, \

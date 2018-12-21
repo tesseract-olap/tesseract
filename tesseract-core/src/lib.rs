@@ -200,6 +200,7 @@ impl Schema {
             let moved_mea = mea_headers.remove(g_mea_idx);
             mea_headers.push(moved_mea);
             mea_headers.push(format!("{} Growth", growth.mea.0));
+            mea_headers.push(format!("{} Growth Value", growth.mea.0));
 
             // swapping around drilldown headers. Move time to back
             let time_headers = self.cube_drill_headers(&cube, &[growth.time_drill.clone()], &[], query.parents)
