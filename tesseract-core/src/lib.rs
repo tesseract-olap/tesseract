@@ -177,7 +177,10 @@ impl Schema {
         let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
 
+
         // TODO this assumes only one growth query at a time
+        // Also, this structure doesn't take into account multiple calculations, e.g.
+        // multiple growth and rca and other calcs.
         let headers = if let Some(ref growth) = query.growth {
             // swapping around measure headers. growth mea moves to back.
             let g_mea_idx = query.measures.iter()

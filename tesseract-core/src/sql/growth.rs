@@ -6,6 +6,9 @@
 //! Near the bottom of this issue, there is a link to how array Join is used
 //! to bring the groupArray back to full rows.
 //! https://github.com/yandex/ClickHouse/issues/1469
+
+use itertools::join;
+
 use super::GrowthSql;
 
 pub fn calculate(
@@ -17,15 +20,16 @@ pub fn calculate(
     // A whole section to string manipulate to remove references to growth cols
     let mut all_drill_cols_except_growth = final_drill_cols.to_owned();
 
-    let mut growth_cols = vec![];
+    let mut time_cols = vec![];
 
     for l in &growth.time_drill.level_columns {
-        growth_cols.push(l.key_column.clone());
+        time_cols.push(l.key_column.clone());
         if let Some(ref n) = l.name_column {
-            growth_cols.push(n.clone());
+            time_cols.push(n.clone());
         }
     }
 
+    let mut growth_cols = time_cols.clone();
     growth_cols.push(growth.mea.clone());
 
     // slow for now, but it's a small string
@@ -36,22 +40,37 @@ pub fn calculate(
     all_drill_cols_except_growth = all_drill_cols_except_growth.trim().trim_matches(',').to_owned();
 
     // Group by everything besides the time cols
+    // The time columns need to each be packed and unpacked individually; handles cases when
+    // there's a time col that has parents.
+    // TODO this does not handle a time column that has properties!!!
+
+    let time_drill_len = time_cols.len();
+
+    let final_times = join((0..time_drill_len).map(|i| format!("final_times_{}", i)), ", ");
+    let times = join((0..time_drill_len).map(|i| format!("times_{}", i)), ", ");
+    let times_as_final_times = join((0..time_drill_len).map(|i| format!("times_{} as final_times_{}", i, i)), ", ");
+
+    let grouparray_times = join(
+        time_cols.iter().enumerate()
+            .map(|(i, col)| format!("groupArray({}) as times_{}", col, i))
+            , ", "
+    );
 
     let final_sql = format!("\
         select \
             {}, \
-            final_times, \
+            {final_times}, \
             final_m, \
             (final_m_diff / (final_m - final_m_diff)) as growth \
         from (\
             with \
-                groupArray({}) as times, \
+                {grouparray_times}, \
                 groupArray({}) as all_m_in_group, \
                 arrayEnumerate(all_m_in_group) as all_m_in_group_ids, \
                 arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff \
             select \
                 {}, \
-                times, \
+                {times}, \
                 all_m_in_group, \
                 m_diff \
             from ({} \
@@ -64,19 +83,22 @@ pub fn calculate(
         array Join \
             m_diff as final_m_diff, \
             all_m_in_group as final_m, \
-            times as final_times",
+            {times_as_final_times}",
         all_drill_cols_except_growth,
-        growth.time_drill.col_string(),
         growth.mea,
         all_drill_cols_except_growth,
         final_sql,
         growth.time_drill.col_string(),
         all_drill_cols_except_growth,
+        final_times = final_times,
+        grouparray_times = grouparray_times,
+        times = times,
+        times_as_final_times = times_as_final_times,
     );
 
     // Externally, remember to switch out order of time cols. Internally, don't care, number
     // is the same
-    let final_drill_cols = format!("{}, final_times, final_m, growth", all_drill_cols_except_growth);
+    let final_drill_cols = format!("{}, {}, final_m, growth", final_times, all_drill_cols_except_growth);
 
     (final_sql, final_drill_cols)
 }
