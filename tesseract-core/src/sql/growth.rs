@@ -96,7 +96,10 @@ pub fn calculate(
         .filter(|i| {
             *i != growth_mea_idx as usize
         }).map(|i| format!("other_m{} as final_other_m{}", i, i));
-    let other_meas_as_final_other_meas = join(other_meas_as_final_other_meas, ", ");
+    let mut other_meas_as_final_other_meas = join(other_meas_as_final_other_meas, ", ");
+    if other_meas_as_final_other_meas != "" {
+        other_meas_as_final_other_meas = format!(",{}", other_meas_as_final_other_meas);
+    }
 
     let final_sql = format!("\
         select \
@@ -128,7 +131,7 @@ pub fn calculate(
         array Join \
             m_diff as final_m_diff, \
             all_m_in_group as final_m, \
-            {times_as_final_times}, \
+            {times_as_final_times} \
             {other_meas_as_final_other_meas}",
         all_drill_cols_except_growth,
         growth.mea,
