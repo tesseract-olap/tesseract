@@ -27,6 +27,15 @@ export TESSERACT_SCHEMA_FILEPATH=test-schema/schema.json
 # API
 
 ## Metadata
+Metadata for all cubes:
+```
+/cubes
+```
+
+Metadata for one cube:
+```
+/cubes/<cube_name>
+```
 
 ## Aggregate Query:
 ```
