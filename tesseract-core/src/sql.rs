@@ -37,7 +37,7 @@ pub fn clickhouse_sql(
     };
 
     if let Some(growth) = growth {
-        let (sql, drill_cols) = growth::calculate(final_sql, &final_drill_cols, growth);
+        let (sql, drill_cols) = growth::calculate(final_sql, &final_drill_cols, meas.len(), growth);
         final_sql = sql;
         final_drill_cols = drill_cols;
     }

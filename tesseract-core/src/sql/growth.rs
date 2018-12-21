@@ -14,11 +14,13 @@ use super::GrowthSql;
 pub fn calculate(
     final_sql: String,
     final_drill_cols: &str,
+    num_measures: usize,
     growth: &GrowthSql,
     ) -> (String, String)
 {
     // A whole section to string manipulate to remove references to growth cols
     let mut all_drill_cols_except_growth = final_drill_cols.to_owned();
+    println!("og all_drill_cols_except_growth: {}", all_drill_cols_except_growth);
 
     let mut time_cols = vec![];
 
@@ -56,20 +58,70 @@ pub fn calculate(
             , ", "
     );
 
+    // TODO fix hack for parsing growth mea idx, probably by passing in a usize and then
+    // constructing the name later
+    println!("{:?}", growth.mea);
+    let growth_mea_idx = growth.mea.chars()
+        .last()
+        .expect("must be a last char for growth.mea")
+        .to_digit(10)
+        .expect("last char of growth.mea must be integer");
+
+    let final_other_meas = (0..num_measures)
+        .filter(|i| {
+            *i != growth_mea_idx as usize
+        }).map(|i| format!("final_other_m{}", i));
+    let mut final_other_meas = join(final_other_meas, ", ");
+    if final_other_meas != "" {
+        final_other_meas = format!("{}, ", final_other_meas);
+    }
+
+    let other_meas = (0..num_measures)
+        .filter(|i| {
+            *i != growth_mea_idx as usize
+        }).map(|i| format!("other_m{}", i));
+    let mut other_meas = join(other_meas, ", ");
+    if other_meas != "" {
+        other_meas = format!("{}, ", other_meas);
+    }
+
+    let grouparray_other_meas = (0..num_measures)
+        .filter(|i| {
+            *i != growth_mea_idx as usize
+        }).map(|i| format!("groupArray(final_m{}) as other_m{}", i, i));
+    let mut grouparray_other_meas = join(grouparray_other_meas, ", ");
+    if grouparray_other_meas != "" {
+        grouparray_other_meas = format!("{}, ", grouparray_other_meas);
+    }
+
+    let other_meas_as_final_other_meas = (0..num_measures)
+        .filter(|i| {
+            *i != growth_mea_idx as usize
+        }).map(|i| format!("other_m{} as final_other_m{}", i, i));
+    let other_meas_as_final_other_meas = join(other_meas_as_final_other_meas, ", ");
+
+    println!("{}", growth_mea_idx);
+    println!("{}", num_measures);
+    println!("{}", other_meas);
+
+
     let final_sql = format!("\
         select \
             {}, \
             {final_times}, \
+            {final_other_meas} \
             final_m, \
             (final_m_diff / (final_m - final_m_diff)) as growth \
         from (\
             with \
                 {grouparray_times}, \
+                {grouparray_other_meas} \
                 groupArray({}) as all_m_in_group, \
                 arrayEnumerate(all_m_in_group) as all_m_in_group_ids, \
                 arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff \
             select \
                 {}, \
+                {other_meas} \
                 {times}, \
                 all_m_in_group, \
                 m_diff \
@@ -83,7 +135,8 @@ pub fn calculate(
         array Join \
             m_diff as final_m_diff, \
             all_m_in_group as final_m, \
-            {times_as_final_times}",
+            {times_as_final_times}, \
+            {other_meas_as_final_other_meas}",
         all_drill_cols_except_growth,
         growth.mea,
         all_drill_cols_except_growth,
@@ -94,11 +147,15 @@ pub fn calculate(
         grouparray_times = grouparray_times,
         times = times,
         times_as_final_times = times_as_final_times,
+        other_meas = other_meas,
+        final_other_meas = final_other_meas,
+        grouparray_other_meas = grouparray_other_meas,
+        other_meas_as_final_other_meas = other_meas_as_final_other_meas,
     );
 
     // Externally, remember to switch out order of time cols. Internally, don't care, number
     // is the same
-    let final_drill_cols = format!("{}, {}, final_m, growth", final_times, all_drill_cols_except_growth);
+    let final_drill_cols = format!("{}, {}, {} final_m, growth", all_drill_cols_except_growth, final_times, final_other_meas);
 
     (final_sql, final_drill_cols)
 }
