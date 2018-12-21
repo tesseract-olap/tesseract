@@ -20,7 +20,6 @@ pub fn calculate(
 {
     // A whole section to string manipulate to remove references to growth cols
     let mut all_drill_cols_except_growth = final_drill_cols.to_owned();
-    println!("og all_drill_cols_except_growth: {}", all_drill_cols_except_growth);
 
     let mut time_cols = vec![];
 
@@ -60,7 +59,6 @@ pub fn calculate(
 
     // TODO fix hack for parsing growth mea idx, probably by passing in a usize and then
     // constructing the name later
-    println!("{:?}", growth.mea);
     let growth_mea_idx = growth.mea.chars()
         .last()
         .expect("must be a last char for growth.mea")
@@ -99,11 +97,6 @@ pub fn calculate(
             *i != growth_mea_idx as usize
         }).map(|i| format!("other_m{} as final_other_m{}", i, i));
     let other_meas_as_final_other_meas = join(other_meas_as_final_other_meas, ", ");
-
-    println!("{}", growth_mea_idx);
-    println!("{}", num_measures);
-    println!("{}", other_meas);
-
 
     let final_sql = format!("\
         select \

@@ -214,10 +214,13 @@ impl Schema {
                 .collect();
             let time_header_idxs = time_header_idxs?;
 
-            for idx in time_header_idxs {
-                let moved_hdr = drill_headers.remove(idx);
-                drill_headers.push(moved_hdr);
+            // TODO figure out a better way to move headers
+            let mut temp_time_headers = vec![];
+            for idx in time_header_idxs.iter().rev() {
+                let moved_hdr = drill_headers.remove(*idx);
+                temp_time_headers.insert(0, moved_hdr);
             }
+            drill_headers.extend_from_slice(&temp_time_headers);
 
             [&drill_headers[..], &mea_headers[..]].concat()
         } else {
