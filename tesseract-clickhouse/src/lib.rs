@@ -41,7 +41,7 @@ impl Backend for Clickhouse {
             .from_err()
             .and_then(move |(_, block)| {
                 let timing = time_start.elapsed();
-                info!("Time for sql execution: {}.{}", timing.as_secs(), timing.subsec_millis());
+                info!("Time for sql execution: {}.{:03}", timing.as_secs(), timing.subsec_millis());
                 debug!("Block: {:?}", block);
 
                 Ok(block_to_df(block)?)
