@@ -47,7 +47,7 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     ColumnData::Int64(vec![]),
                 ))
             },
-            MYSQL_TYPE_VARCHAR | MYSQL_TYPE_VAR_STRING=> {
+            MYSQL_TYPE_VARCHAR | MYSQL_TYPE_VAR_STRING => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
                     ColumnData::Text(vec![]),
