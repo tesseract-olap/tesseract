@@ -13,7 +13,7 @@ mod df;
 use self::df::{rows_to_df};
 
 use my::prelude::*;
-use failure::err_msg;
+
 #[derive(Clone)]
 pub struct MySql {
     pool: my::Pool
@@ -62,33 +62,9 @@ mod tests {
     #[test]
     fn test_add1() {
         let mysql_db = env::var("MYSQL_DATABASE_URL").unwrap();
-        let sql = r"SELECT gh_project_id from valid_projects limit 5;";
+        let sql = r"SELECT name, gh_project_id from valid_projects limit 5;";
         let mysql = MySql::new(&mysql_db);
         let r = mysql.exec_sql(sql.to_string()).wait().unwrap();
         println!("{:?}", r);
     }
-
-    // #[test]
-    // fn test2() {
-    //     let mysql_db = env::var("MYSQL_DATABASE_URL").unwrap();
-    //     let pool = my::Pool::new(mysql_db);
-    //     println!("HEYO!");
-    //     let future = pool.get_conn().and_then(move |conn| {
-    //             // Create temporary table
-    //             conn.prep_exec("SELECT 1 as test", ())
-    //         })
-    //         .and_then(|result| {
-    //             let y = result.columns_ref();
-    //             result.for_each(|row| {
-    //                 let val = row.get(0).unwrap();
-    //                 let z = match val {
-    //                     Value::Int(y) => y,
-    //                     s => 1111
-    //                 };
-    //                 println!("booo GOT IT!!! {:?}", z);
-    //             })
-    //         });
-
-    //      future.wait().unwrap();
-    // }
 }

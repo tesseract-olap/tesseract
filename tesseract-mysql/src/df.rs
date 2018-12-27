@@ -1,15 +1,14 @@
 //! Convert clickhouse Block to tesseract_core::DataFrame
 // extern crate mysql;
-use failure::{Error, format_err, bail};
+
+use failure::{Error, format_err};
 extern crate mysql_async;
 extern crate futures;
-use futures::future::ok;
-use futures::future::{FutureResult};
+use std::str;
 use mysql_async::{QueryResult, BinaryProtocol, Conn};
 use mysql_async::consts::ColumnType::*;
 use tesseract_core::{DataFrame, Column, ColumnData};
 use mysql_async::Value::*;
-// use mysql_async::{Row};
 use futures::future::{self, Future};
 
 pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future<Item=DataFrame, Error=Error>> {
@@ -67,13 +66,22 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     let raw_value = row.get(col_idx).unwrap();
                     match raw_value {
                         Int(y) => Some(col_data.push(*y)),
-                        s => {
-                            println!("No match for {:?}", s);
-                            None
-                        }
+                        _s => None
                     };
                 },
-                s => {
+                ColumnData::Text(col_data) => {
+                    let raw_value = row.get(col_idx).unwrap();
+                    match raw_value {
+                        Bytes(y) => {
+                            let tmp_str = str::from_utf8(y).unwrap();
+                            // TODO is there a more memory efficient way to handle this
+                            // other than copying the strings into the dataframe
+                            Some(col_data.push(tmp_str.to_string()))
+                        },
+                        _s => None
+                    };
+                },
+                _s => {
                     println!("FAILING HERE!");
                 }
             }
