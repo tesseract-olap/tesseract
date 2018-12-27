@@ -31,7 +31,6 @@ impl MySql {
 
 impl Backend for MySql {
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
-        println!("TRYING {:?}", sql);
         let future = self.pool.get_conn()
             .and_then(move |conn| {
                 conn.prep_exec(sql.to_string(), ())
