@@ -86,7 +86,8 @@ impl Schema {
 
         // for rca, disallow cuts on the second drilldown for now, until better system
         // is figured out.
-        // But the calculation itself should all external cuts, and all internal cuts
+        // There is internal filtering of cuts internally also, which should follow the
+        // pattern of the check here.
         if let Some(ref rca) = query.rca {
             let cuts_contain_drill_2 = query.cuts.iter()
                 .any(|c| c.level_name == rca.drill_2.0);

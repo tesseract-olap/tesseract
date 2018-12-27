@@ -47,46 +47,47 @@ pub fn calculate(
     };
 
     // for cuts,
-    // - a can be cut (it's all members)
-    // - b can be cut for d2 (no d1)
-    // - c can be cut for d1 (no d2)
-    // - d cannot be cut on d1 or d2
+    // - a can be cut on d1 and ext
+    // - b cannot be int cut, only ext
+    // - c can be cut on d1 and ext
+    // - d cannot be int cut, only ext
+    //
+    // In the future, would I allow more cuts? Maybe depending on use case
+    //
+    // The blacklist is the drilldowns contained in each of a, b, c, d
 
-    let mut b_drill_keys_blacklist = rca.drill_1.iter()
-        .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()));
+    let ac_drill_keys_blacklist: Vec<_> = rca.drill_2.iter()
+        .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()))
+        .collect();
 
-    let mut c_drill_keys_blacklist = rca.drill_2.iter()
-        .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()));
+    let bd_drill_keys_blacklist: Vec<_> = rca.drill_1.iter().chain(rca.drill_2.iter())
+        .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()))
+        .collect();
 
-    let mut d_drill_keys_blacklist = rca.drill_1.iter().chain(rca.drill_2.iter())
-        .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()));
-
-    let b_cuts: Vec<_> = cuts.iter()
+    let ac_cuts: Vec<_> = cuts.iter()
         .filter(|cut| {
-            b_drill_keys_blacklist.find(|k| *k == cut.column).is_none()
+            ac_drill_keys_blacklist.iter().find(|k| **k == cut.column).is_none()
         })
         .cloned()
         .collect();
 
-    let c_cuts: Vec<_> = cuts.iter()
+    let bd_cuts: Vec<_> = cuts.iter()
         .filter(|cut| {
-            c_drill_keys_blacklist.find(|k| *k == cut.column).is_none()
+            bd_drill_keys_blacklist.iter().find(|k| **k == cut.column).is_none()
         })
         .cloned()
         .collect();
 
-    let d_cuts: Vec<_> = cuts.iter()
-        .filter(|cut| {
-            d_drill_keys_blacklist.find(|k| *k == cut.column).is_none()
-        })
-        .cloned()
-        .collect();
+    println!("{:#?}", cuts);
+    println!("{:#?}", ac_cuts);
+    println!("{:#?}", bd_cuts);
 
+    // now aggregate each component
 
-    let (a, a_final_drills) = primary_agg(table,   &cuts, &a_drills, &all_meas);
-    let (b, b_final_drills) = primary_agg(table, &b_cuts, &b_drills, &all_meas);
-    let (c, c_final_drills) = primary_agg(table, &c_cuts, &c_drills, &all_meas);
-    let (d, d_final_drills) = primary_agg(table, &d_cuts, &d_drills, &all_meas);
+    let (a, a_final_drills) = primary_agg(table, &ac_cuts, &a_drills, &all_meas);
+    let (b, b_final_drills) = primary_agg(table, &bd_cuts,  &b_drills, &all_meas);
+    let (c, c_final_drills) = primary_agg(table, &ac_cuts, &c_drills, &all_meas);
+    let (d, d_final_drills) = primary_agg(table, &bd_cuts,  &d_drills, &all_meas);
 
 
     // replace final_m0 with letter name.
