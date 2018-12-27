@@ -1,6 +1,6 @@
 //! Convert clickhouse Block to tesseract_core::DataFrame
 // extern crate mysql;
-use failure::{Error, bail};
+use failure::{Error, format_err, bail};
 extern crate mysql_async;
 extern crate futures;
 use futures::future::ok;
@@ -10,9 +10,9 @@ use mysql_async::consts::ColumnType::*;
 use tesseract_core::{DataFrame, Column, ColumnData};
 use mysql_async::Value::*;
 // use mysql_async::{Row};
-use mysql_async::futures::{ForEach};
+use futures::future::{self, Future};
 
-pub fn build_column_vec(query_result: &QueryResult<Conn, BinaryProtocol>) -> Result<Vec<Column>, Error> {
+pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future<Item=DataFrame, Error=Error>> {
     let mut tcolumn_list = vec![];
     let columns = query_result.columns_ref();
 
@@ -48,19 +48,17 @@ pub fn build_column_vec(query_result: &QueryResult<Conn, BinaryProtocol>) -> Res
                     ColumnData::Float64(vec![]),
                 ))
             },
-            unknown => bail!("MySQL type not supported: {:?}", unknown),
+            t => return Box::new(future::err(format_err!("Mysql type not yet supported: {:?}", t))),
         }
     }
-    Ok(tcolumn_list)
-}
 
+    let df = DataFrame::from_vec(tcolumn_list);
 
-pub fn push_data_to_vec(mut tcolumn_list: Vec<Column>, query_result: QueryResult<Conn, BinaryProtocol>) -> futures::future::Either<FutureResult<QueryResult<Conn, BinaryProtocol>, my::errors::Error>, ForEach<Conn, BinaryProtocol, u32>> {
-    let future = query_result.for_each(|x| {
-        let row = x.unwrap();
-        println!("Arrived to this point...");
-        for col_idx in 0..tcolumn_list.len() {
-            let column_data = tcolumn_list
+    let future = query_result.reduce(df, |mut df_accum, r| {
+        let row = r.unwrap();
+
+        for col_idx in 0..df_accum.columns.len() {
+            let column_data = df_accum.columns
                 .get_mut(col_idx)
                 .expect("logic checked?")
                 .column_data();
@@ -80,10 +78,11 @@ pub fn push_data_to_vec(mut tcolumn_list: Vec<Column>, query_result: QueryResult
                 }
             }
         }
-    });
-    future
-    // an alternative approach of simply calling future.wait() 
-    // then building the dataframe works, but defeats the power of the async
-    // future.wait();
-    // DataFrame::from_vec(tcolumn_list)
+
+        df_accum
+    })
+    .map(|(_, df)| df)
+    .map_err(|err| format_err!("mysql err {}", err));
+
+    Box::new(future)
 }

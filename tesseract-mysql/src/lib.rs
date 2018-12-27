@@ -1,4 +1,4 @@
-use failure::Error;
+use failure::{Error, format_err};
 use futures::future::Future;
 use tesseract_core::{Backend, DataFrame};
 
@@ -10,7 +10,7 @@ extern crate mysql_async as my;
 // use mysql as my;
 // use futures::done;
 mod df;
-use self::df::{build_column_vec, push_data_to_vec};
+use self::df::{rows_to_df};
 
 use my::prelude::*;
 use failure::err_msg;
@@ -36,17 +36,13 @@ impl Backend for MySql {
             .and_then(move |conn| {
                 conn.prep_exec(sql.to_string(), ())
             })
-            .and_then(|result| {
-                let tmp_vec = build_column_vec(&result).unwrap();
-                Ok(push_data_to_vec(tmp_vec, result))
+            .map_err(|e| {
+                format_err!("{}", e.description().to_string())
             })
-            .and_then(|x| {
+            .and_then(|result| {
                 // TODO once I can get the the push_data_to_vec fn to chain properly
                 // ...should be straightforward to build the df
-                Ok(DataFrame::new())
-            })
-            .map_err(|e| {
-                err_msg(e.description().to_string())
+                rows_to_df(result)
             });
         Box::new(future)
     }
