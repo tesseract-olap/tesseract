@@ -59,7 +59,7 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     ColumnData::Float32(vec![]),
                 ))
             },
-            MYSQL_TYPE_DOUBLE => {
+            MYSQL_TYPE_DOUBLE | MYSQL_TYPE_NEWDECIMAL => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
                     ColumnData::Float64(vec![]),
@@ -131,6 +131,10 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     let raw_value = row.get(col_idx).unwrap();
                     match raw_value {
                         Float(y) => Some(col_data.push(*y)),
+                        Bytes(y) => {
+                            let tmp_val = str::from_utf8(y).unwrap().parse().unwrap();
+                            Some(col_data.push(tmp_val))
+                        },
                         _s => None
                     };
                 },
