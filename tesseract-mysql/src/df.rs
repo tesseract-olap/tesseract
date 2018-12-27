@@ -23,7 +23,25 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
         match col_type {
             // confusing but TYPE_LONG is regular integer (32-bit)
             // see https://dev.mysql.com/doc/refman/8.0/en/c-api-prepared-statement-type-codes.html
-            MYSQL_TYPE_LONGLONG | MYSQL_TYPE_LONG | MYSQL_TYPE_SHORT | MYSQL_TYPE_TINY => {
+            MYSQL_TYPE_TINY => {
+                tcolumn_list.push(Column::new(
+                    col_name.to_string(),
+                    ColumnData::Int8(vec![]),
+                ))
+            },
+            MYSQL_TYPE_SHORT => {
+                tcolumn_list.push(Column::new(
+                    col_name.to_string(),
+                    ColumnData::Int16(vec![]),
+                ))
+            },
+            MYSQL_TYPE_LONG => {
+                tcolumn_list.push(Column::new(
+                    col_name.to_string(),
+                    ColumnData::Int32(vec![]),
+                ))
+            },
+            MYSQL_TYPE_LONGLONG => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
                     ColumnData::Int64(vec![]),
@@ -62,10 +80,57 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                 .expect("logic checked?")
                 .column_data();
             match column_data {
+                ColumnData::Int8(col_data) => {
+                    let raw_value = row.get(col_idx).unwrap();
+                    match raw_value {
+                        Int(y) => {
+                            let raw_val: i8 = *y as i8;
+                            Some(col_data.push(raw_val))
+                        },
+                        _s => None
+                    };
+                },
+                ColumnData::Int16(col_data) => {
+                    let raw_value = row.get(col_idx).unwrap();
+                    match raw_value {
+                        Int(y) => {
+                            let raw_val: i16 = *y as i16;
+                            Some(col_data.push(raw_val))
+                        },
+                        _s => None
+                    };
+                },
+                ColumnData::Int32(col_data) => {
+                    let raw_value = row.get(col_idx).unwrap();
+                    match raw_value {
+                        Int(y) => {
+                            let raw_val: i32 = *y as i32;
+                            Some(col_data.push(raw_val))
+                        },
+                        _s => None
+                    };
+                },
                 ColumnData::Int64(col_data) => {
                     let raw_value = row.get(col_idx).unwrap();
                     match raw_value {
                         Int(y) => Some(col_data.push(*y)),
+                        _s => None
+                    };
+                },
+                ColumnData::Float32(col_data) => {
+                    let raw_value = row.get(col_idx).unwrap();
+                    match raw_value {
+                        Float(y) => {
+                            let raw_val: f32 = *y as f32;
+                            Some(col_data.push(raw_val))
+                        },
+                        _s => None
+                    };
+                },
+                ColumnData::Float64(col_data) => {
+                    let raw_value = row.get(col_idx).unwrap();
+                    match raw_value {
+                        Float(y) => Some(col_data.push(*y)),
                         _s => None
                     };
                 },

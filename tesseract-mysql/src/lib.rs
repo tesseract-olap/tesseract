@@ -62,7 +62,7 @@ mod tests {
     #[test]
     fn test_add1() {
         let mysql_db = env::var("MYSQL_DATABASE_URL").unwrap();
-        let sql = r"SELECT name, gh_project_id from valid_projects limit 5;";
+        let sql = r"SELECT id, hello, fuzzy from my_test limit 5;";
         let mysql = MySql::new(&mysql_db);
         let r = mysql.exec_sql(sql.to_string()).wait().unwrap();
         println!("{:?}", r);
