@@ -39,8 +39,6 @@ impl Backend for MySql {
                 format_err!("{}", e.description().to_string())
             })
             .and_then(|result| {
-                // TODO once I can get the the push_data_to_vec fn to chain properly
-                // ...should be straightforward to build the df
                 rows_to_df(result)
             });
         Box::new(future)
