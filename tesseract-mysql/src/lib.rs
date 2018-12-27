@@ -4,11 +4,7 @@ use tesseract_core::{Backend, DataFrame};
 
 extern crate futures;
 extern crate mysql_async as my;
-// extern crate tokio;
 
-// extern crate mysql;
-// use mysql as my;
-// use futures::done;
 mod df;
 use self::df::{rows_to_df};
 
