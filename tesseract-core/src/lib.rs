@@ -58,7 +58,7 @@ impl Schema {
     {
         // First do checks, like making sure there's a measure, and that there's
         // either a cut or drilldown
-        if query.measures.is_empty() {
+        if query.measures.is_empty() && query.rca.is_none() {
             return Err(format_err!("No measure found; please specify at least one"));
         }
         if query.drilldowns.is_empty() && query.cuts.is_empty(){
@@ -81,6 +81,19 @@ impl Schema {
             }
             if !query.measures.contains(&growth.mea) {
                 bail!("Growth measure {} is not in measures", growth.mea);
+            }
+        }
+
+        // for rca, disallow cuts on the second drilldown for now, until better system
+        // is figured out.
+        // But the calculation itself should all external cuts, and all internal cuts
+        if let Some(ref rca) = query.rca {
+            let cuts_contain_drill_2 = query.cuts.iter()
+                .any(|c| c.level_name == rca.drill_2.0);
+
+            if cuts_contain_drill_2 {
+                return Err(format_err!("Cut on rca drill 2 is not allowed; for rca, \
+                    only external cuts and cuts on drill 1 allowed", ));
             }
         }
 
@@ -187,10 +200,18 @@ impl Schema {
         let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
 
+        // rca mea will always be first, so just put
+        // in `Mea RCA` second
+        if let Some(ref rca) = query.rca {
+            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &[], query.parents)
+                .map_err(|err| format_err!("Error getting rca drill headers: {}", err))?;
+            drill_headers.extend_from_slice(&rca_drill_headers);
 
-        // TODO this assumes only one growth query at a time
-        // Also, this structure doesn't take into account multiple calculations, e.g.
-        // multiple growth and rca and other calcs.
+            mea_headers.insert(0, format!("{} RCA", rca.mea.0.clone()));
+        }
+
+
+        // Be careful with other calculations. TODO figure out a more composable system.
         let headers = if let Some(ref growth) = query.growth {
             // swapping around measure headers. growth mea moves to back.
             let g_mea_idx = query.measures.iter()

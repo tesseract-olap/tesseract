@@ -1,3 +1,5 @@
+use itertools::join;
+
 use crate::sql::primary_agg::primary_agg;
 use super::{
     TableSql,
@@ -125,8 +127,16 @@ pub fn calculate(
         }
     };
 
-    final_sql = format!("select {}, ((a/b) / (c/d)) as rca from ({})",
+    // adding final measures at the end
+    let final_ext_meas = if !meas.is_empty() {
+        ", ".to_owned() + &join((1..meas.len()+1).map(|i| format!("m{}", i)), ", ")
+    } else {
+        "".to_owned()
+    };
+
+    final_sql = format!("select {}, ((a/b) / (c/d)) as rca{} from ({})",
         a_final_drills,
+        final_ext_meas,
         final_sql,
     );
 
