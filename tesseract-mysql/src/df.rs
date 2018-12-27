@@ -1,17 +1,18 @@
 //! Convert clickhouse Block to tesseract_core::DataFrame
-extern crate mysql;
+// extern crate mysql;
 use failure::{Error, bail};
-use mysql::QueryResult;
-use mysql::consts::ColumnType::*;
+extern crate mysql_async;
+extern crate futures;
+use futures::future::ok;
+use futures::future::{FutureResult};
+use mysql_async::{QueryResult, BinaryProtocol, Conn};
+use mysql_async::consts::ColumnType::*;
 use tesseract_core::{DataFrame, Column, ColumnData};
+use mysql_async::Value::*;
+// use mysql_async::{Row};
+use mysql_async::futures::{ForEach};
 
-// was able to replace this with done()
-// pub fn query_future_wrapper(query_result: QueryResult) -> impl Future<Item = DataFrame, Error = Error> {
-//     let res: DataFrame = self::queryresult_to_df(query_result).expect("Failed to build dataframe");
-//     ok(res)
-// }
-
-pub fn queryresult_to_df(query_result: QueryResult) -> Result<DataFrame, Error> {
+pub fn build_column_vec(query_result: &QueryResult<Conn, BinaryProtocol>) -> Result<Vec<Column>, Error> {
     let mut tcolumn_list = vec![];
     let columns = query_result.columns_ref();
 
@@ -21,27 +22,9 @@ pub fn queryresult_to_df(query_result: QueryResult) -> Result<DataFrame, Error> 
         let col_name = col.name_str();
         // println!("NAME: {:?} TYPE {:?}", col.name_str(), col_type);
         match col_type {
-            MYSQL_TYPE_TINY => {
-                tcolumn_list.push(Column::new(
-                    col_name.to_string(),
-                    ColumnData::Int8(vec![]),
-                ))
-            },
-            MYSQL_TYPE_SHORT => {
-                tcolumn_list.push(Column::new(
-                    col_name.to_string(),
-                    ColumnData::Int16(vec![]),
-                ))
-            },
             // confusing but TYPE_LONG is regular integer (32-bit)
             // see https://dev.mysql.com/doc/refman/8.0/en/c-api-prepared-statement-type-codes.html
-            MYSQL_TYPE_LONG => {
-                tcolumn_list.push(Column::new(
-                    col_name.to_string(),
-                    ColumnData::Int32(vec![]),
-                ))
-            },
-            MYSQL_TYPE_LONGLONG => {
+            MYSQL_TYPE_LONGLONG | MYSQL_TYPE_LONG | MYSQL_TYPE_SHORT | MYSQL_TYPE_TINY => {
                 tcolumn_list.push(Column::new(
                     col_name.to_string(),
                     ColumnData::Int64(vec![]),
@@ -68,54 +51,39 @@ pub fn queryresult_to_df(query_result: QueryResult) -> Result<DataFrame, Error> 
             unknown => bail!("MySQL type not supported: {:?}", unknown),
         }
     }
+    Ok(tcolumn_list)
+}
 
-    query_result.for_each(|x| {
+
+pub fn push_data_to_vec(mut tcolumn_list: Vec<Column>, query_result: QueryResult<Conn, BinaryProtocol>) -> futures::future::Either<FutureResult<QueryResult<Conn, BinaryProtocol>, my::errors::Error>, ForEach<Conn, BinaryProtocol, u32>> {
+    let future = query_result.for_each(|x| {
         let row = x.unwrap();
+        println!("Arrived to this point...");
         for col_idx in 0..tcolumn_list.len() {
             let column_data = tcolumn_list
                 .get_mut(col_idx)
                 .expect("logic checked?")
                 .column_data();
             match column_data {
-                ColumnData::UInt64(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::UInt32(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::UInt16(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::UInt8(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
                 ColumnData::Int64(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
+                    let raw_value = row.get(col_idx).unwrap();
+                    match raw_value {
+                        Int(y) => Some(col_data.push(*y)),
+                        s => {
+                            println!("No match for {:?}", s);
+                            None
+                        }
+                    };
                 },
-                ColumnData::Int32(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::Int16(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::Int8(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::Float32(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::Float64(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
-                ColumnData::Text(col_data) => {
-                    col_data.push(row.get(col_idx).expect("Data unpacking failure"));
-                },
+                s => {
+                    println!("FAILING HERE!");
+                }
             }
         }
     });
-
-    let df = DataFrame::from_vec(tcolumn_list);
-    println!("WOOT WOOT ! {:?}", df);
-    Ok(df)
+    future
+    // an alternative approach of simply calling future.wait() 
+    // then building the dataframe works, but defeats the power of the async
+    // future.wait();
+    // DataFrame::from_vec(tcolumn_list)
 }
-
