@@ -109,11 +109,21 @@ pub fn calculate(
         c_final_drills
     );
 
-    final_sql = format!("select * from ({}) all inner join ({}) using {}",
-        d,
-        final_sql,
-        d_final_drills,
-    );
+    // for d, cross join if d_final_drills is empty
+    final_sql = {
+        if d_final_drills.is_empty() {
+            format!("select * from ({}) cross join ({})",
+                d,
+                final_sql,
+            )
+        } else {
+            format!("select * from ({}) all inner join ({}) using {}",
+                d,
+                final_sql,
+                d_final_drills,
+            )
+        }
+    };
 
     final_sql = format!("select {}, ((a/b) / (c/d)) as rca from ({})",
         a_final_drills,
