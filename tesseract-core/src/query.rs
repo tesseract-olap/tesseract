@@ -148,6 +148,28 @@ pub struct RcaQuery {
     pub mea: Measure,
 }
 
+impl FromStr for RcaQuery {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.split(",").collect::<Vec<_>>()[..] {
+            [drill_1, drill_2, measure] => {
+                let drill_1 = drill_1.parse::<Drilldown>()?;
+                let drill_2 = drill_2.parse::<Drilldown>()?;
+                let mea = measure.parse::<Measure>()?;
+
+                Ok(RcaQuery {
+                    drill_1,
+                    drill_2,
+                    mea,
+                })
+            },
+            _ => bail!("Could not parse an rca query, wrong number of args"),
+        }
+
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct GrowthQuery {
     pub time_drill: Drilldown,
@@ -165,10 +187,10 @@ impl FromStr for GrowthQuery {
 
                 Ok(GrowthQuery {
                     time_drill,
-                    mea
+                    mea,
                 })
             },
-            _ => bail!("Could not parse a sort query"),
+            _ => bail!("Could not parse a growth query, wrong number of args"),
         }
 
     }

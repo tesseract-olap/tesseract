@@ -128,6 +128,7 @@ pub struct AggregateQueryOpt {
     sort: Option<String>,
     limit: Option<String>,
     growth: Option<String>,
+    rca: Option<String>,
 //    debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
@@ -182,6 +183,10 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             .map(|g| g.parse())
             .transpose()?;
 
+        let rca = agg_query_opt.rca
+            .map(|r| r.parse())
+            .transpose()?;
+
         Ok(TsQuery {
             drilldowns,
             cuts,
@@ -191,7 +196,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             top,
             sort,
             limit,
-            rca: None,
+            rca,
             growth,
         })
     }
