@@ -147,7 +147,7 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     };
                 },
                 _s => {
-                    println!("FAILING HERE!");
+                    println!("Unable to match column index {}!", col_idx);
                 }
             }
         }
