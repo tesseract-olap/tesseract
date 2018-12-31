@@ -38,6 +38,26 @@ pub fn standard_sql(
     _growth: &Option<GrowthSql>,
     ) -> String
 {
+    // --------------------------------------------------
+    // copied from primary_agg for clickhouse
+    let ext_drills: Vec<_> = drills.iter()
+        .filter(|d| d.table.name != table.name)
+        .collect();
+
+    //let ext_cuts: Vec<_> = cuts.iter()
+    //    .filter(|c| c.table.name != table.name)
+    //    .collect();
+    //let ext_cuts_for_inline = ext_cuts.clone();
+
+    //let inline_drills: Vec<_> = drills.iter()
+    //    .filter(|d| d.table.name == table.name)
+    //    .collect();
+
+    //let inline_cuts: Vec<_> = cuts.iter()
+    //    .filter(|c| c.table.name == table.name)
+    //    .collect();
+    // --------------------------------------------------
+
     let drill_cols = join(drills.iter().map(|d| d.col_string()), ", ");
     let mea_cols = join(meas.iter().map(|m| m.agg_col_string()), ", ");
 
@@ -47,12 +67,33 @@ pub fn standard_sql(
         table.name,
     );
 
-    if !cuts.is_empty() {
-        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.column, c.members_string())), ", ");
-        final_sql = format!("{} where {}", final_sql, cut_clauses);
+    // join external dims
+    if !ext_drills.is_empty() {
+        let join_ext_dim_clauses = join(ext_drills.iter()
+            .map(|d| {
+                format!("inner join {} on {}.{} = {}.{}",
+                    d.table.full_name(),
+                    d.table.full_name(),
+                    d.primary_key,
+                    table.name,
+                    d.foreign_key,
+                )
+        }), ", ");
+
+        final_sql = format!("{} {}", final_sql, join_ext_dim_clauses);
     }
 
-    final_sql = format!("{} group_by {}", final_sql, drill_cols);
+    if !cuts.is_empty() && !ext_drills.is_empty() {
+        final_sql = format!("{} where", final_sql);
+    }
+
+
+    if !cuts.is_empty() {
+        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.column, c.members_string())), ", ");
+        final_sql = format!("{} {}", final_sql, cut_clauses);
+    }
+
+    final_sql = format!("{} group by {}", final_sql, drill_cols);
 
     final_sql
 }
@@ -434,16 +475,17 @@ mod test {
     /// - parents
     ///
     fn test_standard_sql() {
+        //"select valid_projects.id, name, sum(commits) from project_facts inner join valid_projects on project_facts.project_id = valid_projects.id where valid_projects.id=442841 group by name;"
         let table = TableSql {
-            name: "sales".into(),
-            primary_key: Some("product_id".into()),
+            name: "project_facts".into(),
+            primary_key: Some("id".into()),
         };
         let cuts = vec![
             CutSql {
-                foreign_key: "product_id".into(),
-                primary_key: "product_id".into(),
-                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
-                column: "product_group_id".into(),
+                foreign_key: "project_id".into(),
+                primary_key: "id".into(),
+                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
+                column: "id".into(),
                 members: vec!["3".into()],
                 member_type: MemberType::NonText,
             },
@@ -452,46 +494,20 @@ mod test {
             // this dim is inline, so should use the fact table
             // also has parents, so has 
             DrilldownSql {
-                foreign_key: "date_id".into(),
-                primary_key: "date_id".into(),
-                table: Table { name: "sales".into(), schema: None, primary_key: None },
+                foreign_key: "project_id".into(),
+                primary_key: "id".into(),
+                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
                 level_columns: vec![
                     LevelColumn {
-                        key_column: "year".into(),
-                        name_column: None,
-                    },
-                    LevelColumn {
-                        key_column: "month".into(),
-                        name_column: None,
-                    },
-                    LevelColumn {
-                        key_column: "day".into(),
-                        name_column: None,
-                    },
-                ],
-                property_columns: vec![],
-            },
-            // this comes second, but should join first because of primary key match
-            // on fact table
-            DrilldownSql {
-                foreign_key: "product_id".into(),
-                primary_key: "product_id".into(),
-                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
-                level_columns: vec![
-                    LevelColumn {
-                        key_column: "product_group_id".into(),
-                        name_column: Some("product_group_label".into()),
-                    },
-                    LevelColumn {
-                        key_column: "product_id_raw".into(),
-                        name_column: Some("product_label".into()),
+                        key_column: "id".into(),
+                        name_column: Some("name".to_owned()),
                     },
                 ],
                 property_columns: vec![],
             },
         ];
         let meas = vec![
-            MeasureSql { aggregator: "sum".into(), column: "quantity".into() }
+            MeasureSql { aggregator: "sum".into(), column: "commits".into() }
         ];
 
         assert_eq!(

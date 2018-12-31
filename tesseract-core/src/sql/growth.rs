@@ -164,7 +164,7 @@ mod test {
 
     #[test]
     fn test_growth() {
-        let (growth, headers) = calculate("select * from test".to_owned(), "date, language, framework, ex_complete", 1,
+        let (growth, _headers) = calculate("select * from test".to_owned(), "date, language, framework, ex_complete", 1,
             &GrowthSql {
                 time_drill: DrilldownSql {
                     table: Table { name: "".to_owned(), primary_key: None, schema: None },
