@@ -13,10 +13,11 @@ use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
-use tesseract_core::Database;
+use tesseract_core::SqlType;
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
+use crate::db_config::Database;
 
 pub fn aggregate_default_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
@@ -85,10 +86,20 @@ pub fn do_aggregate(
         },
     };
 
-    let sql_result = req
-        .state()
-        .schema
-        .sql_query(&cube, &ts_query, Database::Clickhouse);
+    let sql_result = match req.state().db_type {
+        Database::Clickhouse => {
+            req
+                .state()
+                .schema
+                .sql_query(&cube, &ts_query, SqlType::Clickhouse)
+        },
+        _ => {
+            req
+                .state()
+                .schema
+                .sql_query(&cube, &ts_query, SqlType::Standard)
+        }
+    };
 
     let (sql, headers) = match sql_result {
         Ok(sql) => sql,

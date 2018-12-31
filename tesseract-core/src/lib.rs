@@ -31,8 +31,8 @@ use self::sql::{
     SortSql,
     RcaSql,
     GrowthSql,
-    SqlType,
 };
+pub use self::sql::SqlType;
 pub use self::query::Query;
 
 

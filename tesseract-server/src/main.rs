@@ -51,6 +51,7 @@ fn main() -> Result<(), Error> {
         .map_err(|_| format_err!("database url not found; either TESSERACT_DATABASE_URL or cli option required"))?;
 
     let (db, db_url, db_type) = db_config::get_db(&db_url_full)?;
+    let db_type_viz = db_type.clone();
 
     // Initialize Schema
     let schema_str = std::fs::read_to_string(&schema_path)
@@ -59,13 +60,13 @@ fn main() -> Result<(), Error> {
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(db.clone(), schema.clone()))
+    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
 
     println!("Tesseract listening on: {}", server_addr);
-    println!("Tesseract database:     {}, {}", db_url, db_type);
+    println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
 
     sys.run();
