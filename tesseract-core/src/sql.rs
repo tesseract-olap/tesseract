@@ -13,6 +13,50 @@ use crate::sql::{
 };
 use crate::query::{LimitQuery, SortDirection};
 
+
+// Temporary, until we get an interface ready for generating different sql
+// per backend.
+pub enum SqlType {
+    Clickhouse,
+    Standard,
+}
+
+/// Error checking is done before this point. This string formatter
+/// accepts any input
+/// Currently just does the standard aggregation.
+/// No calculations, primary aggregation is not split out.
+pub fn standard_sql(
+    table: &TableSql,
+    cuts: &[CutSql],
+    drills: &[DrilldownSql],
+    meas: &[MeasureSql],
+    // TODO put Filters and Calculations into own structs
+    _top: &Option<TopSql>,
+    _sort: &Option<SortSql>,
+    _limit: &Option<LimitSql>,
+    _rca: &Option<RcaSql>,
+    _growth: &Option<GrowthSql>,
+    ) -> String
+{
+    let drill_cols = join(drills.iter().map(|d| d.col_string()), ", ");
+    let mea_cols = join(meas.iter().map(|m| m.agg_col_string()), ", ");
+
+    let mut final_sql = format!("select {}, {} from {}",
+        drill_cols,
+        mea_cols,
+        table.name,
+    );
+
+    if !cuts.is_empty() {
+        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.column, c.members_string())), ", ");
+        final_sql = format!("{} where {}", final_sql, cut_clauses);
+    }
+
+    final_sql = format!("{} group_by {}", final_sql, drill_cols);
+
+    final_sql
+}
+
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 pub fn clickhouse_sql(
@@ -381,4 +425,78 @@ mod test {
     }
 
     // TODO test: drilldowns%5B%5D=Date.Year&measures%5B%5D=Quantity, which has only inline dim
+
+    #[test]
+    /// Tests:
+    /// - basic standard sql generation
+    /// - join dim table or inline
+    /// - cuts on multi-level dim
+    /// - parents
+    ///
+    fn test_standard_sql() {
+        let table = TableSql {
+            name: "sales".into(),
+            primary_key: Some("product_id".into()),
+        };
+        let cuts = vec![
+            CutSql {
+                foreign_key: "product_id".into(),
+                primary_key: "product_id".into(),
+                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+                column: "product_group_id".into(),
+                members: vec!["3".into()],
+                member_type: MemberType::NonText,
+            },
+        ];
+        let drills = vec![
+            // this dim is inline, so should use the fact table
+            // also has parents, so has 
+            DrilldownSql {
+                foreign_key: "date_id".into(),
+                primary_key: "date_id".into(),
+                table: Table { name: "sales".into(), schema: None, primary_key: None },
+                level_columns: vec![
+                    LevelColumn {
+                        key_column: "year".into(),
+                        name_column: None,
+                    },
+                    LevelColumn {
+                        key_column: "month".into(),
+                        name_column: None,
+                    },
+                    LevelColumn {
+                        key_column: "day".into(),
+                        name_column: None,
+                    },
+                ],
+                property_columns: vec![],
+            },
+            // this comes second, but should join first because of primary key match
+            // on fact table
+            DrilldownSql {
+                foreign_key: "product_id".into(),
+                primary_key: "product_id".into(),
+                table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+                level_columns: vec![
+                    LevelColumn {
+                        key_column: "product_group_id".into(),
+                        name_column: Some("product_group_label".into()),
+                    },
+                    LevelColumn {
+                        key_column: "product_id_raw".into(),
+                        name_column: Some("product_label".into()),
+                    },
+                ],
+                property_columns: vec![],
+            },
+        ];
+        let meas = vec![
+            MeasureSql { aggregator: "sum".into(), column: "quantity".into() }
+        ];
+
+        assert_eq!(
+            standard_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
+            "select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(quantity) from sales where product_group_id in (3) group_by year, month, day, product_group_id, product_group_label, product_id_raw, product_label".to_owned()
+        );
+    }
 }

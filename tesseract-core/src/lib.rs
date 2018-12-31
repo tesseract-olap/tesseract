@@ -31,6 +31,7 @@ use self::sql::{
     SortSql,
     RcaSql,
     GrowthSql,
+    SqlType,
 };
 pub use self::query::Query;
 
@@ -53,7 +54,7 @@ impl Schema {
         &self,
         cube: &str,
         query: &Query,
-        db: Database,
+        sql_type: SqlType,
         ) -> Result<(String, Vec<String>), Error>
     {
         // First do checks, like making sure there's a measure, and that there's
@@ -252,10 +253,26 @@ impl Schema {
 
 
         // now feed the database metadata into the sql generator
-        match db {
-            Database::Clickhouse => {
+        match sql_type {
+            SqlType::Clickhouse => {
                 Ok((
                     sql::clickhouse_sql(
+                    &table,
+                    &cut_cols,
+                    &drill_cols,
+                    &mea_cols,
+                    &top,
+                    &sort,
+                    &limit,
+                    &rca,
+                    &growth,
+                    ),
+                    headers,
+                ))
+            },
+            SqlType::Standard => {
+                Ok((
+                    sql::standard_sql(
                     &table,
                     &cut_cols,
                     &drill_cols,
@@ -582,6 +599,3 @@ impl Schema {
     }
 }
 
-pub enum Database {
-    Clickhouse,
-}
