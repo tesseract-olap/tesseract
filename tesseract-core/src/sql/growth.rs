@@ -11,7 +11,6 @@ use itertools::join;
 
 use super::GrowthSql;
 
-// TODO disallow properties? for growth drill?
 pub fn calculate(
     final_sql: String,
     final_drill_cols: &str,
@@ -22,8 +21,14 @@ pub fn calculate(
     // A whole section to string manipulate to remove references to growth cols
     let mut all_drill_cols_except_growth = final_drill_cols.to_owned();
 
-    let time_cols = growth.time_drill.col_vec();
+    let mut time_cols = vec![];
 
+    for l in &growth.time_drill.level_columns {
+        time_cols.push(l.key_column.clone());
+        if let Some(ref n) = l.name_column {
+            time_cols.push(n.clone());
+        }
+    }
 
     let mut growth_cols = time_cols.clone();
     growth_cols.push(growth.mea.clone());
@@ -103,7 +108,7 @@ pub fn calculate(
             {final_other_meas} \
             final_m, \
             (final_m_diff / (final_m - final_m_diff)) as growth, \
-            final_m_diff \
+            final_m_diff
         from (\
             with \
                 {grouparray_times}, \
@@ -159,10 +164,10 @@ mod test {
 
     #[test]
     fn test_growth() {
-        let (growth, _headers) = calculate("select * from test".to_owned(), "time.date, language, framework, ex_complete", 1,
+        let (growth, _headers) = calculate("select * from test".to_owned(), "date, language, framework, ex_complete", 1,
             &GrowthSql {
                 time_drill: DrilldownSql {
-                    table: Table { name: "time".to_owned(), primary_key: None, schema: None },
+                    table: Table { name: "".to_owned(), primary_key: None, schema: None },
                     primary_key: "".to_owned(),
                     foreign_key: "".to_owned(),
                     level_columns: vec![LevelColumn { key_column: "date".to_owned(), name_column: None }],
@@ -176,7 +181,7 @@ mod test {
         //println!("{}", headers);
         assert_eq!(
             growth,
-            "select  language, framework, ex_complete, final_times_0, final_other_m0,  final_m, (final_m_diff / (final_m - final_m_diff)) as growth, final_m_diff from (with groupArray(time.date) as times_0, groupArray(final_m0) as other_m0,  groupArray(mea_1) as all_m_in_group, arrayEnumerate(all_m_in_group) as all_m_in_group_ids, arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff select  language, framework, ex_complete, other_m0,  times_0, all_m_in_group, m_diff from (select * from test order by time.date ) group by  language, framework, ex_complete ) array Join m_diff as final_m_diff, all_m_in_group as final_m, times_0 as final_times_0 ,other_m0 as final_other_m0".to_owned(),
+            "select  language, framework, ex_complete, final_times_0, final_other_m0,  final_m, (final_m_diff / (final_m - final_m_diff)) as growth, final_m_diff\n        from (with groupArray(date) as times_0, groupArray(final_m0) as other_m0,  groupArray(mea_1) as all_m_in_group, arrayEnumerate(all_m_in_group) as all_m_in_group_ids, arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff select  language, framework, ex_complete, other_m0,  times_0, all_m_in_group, m_diff from (select * from test order by date ) group by  language, framework, ex_complete ) array Join m_diff as final_m_diff, all_m_in_group as final_m, times_0 as final_times_0 ,other_m0 as final_other_m0".to_owned(),
             );
     }
 }

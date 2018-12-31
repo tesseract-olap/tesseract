@@ -58,7 +58,7 @@ pub fn standard_sql(
     //    .collect();
     // --------------------------------------------------
 
-    let drill_cols = join(drills.iter().map(|d| d.col_string()), ", ");
+    let drill_cols = join(drills.iter().map(|d| d.col_qual_string()), ", ");
     let mea_cols = join(meas.iter().map(|m| m.agg_col_string()), ", ");
 
     let mut final_sql = format!("select {}, {} from {}",
@@ -154,6 +154,30 @@ impl DrilldownSql {
     }
 
     fn col_vec(&self) -> Vec<String> {
+        let mut cols: Vec<_> = self.level_columns.iter()
+            .map(|l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("{}, {}", l.key_column, name_col)
+                } else {
+                    l.key_column.clone()
+                }
+            }).collect();
+
+        if self.property_columns.len() != 0 {
+            cols.push(
+                join(&self.property_columns, ", ")
+            );
+        }
+
+        cols
+    }
+
+    fn col_qual_string(&self) -> String {
+        let cols = self.col_qual_vec();
+        join(cols, ", ")
+    }
+
+    fn col_qual_vec(&self) -> Vec<String> {
         let mut cols: Vec<_> = self.level_columns.iter()
             .map(|l| {
                 if let Some(ref name_col) = l.name_column {
@@ -419,7 +443,7 @@ mod test {
 
         assert_eq!(
             clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
-            "select * from (select sales.year, sales.month, sales.day, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, sum(m0) as final_m0 from (select sales.year, sales.month, sales.day, product_id, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, m0 from (select dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, product_id as product_id from dim_products where product_group_id in (3)) all inner join (select sales.year, sales.month, sales.day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by sales.year, sales.month, sales.day, product_id) using product_id) group by sales.year, sales.month, sales.day, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label) order by sales.year, sales.month, sales.day, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label asc ".to_owned()
+            "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id as product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
         );
     }
 
@@ -453,7 +477,6 @@ mod test {
             "3",
         );
     }
-
     #[test]
     fn drilldown_with_properties() {
         let drill = DrilldownSql {
@@ -475,6 +498,31 @@ mod test {
 
         assert_eq!(
             drill.col_string(),
+            "product_group_id, product_group_label, product_id_raw, product_label, hexcode, form".to_owned(),
+        );
+    }
+
+    #[test]
+    fn drilldown_with_properties_qual() {
+        let drill = DrilldownSql {
+            foreign_key: "product_id".into(),
+            primary_key: "product_id".into(),
+            table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+            level_columns: vec![
+                LevelColumn {
+                    key_column: "product_group_id".into(),
+                    name_column: Some("product_group_label".into()),
+                },
+                LevelColumn {
+                    key_column: "product_id_raw".into(),
+                    name_column: Some("product_label".into()),
+                },
+            ],
+            property_columns: vec!["hexcode".to_owned(), "form".to_owned()],
+        };
+
+        assert_eq!(
+            drill.col_qual_string(),
             "dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, dim_products.hexcode, dim_products.form".to_owned(),
         );
     }
