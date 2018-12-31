@@ -89,11 +89,11 @@ pub fn standard_sql(
 
 
     if !cuts.is_empty() {
-        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.column, c.members_string())), ", ");
+        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.col_qual_string(), c.members_string())), ", ");
         final_sql = format!("{} {}", final_sql, cut_clauses);
     }
 
-    final_sql = format!("{} group by {}", final_sql, drill_cols);
+    final_sql = format!("{} group by {};", final_sql, drill_cols);
 
     final_sql
 }
@@ -149,22 +149,32 @@ pub struct DrilldownSql {
 
 impl DrilldownSql {
     fn col_string(&self) -> String {
+        let cols = self.col_vec();
+        join(cols, ", ")
+    }
+
+    fn col_vec(&self) -> Vec<String> {
         let mut cols: Vec<_> = self.level_columns.iter()
             .map(|l| {
                 if let Some(ref name_col) = l.name_column {
-                    format!("{}, {}", l.key_column, name_col)
+                    format!("{}.{}, {}.{}", self.table.name, l.key_column, self.table.name, name_col)
                 } else {
-                    l.key_column.clone()
+                    format!("{}.{}", self.table.name, l.key_column)
                 }
             }).collect();
 
         if self.property_columns.len() != 0 {
+            let prop_cols_qual = self.property_columns.iter()
+                .map(|p| {
+                    format!("{}.{}", self.table.name, p)
+                });
+
             cols.push(
-                join(&self.property_columns, ", ")
+                join(prop_cols_qual, ", ")
             );
         }
 
-        join(cols, ", ")
+        cols
     }
 }
 
@@ -197,6 +207,10 @@ impl CutSql {
             }
         };
         format!("{}", members)
+    }
+
+    fn col_qual_string(&self) -> String {
+        format!("{}.{}", self.table.name, self.column)
     }
 }
 
@@ -405,7 +419,7 @@ mod test {
 
         assert_eq!(
             clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
-            "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id as product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
+            "select * from (select sales.year, sales.month, sales.day, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, sum(m0) as final_m0 from (select sales.year, sales.month, sales.day, product_id, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, m0 from (select dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, product_id as product_id from dim_products where product_group_id in (3)) all inner join (select sales.year, sales.month, sales.day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by sales.year, sales.month, sales.day, product_id) using product_id) group by sales.year, sales.month, sales.day, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label) order by sales.year, sales.month, sales.day, dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label asc ".to_owned()
         );
     }
 
@@ -461,7 +475,7 @@ mod test {
 
         assert_eq!(
             drill.col_string(),
-            "product_group_id, product_group_label, product_id_raw, product_label, hexcode, form".to_owned(),
+            "dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, dim_products.hexcode, dim_products.form".to_owned(),
         );
     }
 
@@ -512,7 +526,7 @@ mod test {
 
         assert_eq!(
             standard_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
-            "select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(quantity) from sales where product_group_id in (3) group_by year, month, day, product_group_id, product_group_label, product_id_raw, product_label".to_owned()
+            "select valid_projects.id, valid_projects.name, sum(commits) from project_facts inner join valid_projects on valid_projects.id = project_facts.project_id where valid_projects.id in (3) group by valid_projects.id, valid_projects.name;".to_owned()
         );
     }
 }
