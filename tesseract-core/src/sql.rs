@@ -83,7 +83,7 @@ pub fn standard_sql(
         final_sql = format!("{} {}", final_sql, join_ext_dim_clauses);
     }
 
-    if !cuts.is_empty() && !ext_drills.is_empty() {
+    if !cuts.is_empty() || !ext_drills.is_empty() {
         final_sql = format!("{} where", final_sql);
     }
 
