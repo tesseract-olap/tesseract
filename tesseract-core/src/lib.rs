@@ -200,7 +200,7 @@ impl Schema {
             .map_err(|err| format_err!("Error getting drill headers: {}", err))?;
 
         let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
-            .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
+            .map_err(|err| format_err!("Error getting mea headers: {}", err))?;
 
         // rca mea will always be first, so just put
         // in `Mea RCA` second
@@ -285,7 +285,7 @@ impl Schema {
                     ),
                     headers,
                 ))
-            }
+            },
         }
     }
 
@@ -351,6 +351,8 @@ impl Schema {
         Ok(res)
     }
 
+    // TODO as currently written, properties that don't get picked up by a drilldown
+    // will just silently fail.
     fn cube_drill_cols(
         &self,
         cube_name: &str,

@@ -23,5 +23,9 @@ structopt = "0.2.13"
 [dependencies.tesseract-clickhouse]
 path = "../tesseract-clickhouse"
 
+[dependencies.tesseract-mysql]
+path = "../tesseract-mysql"
+
+
 [dependencies.tesseract-core]
 path = "../tesseract-core"
