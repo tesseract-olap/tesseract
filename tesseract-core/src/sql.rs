@@ -527,31 +527,6 @@ mod test {
         );
     }
 
-    #[test]
-    fn drilldown_with_properties() {
-        let drill = DrilldownSql {
-            foreign_key: "product_id".into(),
-            primary_key: "product_id".into(),
-            table: Table { name: "dim_products".into(), schema: None, primary_key: None },
-            level_columns: vec![
-                LevelColumn {
-                    key_column: "product_group_id".into(),
-                    name_column: Some("product_group_label".into()),
-                },
-                LevelColumn {
-                    key_column: "product_id_raw".into(),
-                    name_column: Some("product_label".into()),
-                },
-            ],
-            property_columns: vec!["hexcode".to_owned(), "form".to_owned()],
-        };
-
-        assert_eq!(
-            drill.col_string(),
-            "product_group_id, product_group_label, product_id_raw, product_label, hexcode, form".to_owned(),
-        );
-    }
-
     // TODO test: drilldowns%5B%5D=Date.Year&measures%5B%5D=Quantity, which has only inline dim
 
     #[test]

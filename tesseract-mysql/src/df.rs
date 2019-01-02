@@ -1,15 +1,12 @@
 //! Convert clickhouse Block to tesseract_core::DataFrame
-// extern crate mysql;
 
 use failure::{Error, format_err};
-extern crate mysql_async;
-extern crate futures;
-use std::str;
+use futures::future::{self, Future};
 use mysql_async::{QueryResult, BinaryProtocol, Conn};
 use mysql_async::consts::ColumnType::*;
-use tesseract_core::{DataFrame, Column, ColumnData};
 use mysql_async::Value::*;
-use futures::future::{self, Future};
+use std::str;
+use tesseract_core::{DataFrame, Column, ColumnData};
 
 pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future<Item=DataFrame, Error=Error>> {
     let mut tcolumn_list = vec![];
