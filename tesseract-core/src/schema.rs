@@ -48,8 +48,6 @@ impl From<SchemaConfig> for Schema {
                                 dimensions.push(Dimension {
                                     name: shared_dim_config.name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
-                                    // TODO hardcoded hack
-                                    foreign_key_type: Some(MemberType::NonText),
                                     hierarchies: hierarchies,
 
                                 });
@@ -88,7 +86,6 @@ pub struct Cube {
 pub struct Dimension {
     pub name: String,
     pub foreign_key: Option<String>,
-    pub foreign_key_type:Option<MemberType>,
     pub hierarchies: Vec<Hierarchy>,
 }
 
@@ -101,7 +98,6 @@ impl From<DimensionConfig> for Dimension {
         Dimension {
             name: dimension_config.name,
             foreign_key: dimension_config.foreign_key,
-            foreign_key_type: dimension_config.foreign_key_type,
             hierarchies: hierarchies,
         }
     }
@@ -145,6 +141,7 @@ pub struct Level {
     pub key_column: String,
     pub name_column: Option<String>,
     pub properties: Option<Vec<Property>>,
+    pub key_type: Option<MemberType>,
 }
 
 impl From<LevelConfig> for Level {
@@ -161,6 +158,7 @@ impl From<LevelConfig> for Level {
             key_column: level_config.key_column,
             name_column: level_config.name_column,
             properties,
+            key_type: level_config.key_type,
         }
     }
 }

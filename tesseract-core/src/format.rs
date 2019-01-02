@@ -75,20 +75,20 @@ fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error
 
     // write data
     for row_idx in 0..df.len() {
-        let mut row = IndexMap::new();
+        let mut row: IndexMap<&str, serde_json::Value> = IndexMap::new();
         for col_idx in 0..df.columns.len() {
             let val = match df.columns[col_idx].column_data {
-                ColumnData::Int8(ref ns) => ns[row_idx].to_string(),
-                ColumnData::Int16(ref ns) => ns[row_idx].to_string(),
-                ColumnData::Int32(ref ns) => ns[row_idx].to_string(),
-                ColumnData::Int64(ref ns) => ns[row_idx].to_string(),
-                ColumnData::UInt8(ref ns) => ns[row_idx].to_string(),
-                ColumnData::UInt16(ref ns) => ns[row_idx].to_string(),
-                ColumnData::UInt32(ref ns) => ns[row_idx].to_string(),
-                ColumnData::UInt64(ref ns) => ns[row_idx].to_string(),
-                ColumnData::Float32(ref ns) => ns[row_idx].to_string(),
-                ColumnData::Float64(ref ns) => ns[row_idx].to_string(),
-                ColumnData::Text(ref ss) => ss[row_idx].to_string(),
+                ColumnData::Int8(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Int16(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Int32(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Int64(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt8(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt16(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt32(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt64(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Float32(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Float64(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Text(ref ss) => ss[row_idx].clone().into(),
             };
 
             row.insert(&headers[col_idx], val);

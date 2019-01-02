@@ -33,7 +33,6 @@ pub struct CubeConfig {
 pub struct DimensionConfig {
     pub name: String,
     pub foreign_key: Option<String>, // does not exist for shared dims
-    pub foreign_key_type: Option<MemberType>,
     pub hierarchies: Vec<HierarchyConfig>,
 }
 
@@ -63,6 +62,7 @@ pub struct LevelConfig {
     pub key_column: String,
     pub name_column: Option<String>,
     pub properties: Option<Vec<PropertyConfig>>,
+    pub key_type: Option<MemberType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

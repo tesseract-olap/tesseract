@@ -13,10 +13,11 @@ use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
-use tesseract_core::Database;
+use tesseract_core::SqlType;
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
+use crate::db_config::Database;
 
 pub fn aggregate_default_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
@@ -85,10 +86,20 @@ pub fn do_aggregate(
         },
     };
 
-    let sql_result = req
-        .state()
-        .schema
-        .sql_query(&cube, &ts_query, Database::Clickhouse);
+    let sql_result = match req.state().db_type {
+        Database::Clickhouse => {
+            req
+                .state()
+                .schema
+                .sql_query(&cube, &ts_query, SqlType::Clickhouse)
+        },
+        _ => {
+            req
+                .state()
+                .schema
+                .sql_query(&cube, &ts_query, SqlType::Standard)
+        }
+    };
 
     let (sql, headers) = match sql_result {
         Ok(sql) => sql,
@@ -124,7 +135,12 @@ pub struct AggregateQueryOpt {
     measures: Option<Vec<String>>,
     properties: Option<Vec<String>>,
     parents: Option<bool>,
-    debug: Option<bool>,
+    top: Option<String>,
+    sort: Option<String>,
+    limit: Option<String>,
+    growth: Option<String>,
+    rca: Option<String>,
+//    debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
@@ -164,12 +180,35 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
         let parents = agg_query_opt.parents.unwrap_or(false);
         let properties = properties?;
 
+        let top = agg_query_opt.top
+            .map(|t| t.parse())
+            .transpose()?;
+        let sort = agg_query_opt.sort
+            .map(|s| s.parse())
+            .transpose()?;
+        let limit = agg_query_opt.limit
+            .map(|l| l.parse())
+            .transpose()?;
+
+        let growth = agg_query_opt.growth
+            .map(|g| g.parse())
+            .transpose()?;
+
+        let rca = agg_query_opt.rca
+            .map(|r| r.parse())
+            .transpose()?;
+
         Ok(TsQuery {
             drilldowns,
             cuts,
             measures,
             parents,
             properties,
+            top,
+            sort,
+            limit,
+            rca,
+            growth,
         })
     }
 }

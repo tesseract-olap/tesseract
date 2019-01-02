@@ -1,4 +1,6 @@
 #![feature(try_from)]
+#![feature(transpose_result)]
+
 //! tesseract-core contains Schema;
 //! Schema is stateless; it is constructed from the schema file.
 //! Schema is held in the AppState struct to provide access from a route
@@ -22,6 +24,7 @@
 //! different databases. Supported: clickhouse, postgres, mysql, sqlite.
 
 mod app;
+mod db_config;
 mod handlers;
 
 use actix_web::server;
@@ -29,11 +32,7 @@ use dotenv::dotenv;
 use failure::{Error, format_err};
 use std::env;
 use structopt::StructOpt;
-use tesseract_mysql::MySql;
 
-use tesseract_core::{Backend};
-
-use tesseract_clickhouse::Clickhouse;
 use tesseract_core::Schema;
 
 fn main() -> Result<(), Error> {
@@ -47,43 +46,12 @@ fn main() -> Result<(), Error> {
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
-    // DB options: For now, only one db at a time, and only
-    // clickhouse or mysql
-    // They're set to conflict with each other in cli opts
-    //
-    // Also, casting to trait object:
-    // https://stackoverflow.com/questions/38294911/how-do-i-cast-a-literal-value-to-a-trait-object
-    //
-    // Also, it needs to be safe to send between threads, so add trait bounds
-    // Send + Sync.
-    // https://users.rust-lang.org/t/sending-trait-objects-between-threads/2374
-    //
-    // Also, it needs to be clonable to move into the closure that is
-    // used to initialize actix-web, so there's a litle boilerplate
-    // to implement https://users.rust-lang.org/t/solved-is-it-possible-to-clone-a-boxed-trait-object/1714/4
-    let mut db_url = String::new();
+    let db_url_full = env::var("TESSERACT_DATABASE_URL")
+        .or(opt.database_url.ok_or(format_err!("")))
+        .map_err(|_| format_err!("database url not found; either TESSERACT_DATABASE_URL or cli option required"))?;
 
-    let clickhouse_db = env::var("CLICKHOUSE_DATABASE_URL")
-        .or(opt.clickhouse_db_url.ok_or(format_err!("")))
-        .and_then(|url| {
-            let db = Clickhouse::from_addr(&url);
-            db_url = url;
-            db
-        })
-        .map(|db| Box::new(db) as Box<dyn Backend + Send + Sync>);
-
-    let mysql_db = env::var("MYSQL_DATABASE_URL")
-        .or(opt.mysql_db_url.ok_or(format_err!("")))
-        .and_then(|url| {
-            // TODO replace with mysql backend here
-            let db = MySql::from_addr(&url);
-            db_url = url;
-            db
-        })
-        .map(|db| Box::new(db) as Box<dyn Backend + Send + Sync>);
-
-    let db = clickhouse_db.or(mysql_db)
-        .expect("No database url found");
+    let (db, db_url, db_type) = db_config::get_db(&db_url_full)?;
+    let db_type_viz = db_type.clone();
 
     // Initialize Schema
     let schema_str = std::fs::read_to_string(&schema_path)
@@ -92,13 +60,13 @@ fn main() -> Result<(), Error> {
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(db.clone(), schema.clone()))
+    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
 
     println!("Tesseract listening on: {}", server_addr);
-    println!("Tesseract database:   {}", db_url);
+    println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
 
     sys.run();
@@ -112,12 +80,8 @@ struct Opt {
     #[structopt(short="a", long="addr")]
     address: Option<String>,
 
-    #[structopt(long="clickhouse-url")]
-    #[structopt(conflicts_with="mysql-url")]
-    clickhouse_db_url: Option<String>,
-
-    #[structopt(long="mysql-url")]
-    mysql_db_url: Option<String>,
+    #[structopt(long="db-url")]
+    database_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -126,3 +90,4 @@ struct EnvVars {
     pub database_url: String,
     pub schema_filepath: Option<String>,
 }
+

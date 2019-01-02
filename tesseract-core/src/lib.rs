@@ -7,7 +7,7 @@ mod schema_config;
 mod sql;
 mod query;
 
-use failure::{Error, format_err};
+use failure::{Error, format_err, bail};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -16,6 +16,7 @@ use self::names::{
     Drilldown,
     Measure,
     Property,
+    LevelName,
 };
 pub use self::schema::{Schema, Cube};
 use self::schema_config::SchemaConfig;
@@ -26,7 +27,12 @@ use self::sql::{
     MemberType,
     TableSql,
     LevelColumn,
+    TopSql,
+    SortSql,
+    RcaSql,
+    GrowthSql,
 };
+pub use self::sql::SqlType;
 pub use self::query::Query;
 
 
@@ -48,12 +54,12 @@ impl Schema {
         &self,
         cube: &str,
         query: &Query,
-        db: Database,
+        sql_type: SqlType,
         ) -> Result<(String, Vec<String>), Error>
     {
         // First do checks, like making sure there's a measure, and that there's
         // either a cut or drilldown
-        if query.measures.is_empty() {
+        if query.measures.is_empty() && query.rca.is_none() {
             return Err(format_err!("No measure found; please specify at least one"));
         }
         if query.drilldowns.is_empty() && query.cuts.is_empty(){
@@ -66,6 +72,30 @@ impl Schema {
 
             if !has_drill {
                 return Err(format_err!("Property {} has no matching drilldown", property));
+            }
+        }
+
+        // for growth, check if time dim and mea are in drilldown and measures
+        if let Some(ref growth) = query.growth {
+            if !query.drilldowns.contains(&growth.time_drill) {
+                bail!("Growth time drilldown {} is not in drilldowns", growth.time_drill);
+            }
+            if !query.measures.contains(&growth.mea) {
+                bail!("Growth measure {} is not in measures", growth.mea);
+            }
+        }
+
+        // for rca, disallow cuts on the second drilldown for now, until better system
+        // is figured out.
+        // There is internal filtering of cuts internally also, which should follow the
+        // pattern of the check here.
+        if let Some(ref rca) = query.rca {
+            let cuts_contain_drill_2 = query.cuts.iter()
+                .any(|c| c.level_name == rca.drill_2.0);
+
+            if cuts_contain_drill_2 {
+                return Err(format_err!("Cut on rca drill 2 is not allowed; for rca, \
+                    only external cuts and cuts on drill 1 allowed", ));
             }
         }
 
@@ -82,39 +112,180 @@ impl Schema {
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
 
+        // Options for sorting and limiting
+
+        let limit = query.limit.clone().map(|l| l.into());
+
+        let top = if let Some(ref t) = query.top {
+            // don't want the actual measure column,
+            // want the index so that we can use `m0` etc.
+            let top_sort_columns: Result<Vec<_>, _> = t.sort_measures.iter()
+                .map(|m| {
+                    query.measures.iter()
+                        .position(|col| col == m )
+                        .map(|idx| format!("final_m{}", idx))
+                        .ok_or(format_err!("measure for Top must be in measures"))
+                })
+                .collect();
+            let top_sort_columns = top_sort_columns?;
+
+            // check that by_dimension is in query.drilldowns
+            query.drilldowns.iter()
+                .map(|d| &d.0)
+                .find(|name| **name == t.by_dimension)
+                .ok_or(format_err!("Top by_dimension must be in drilldowns"))?;
+
+            Some(TopSql {
+                n: t.n,
+                by_column: self.get_dim_col(&cube, &t.by_dimension)?,
+                sort_columns: top_sort_columns,
+                sort_direction: t.sort_direction.clone(),
+            })
+        } else {
+            None
+        };
+
+        let sort = if let Some(ref s) = query.sort {
+            let sort_column = self.get_mea_col(&cube, &s.measure)?;
+
+            Some(SortSql {
+                direction: s.direction.clone(),
+                column: sort_column,
+            })
+        } else {
+            None
+        };
+
+        // TODO check that no overlapping dim or mea cols between rca and others
+        let rca = if let Some(ref rca) = query.rca {
+            let drill_1 = self.cube_drill_cols(&cube, &[rca.drill_1.clone()], &query.properties, query.parents)?;
+            let drill_2 = self.cube_drill_cols(&cube, &[rca.drill_2.clone()], &query.properties, query.parents)?;
+
+            let mea = self.cube_mea_cols(&cube, &[rca.mea.clone()])?
+                .get(0)
+                .ok_or(format_err!("no measure found for rca"))?
+                .clone();
+
+            Some(RcaSql {
+                drill_1,
+                drill_2,
+                mea,
+            })
+        } else {
+            None
+        };
+
+        let growth = if let Some(ref growth) = query.growth {
+            let time_drill = self.cube_drill_cols(&cube, &[growth.time_drill.clone()], &query.properties, query.parents)?
+                .get(0)
+                .ok_or(format_err!("no measure found for growth"))?
+                .clone();
+
+            // just want the measure id, not the actual measure col
+            let mea = query.measures.iter()
+                    .position(|mea| *mea == growth.mea )
+                    .map(|idx| format!("final_m{}", idx))
+                    .ok_or(format_err!("measure for Growth must be in measures"))?;
+
+            Some(GrowthSql {
+                time_drill,
+                mea,
+            })
+        } else {
+            None
+        };
+
         // getting headers, not for sql but needed for formatting
-        let drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
-            .map_err(|err| format_err!("Error getting drill heaers: {}", err))?;
+        let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
+            .map_err(|err| format_err!("Error getting drill headers: {}", err))?;
 
-        let mea_headers = self.cube_mea_headers(&cube, &query.measures)
-            .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
+        let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
+            .map_err(|err| format_err!("Error getting mea headers: {}", err))?;
 
-        let headers = [&drill_headers[..], &mea_headers[..]].concat();
+        // rca mea will always be first, so just put
+        // in `Mea RCA` second
+        if let Some(ref rca) = query.rca {
+            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &[], query.parents)
+                .map_err(|err| format_err!("Error getting rca drill headers: {}", err))?;
+            drill_headers.extend_from_slice(&rca_drill_headers);
+
+            mea_headers.insert(0, format!("{} RCA", rca.mea.0.clone()));
+        }
+
+
+        // Be careful with other calculations. TODO figure out a more composable system.
+        let headers = if let Some(ref growth) = query.growth {
+            // swapping around measure headers. growth mea moves to back.
+            let g_mea_idx = query.measures.iter()
+                    .position(|mea| *mea == growth.mea )
+                    .ok_or(format_err!("measure for Growth must be in measures"))?;
+
+            let moved_mea = mea_headers.remove(g_mea_idx);
+            mea_headers.push(moved_mea);
+            mea_headers.push(format!("{} Growth", growth.mea.0));
+            mea_headers.push(format!("{} Growth Value", growth.mea.0));
+
+            // swapping around drilldown headers. Move time to back
+            let time_headers = self.cube_drill_headers(&cube, &[growth.time_drill.clone()], &[], query.parents)
+                .map_err(|err| format_err!("Error getting time drill headers for Growth: {}", err))?;
+
+            let time_header_idxs: Result<Vec<_>,_> = time_headers.iter()
+                .map(|th| {
+                    drill_headers.iter()
+                        .position(|h| h == th)
+                        .ok_or(format_err!("Growth, cannot find time header {} in drill headers", th))
+                })
+                .collect();
+            let time_header_idxs = time_header_idxs?;
+
+            // TODO figure out a better way to move headers
+            let mut temp_time_headers = vec![];
+            for idx in time_header_idxs.iter().rev() {
+                let moved_hdr = drill_headers.remove(*idx);
+                temp_time_headers.insert(0, moved_hdr);
+            }
+            drill_headers.extend_from_slice(&temp_time_headers);
+
+            [&drill_headers[..], &mea_headers[..]].concat()
+        } else {
+            [&drill_headers[..], &mea_headers[..]].concat()
+        };
+
 
         // now feed the database metadata into the sql generator
-        match db {
-            Database::Clickhouse => {
+        match sql_type {
+            SqlType::Clickhouse => {
                 Ok((
                     sql::clickhouse_sql(
-                    table,
+                    &table,
                     &cut_cols,
                     &drill_cols,
                     &mea_cols,
+                    &top,
+                    &sort,
+                    &limit,
+                    &rca,
+                    &growth,
                     ),
                     headers,
                 ))
             },
-            Database::MySql => {
+            SqlType::Standard => {
                 Ok((
-                    sql::clickhouse_sql(
-                    table,
+                    sql::standard_sql(
+                    &table,
                     &cut_cols,
                     &drill_cols,
                     &mea_cols,
+                    &top,
+                    &sort,
+                    &limit,
+                    &rca,
+                    &growth,
                     ),
                     headers,
                 ))
-            }
+            },
         }
     }
 
@@ -144,13 +315,13 @@ impl Schema {
         for cut in cuts {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == cut.level_name.dimension)
-                .ok_or(format_err!("could not find dimension for cut"))?;
+                .ok_or(format_err!("could not find dimension for cut {}", cut.level_name))?;
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == cut.level_name.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for cut"))?;
+                .ok_or(format_err!("could not find hierarchy for cut {}", cut.level_name))?;
             let level = hier.levels.iter()
                 .find(|lvl| lvl.name == cut.level_name.level)
-                .ok_or(format_err!("could not find level for cut"))?;
+                .ok_or(format_err!("could not find level for cut {}", cut.level_name))?;
 
             // No table (means inline table) will replace with fact table
             let table = hier.table
@@ -173,7 +344,7 @@ impl Schema {
                 foreign_key,
                 column,
                 members: cut.members.clone(),
-                member_type: dim.foreign_key_type.clone().unwrap_or(MemberType::NonText),
+                member_type: level.key_type.clone().unwrap_or(MemberType::NonText),
             });
         }
 
@@ -200,10 +371,10 @@ impl Schema {
         for drill in drills {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == drill.0.dimension)
-                .ok_or(format_err!("could not find dimension for drill"))?;
+                .ok_or(format_err!("could not find dimension for drill {}", drill.0))?;
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == drill.0.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for drill"))?;
+                .ok_or(format_err!("could not find hierarchy for drill {}", drill.0))?;
             let levels = &hier.levels;
 
             // for this drill, get related properties.
@@ -247,7 +418,7 @@ impl Schema {
             // if not,then just level
             let level_idx = levels.iter()
                 .position(|lvl| lvl.name == drill.0.level)
-                .ok_or(format_err!("could not find hierarchy for drill"))?;
+                .ok_or(format_err!("could not find level for drill {}", drill.0))?;
 
             let mut level_columns = vec![];
 
@@ -287,7 +458,7 @@ impl Schema {
         for measure in meas {
             let mea = cube.measures.iter()
                 .find(|m| m.name == measure.0)
-                .ok_or(format_err!("could not find dimension for drill"))?;
+                .ok_or(format_err!("could not find measure for {}", measure.0))?;
 
             res.push(MeasureSql {
                 column: mea.column.clone(),
@@ -394,9 +565,39 @@ impl Schema {
 
         Ok(res)
     }
+
+    fn get_dim_col(&self, cube_name: &str, level_name: &LevelName) -> Result<String, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let dim = cube.dimensions.iter()
+            .find(|dim| dim.name == level_name.dimension)
+            .ok_or(format_err!("could not find dimension for level name"))?;
+        let hier = dim.hierarchies.iter()
+            .find(|hier| hier.name == level_name.hierarchy)
+            .ok_or(format_err!("could not find hierarchy for level name"))?;
+        let level = hier.levels.iter()
+            .find(|lvl| lvl.name == level_name.level)
+            .ok_or(format_err!("could not find level for level name"))?;
+
+        let column = level.key_column.clone();
+
+        Ok(column)
+    }
+
+    fn get_mea_col(&self, cube_name: &str, measure: &Measure) -> Result<String, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mea = cube.measures.iter()
+            .find(|m| m.name == measure.0)
+            .ok_or(format_err!("could not find level for level name"))?;
+
+        let column = mea.column.clone();
+
+        Ok(column)
+    }
 }
 
-pub enum Database {
-    Clickhouse,
-    MySql
-}

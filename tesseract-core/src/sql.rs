@@ -1,161 +1,135 @@
+mod growth;
+mod options;
+mod primary_agg;
+mod rca;
+
 use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::schema::Table;
+use crate::sql::{
+    options::wrap_options,
+    primary_agg::primary_agg,
+};
+use crate::query::{LimitQuery, SortDirection};
+
+
+// Temporary, until we get an interface ready for generating different sql
+// per backend.
+pub enum SqlType {
+    Clickhouse,
+    Standard,
+}
+
+/// Error checking is done before this point. This string formatter
+/// accepts any input
+/// Currently just does the standard aggregation.
+/// No calculations, primary aggregation is not split out.
+pub fn standard_sql(
+    table: &TableSql,
+    cuts: &[CutSql],
+    drills: &[DrilldownSql],
+    meas: &[MeasureSql],
+    // TODO put Filters and Calculations into own structs
+    _top: &Option<TopSql>,
+    _sort: &Option<SortSql>,
+    _limit: &Option<LimitSql>,
+    _rca: &Option<RcaSql>,
+    _growth: &Option<GrowthSql>,
+    ) -> String
+{
+    // --------------------------------------------------
+    // copied from primary_agg for clickhouse
+    let ext_drills: Vec<_> = drills.iter()
+        .filter(|d| d.table.name != table.name)
+        .collect();
+
+    //let ext_cuts: Vec<_> = cuts.iter()
+    //    .filter(|c| c.table.name != table.name)
+    //    .collect();
+    //let ext_cuts_for_inline = ext_cuts.clone();
+
+    //let inline_drills: Vec<_> = drills.iter()
+    //    .filter(|d| d.table.name == table.name)
+    //    .collect();
+
+    //let inline_cuts: Vec<_> = cuts.iter()
+    //    .filter(|c| c.table.name == table.name)
+    //    .collect();
+    // --------------------------------------------------
+
+    let drill_cols = join(drills.iter().map(|d| d.col_qual_string()), ", ");
+    let mea_cols = join(meas.iter().map(|m| m.agg_col_string()), ", ");
+
+    let mut final_sql = format!("select {}, {} from {}",
+        drill_cols,
+        mea_cols,
+        table.name,
+    );
+
+    // join external dims
+    if !ext_drills.is_empty() {
+        let join_ext_dim_clauses = join(ext_drills.iter()
+            .map(|d| {
+                format!("inner join {} on {}.{} = {}.{}",
+                    d.table.full_name(),
+                    d.table.full_name(),
+                    d.primary_key,
+                    table.name,
+                    d.foreign_key,
+                )
+        }), ", ");
+
+        final_sql = format!("{} {}", final_sql, join_ext_dim_clauses);
+    }
+
+    if !cuts.is_empty() || !ext_drills.is_empty() {
+        final_sql = format!("{} where", final_sql);
+    }
+
+
+    if !cuts.is_empty() {
+        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.col_qual_string(), c.members_string())), ", ");
+        final_sql = format!("{} {}", final_sql, cut_clauses);
+    }
+
+    final_sql = format!("{} group by {};", final_sql, drill_cols);
+
+    final_sql
+}
 
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 pub fn clickhouse_sql(
-    table: TableSql,
+    table: &TableSql,
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    // TODO put Filters and Calculations into own structs
+    top: &Option<TopSql>,
+    sort: &Option<SortSql>,
+    limit: &Option<LimitSql>,
+    rca: &Option<RcaSql>,
+    growth: &Option<GrowthSql>,
     ) -> String
 {
-    // Before first section, need to separate out inline dims.
-    // These are the ones that have the same dim table as fact table.
-    //
-    // First section, get drill/cut combos lined up.
-    //
-    // First "zip" drill and cut into DimSubquery
-    // - pop drill, attempt to match with cut (remove cut if used (sounds sketchy, but could swap
-    // with empty struct))
-    // - go through remaining cuts (if had swapped empty struct, go through ones that aren't empty)
-    //
-    // Then, the order is:
-    // - any dimension that has the same primary key as the
-    // - doesn't matter
-    //
-    // So just swap the primary key DimSubquery to the head
-
-    let mut ext_drills: Vec<_> = drills.iter()
-        .filter(|d| d.table.name != table.name)
-        .collect();
-
-    let mut ext_cuts: Vec<_> = cuts.iter()
-        .filter(|c| c.table.name != table.name)
-        .collect();
-
-    let inline_drills: Vec<_> = drills.iter()
-        .filter(|d| d.table.name == table.name)
-        .collect();
-
-    let inline_cuts: Vec<_> = cuts.iter()
-        .filter(|c| c.table.name == table.name)
-        .collect();
-
-    let mut dim_subqueries = vec![];
-
-    // external drill and cuts section
-
-    while let Some(drill) = ext_drills.pop() {
-        if let Some(idx) = ext_cuts.iter().position(|c| c.table == drill.table) {
-            let cut = ext_cuts.swap_remove(idx);
-
-            dim_subqueries.push(
-                dim_subquery(Some(drill),Some(cut))
-            );
+    let (mut final_sql, mut final_drill_cols) = {
+        if let Some(rca) = rca {
+            rca::calculate(table, cuts, drills, meas, rca)
         } else {
-            dim_subqueries.push(
-                dim_subquery(Some(drill), None)
-            );
+            primary_agg(table, cuts, drills, meas)
         }
+    };
+
+    if let Some(growth) = growth {
+        let (sql, drill_cols) = growth::calculate(final_sql, &final_drill_cols, meas.len(), growth);
+        final_sql = sql;
+        final_drill_cols = drill_cols;
     }
 
-    for cut in ext_cuts {
-        dim_subqueries.push(
-            dim_subquery(None, Some(cut))
-        );
-    }
+    final_sql = wrap_options(final_sql, &final_drill_cols, top, sort, limit);
 
-    if let Some(primary_key) = table.primary_key {
-        if let Some(idx) = dim_subqueries.iter().position(|d| d.foreign_key == primary_key) {
-            dim_subqueries.swap(0, idx);
-        }
-    }
-
-    // Now set up table table query
-    // Group by is hardcoded in because there's an assumption that at least one
-    // dim exists
-    //
-    // This is also the section wher inline dims and cuts get put
-
-    let mea_cols = meas
-        .iter()
-        .enumerate()
-        .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
-    let mea_cols = join(mea_cols, ", ");
-
-    let inline_dim_cols = inline_drills.iter().map(|d| d.col_string());
-    let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
-    let all_dim_cols = join(inline_dim_cols.chain(dim_idx_cols), ", ");
-
-    let mut fact_sql = format!("select {}", all_dim_cols);
-
-    fact_sql.push_str(
-        &format!(", {} from {}", mea_cols, table.name)
-    );
-
-    if !inline_cuts.is_empty() {
-        let inline_cut_clause = inline_cuts
-            .iter()
-            .map(|c| format!(" {} in ({})", c.column, c.members_string()));
-        let inline_cut_clause = join(inline_cut_clause, "and ");
-
-        fact_sql.push_str(
-            &format!(" where {}", inline_cut_clause)
-        );
-    }
-
-    fact_sql.push_str(
-        &format!(" group by {}", all_dim_cols)
-    );
-
-    // Now second half, feed DimSubquery into the multiple joins with fact table
-    // TODO allow for differently named cols to be joined on. (using an alias for as)
-
-    let mut sub_queries = fact_sql;
-
-    // initialize current dim cols with inline drills and idx cols (all dim cols)
-    let mut current_dim_cols = vec![all_dim_cols];
-
-    for dim_subquery in dim_subqueries {
-        // This section needed to accumulate the dim cols that are being selected over
-        // the recursive joins.
-        if let Some(cols) = dim_subquery.dim_cols {
-            current_dim_cols.push(cols);
-        }
-
-        let sub_queries_dim_cols = if !current_dim_cols.is_empty() {
-            format!("{}, ", join(current_dim_cols.iter(), ", "))
-        } else {
-            "".to_owned()
-        };
-
-        // Now construct subquery
-        sub_queries = format!("select {}{} from ({}) all inner join ({}) using {}",
-            sub_queries_dim_cols,
-            join((0..meas.len()).map(|i| format!("m{}", i)), ", "),
-            dim_subquery.sql,
-            sub_queries,
-            dim_subquery.foreign_key
-        );
-    }
-
-    // Finally, wrap with final agg and result
-    let final_drill_cols = drills.iter().map(|drill| drill.col_string());
-    let final_drill_cols = join(final_drill_cols, ", ");
-
-    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{})", mea.aggregator, i));
-    let final_mea_cols = join(final_mea_cols, ", ");
-
-    format!("select {}, {} from ({}) group by {} order by {} asc;",
-        final_drill_cols,
-        final_mea_cols,
-        sub_queries,
-        final_drill_cols,
-        final_drill_cols,
-    )
+    final_sql
 }
 
 #[derive(Debug, Clone)]
@@ -164,7 +138,7 @@ pub struct TableSql {
     pub primary_key: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DrilldownSql {
     pub table: Table,
     pub primary_key: String,
@@ -175,6 +149,11 @@ pub struct DrilldownSql {
 
 impl DrilldownSql {
     fn col_string(&self) -> String {
+        let cols = self.col_vec();
+        join(cols, ", ")
+    }
+
+    fn col_vec(&self) -> Vec<String> {
         let mut cols: Vec<_> = self.level_columns.iter()
             .map(|l| {
                 if let Some(ref name_col) = l.name_column {
@@ -190,13 +169,42 @@ impl DrilldownSql {
             );
         }
 
+        cols
+    }
+
+    fn col_qual_string(&self) -> String {
+        let cols = self.col_qual_vec();
         join(cols, ", ")
+    }
+
+    fn col_qual_vec(&self) -> Vec<String> {
+        let mut cols: Vec<_> = self.level_columns.iter()
+            .map(|l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("{}.{}, {}.{}", self.table.name, l.key_column, self.table.name, name_col)
+                } else {
+                    format!("{}.{}", self.table.name, l.key_column)
+                }
+            }).collect();
+
+        if self.property_columns.len() != 0 {
+            let prop_cols_qual = self.property_columns.iter()
+                .map(|p| {
+                    format!("{}.{}", self.table.name, p)
+                });
+
+            cols.push(
+                join(prop_cols_qual, ", ")
+            );
+        }
+
+        cols
     }
 }
 
 // TODO make level column an enum, to deal better with
 // levels with only key column and no name column?
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LevelColumn {
     pub key_column: String,
     pub name_column: Option<String>,
@@ -224,6 +232,10 @@ impl CutSql {
         };
         format!("{}", members)
     }
+
+    fn col_qual_string(&self) -> String {
+        format!("{}.{}", self.table.name, self.column)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -247,6 +259,48 @@ impl MeasureSql {
 }
 
 #[derive(Debug, Clone)]
+pub struct TopSql {
+    pub n: u64,
+    pub by_column: String,
+    pub sort_columns: Vec<String>,
+    pub sort_direction: SortDirection,
+}
+
+#[derive(Debug, Clone)]
+pub struct LimitSql {
+    pub n: u64,
+}
+
+impl From<LimitQuery> for LimitSql {
+    fn from(l: LimitQuery) -> Self {
+        LimitSql {
+            n: l.n,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SortSql {
+    pub direction: SortDirection,
+    pub column: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RcaSql {
+    // level col for dim 1
+    pub drill_1: Vec<DrilldownSql>,
+    // level col for dim 2
+    pub drill_2: Vec<DrilldownSql>,
+    pub mea: MeasureSql,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrowthSql {
+    pub time_drill: DrilldownSql,
+    pub mea: String,
+}
+
+#[derive(Debug, Clone)]
 struct DimSubquery {
     sql: String,
     foreign_key: String,
@@ -260,15 +314,18 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
     match drill {
         Some(drill) => {
             // TODO
+            // - oops, primary key is mandatory in schema, if not in
+            // schema-config, then it takes the lowest level's key_column
             // - make primary key optional and propagate.
             // if primary key exists
             // if primary key == lowest level col,
             // Or will just making an alias for the primary key work?
             // Then don't add primary key here.
             // Also, make primary key optional?
-            let mut sql = format!("select {}, {} from {}",
+            let mut sql = format!("select {}, {} as {} from {}",
                 drill.col_string(),
                 drill.primary_key.clone(),
+                drill.foreign_key.clone(),
                 drill.table.full_name(),
             );
             if let Some(cut) = cut {
@@ -385,8 +442,8 @@ mod test {
         ];
 
         assert_eq!(
-            clickhouse_sql(table, &cuts, &drills, &meas),
-            "select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc;".to_owned()
+            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
+            "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id as product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
         );
     }
 
@@ -420,6 +477,55 @@ mod test {
             "3",
         );
     }
+    #[test]
+    fn drilldown_with_properties() {
+        let drill = DrilldownSql {
+            foreign_key: "product_id".into(),
+            primary_key: "product_id".into(),
+            table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+            level_columns: vec![
+                LevelColumn {
+                    key_column: "product_group_id".into(),
+                    name_column: Some("product_group_label".into()),
+                },
+                LevelColumn {
+                    key_column: "product_id_raw".into(),
+                    name_column: Some("product_label".into()),
+                },
+            ],
+            property_columns: vec!["hexcode".to_owned(), "form".to_owned()],
+        };
+
+        assert_eq!(
+            drill.col_string(),
+            "product_group_id, product_group_label, product_id_raw, product_label, hexcode, form".to_owned(),
+        );
+    }
+
+    #[test]
+    fn drilldown_with_properties_qual() {
+        let drill = DrilldownSql {
+            foreign_key: "product_id".into(),
+            primary_key: "product_id".into(),
+            table: Table { name: "dim_products".into(), schema: None, primary_key: None },
+            level_columns: vec![
+                LevelColumn {
+                    key_column: "product_group_id".into(),
+                    name_column: Some("product_group_label".into()),
+                },
+                LevelColumn {
+                    key_column: "product_id_raw".into(),
+                    name_column: Some("product_label".into()),
+                },
+            ],
+            property_columns: vec!["hexcode".to_owned(), "form".to_owned()],
+        };
+
+        assert_eq!(
+            drill.col_qual_string(),
+            "dim_products.product_group_id, dim_products.product_group_label, dim_products.product_id_raw, dim_products.product_label, dim_products.hexcode, dim_products.form".to_owned(),
+        );
+    }
 
     #[test]
     fn drilldown_with_properties() {
@@ -447,4 +553,53 @@ mod test {
     }
 
     // TODO test: drilldowns%5B%5D=Date.Year&measures%5B%5D=Quantity, which has only inline dim
+
+    #[test]
+    /// Tests:
+    /// - basic standard sql generation
+    /// - join dim table or inline
+    /// - cuts on multi-level dim
+    /// - parents
+    ///
+    fn test_standard_sql() {
+        //"select valid_projects.id, name, sum(commits) from project_facts inner join valid_projects on project_facts.project_id = valid_projects.id where valid_projects.id=442841 group by name;"
+        let table = TableSql {
+            name: "project_facts".into(),
+            primary_key: Some("id".into()),
+        };
+        let cuts = vec![
+            CutSql {
+                foreign_key: "project_id".into(),
+                primary_key: "id".into(),
+                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
+                column: "id".into(),
+                members: vec!["3".into()],
+                member_type: MemberType::NonText,
+            },
+        ];
+        let drills = vec![
+            // this dim is inline, so should use the fact table
+            // also has parents, so has 
+            DrilldownSql {
+                foreign_key: "project_id".into(),
+                primary_key: "id".into(),
+                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
+                level_columns: vec![
+                    LevelColumn {
+                        key_column: "id".into(),
+                        name_column: Some("name".to_owned()),
+                    },
+                ],
+                property_columns: vec![],
+            },
+        ];
+        let meas = vec![
+            MeasureSql { aggregator: "sum".into(), column: "commits".into() }
+        ];
+
+        assert_eq!(
+            standard_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
+            "select valid_projects.id, valid_projects.name, sum(commits) from project_facts inner join valid_projects on valid_projects.id = project_facts.project_id where valid_projects.id in (3) group by valid_projects.id, valid_projects.name;".to_owned()
+        );
+    }
 }
