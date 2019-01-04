@@ -112,6 +112,8 @@ So in a query where the drilldowns are `geography` and `product` and `brand` and
 
 Drilldown and measure must be specified elsewhere in the query.
 
+Note: `rca` and `growth` are reserved keywords in `Top` only, so no measures that will be used in top can be `rca` or `growth`.
+
 ```
 top=<n>,<GroupDrill>,<Measure>,<sort_order>
 ```

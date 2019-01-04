@@ -33,7 +33,7 @@ use self::sql::{
     GrowthSql,
 };
 pub use self::sql::SqlType;
-pub use self::query::Query;
+pub use self::query::{Query, MeaOrCalc};
 
 
 impl Schema {
@@ -119,21 +119,32 @@ impl Schema {
         let top = if let Some(ref t) = query.top {
             // don't want the actual measure column,
             // want the index so that we can use `m0` etc.
-            let top_sort_columns: Result<Vec<_>, _> = t.sort_measures.iter()
-                .map(|m| {
-                    query.measures.iter()
-                        .position(|col| col == m )
-                        .map(|idx| format!("final_m{}", idx))
-                        .ok_or(format_err!("measure for Top must be in measures"))
+            let top_sort_columns: Result<Vec<_>, _> = t.sort_mea_or_calc.iter()
+                .map(|m_or_c| {
+                    match m_or_c {
+                        MeaOrCalc::Mea(m) => {
+                            query.measures.iter()
+                                .position(|col| col == m )
+                                .map(|idx| format!("final_m{}", idx))
+                                .ok_or(format_err!("measure {} for Top must be in measures", m))
+                        },
+                        MeaOrCalc::Calc(c) => {
+                            Ok(c.sql_string())
+                        }
+                    }
                 })
                 .collect();
             let top_sort_columns = top_sort_columns?;
 
             // check that by_dimension is in query.drilldowns
-            query.drilldowns.iter()
-                .map(|d| &d.0)
-                .find(|name| **name == t.by_dimension)
-                .ok_or(format_err!("Top by_dimension must be in drilldowns"))?;
+            // TODO check for rca drills too
+            if let Some(ref rca) = query.rca {
+            } else {
+                query.drilldowns.iter()
+                    .map(|d| &d.0)
+                    .find(|name| **name == t.by_dimension)
+                    .ok_or(format_err!("Top by_dimension must be in drilldowns"))?;
+            }
 
             Some(TopSql {
                 n: t.n,

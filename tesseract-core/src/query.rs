@@ -1,4 +1,4 @@
-use failure::{Error, bail};
+use failure::{Error, format_err, bail};
 use std::str::FromStr;
 
 use crate::names::{
@@ -47,7 +47,7 @@ impl Query {
 pub struct TopQuery {
     pub n: u64,
     pub by_dimension: LevelName,
-    pub sort_measures: Vec<Measure>,
+    pub sort_mea_or_calc: Vec<MeaOrCalc>,
     pub sort_direction: SortDirection,
 }
 
@@ -61,13 +61,13 @@ impl FromStr for TopQuery {
 
                 let n = n.parse::<u64>()?;
                 let by_dimension = by_dimension.parse::<LevelName>()?;
-                let sort_measures = vec![sort_measure.parse::<Measure>()?];
+                let sort_mea_or_calc = vec![sort_measure.parse::<MeaOrCalc>()?];
                 let sort_direction = sort_direction.parse::<SortDirection>()?;
 
                 Ok(TopQuery {
                     n,
                     by_dimension,
-                    sort_measures,
+                    sort_mea_or_calc,
                     sort_direction,
                 })
             },
@@ -75,6 +75,57 @@ impl FromStr for TopQuery {
         }
     }
 }
+
+// Just for TopQuery
+/// Currently rca and growth will be reserved keywords. This may be changed in the future,
+/// to allow measures that are named rca and growth
+#[derive(Debug, Clone)]
+pub enum MeaOrCalc {
+    Mea(Measure),
+    Calc(Calculation),
+}
+
+impl FromStr for MeaOrCalc {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<Calculation>()
+            .map(|c| MeaOrCalc::Calc(c))
+            .or_else(|_| {
+                s.parse::<Measure>()
+                    .map(|m| MeaOrCalc::Mea(m))
+            })
+            .map_err(|_| format_err!("Could not parse '{}' to measure name or built-in calculation name", s))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Calculation {
+    Rca,
+    Growth,
+}
+
+impl Calculation {
+    pub(crate) fn sql_string(&self) -> String {
+        match self {
+            Calculation::Rca => "rca".to_owned(),
+            Calculation::Growth => "growth".to_owned(),
+        }
+    }
+}
+
+impl FromStr for Calculation {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.to_lowercase()[..] {
+            "rca" => Ok(Calculation::Rca),
+            "growth" => Ok(Calculation::Growth),
+            _ => Err(format_err!("'{}' is not a supported calculation", s)),
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct LimitQuery {
