@@ -264,7 +264,7 @@ impl FromStr for Cut {
             // "].[" won't match
             let s = s.trim_matches(pattern);
             s.split("].")
-                .map(|s| s.trim_left_matches('['))
+                .map(|s| s.trim_start_matches('['))
                 .collect()
         } else {
             s.split(".")
@@ -272,10 +272,10 @@ impl FromStr for Cut {
         };
 
         let members: Vec<_> = name_vec[name_vec.len()-1]
-            .trim_left_matches('&')
-            .trim_left_matches('[')
+            .trim_start_matches('&')
+            .trim_start_matches('[')
             .split(',')
-            .map(|s| s.trim_left_matches('&').to_owned())
+            .map(|s| s.trim_start_matches('&').to_owned())
             .collect();
 
         Ok(Cut {
