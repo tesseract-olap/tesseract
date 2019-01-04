@@ -110,6 +110,8 @@ Top calculation is `top n by dimension, on measure ordered by asc/desc`.
 
 So in a query where the drilldowns are `geography` and `product` and `brand` and the measure is `quantity`, you can use the top calculation to get the top 3 `product`/`brand` combinations by `geography`, for quantity (in this case you'd probably sort desc).
 
+Drilldown and measure must be specified elsewhere in the query.
+
 ```
 top=<n>,<GroupDrill>,<Measure>,<sort_order>
 ```
@@ -117,6 +119,23 @@ top=<n>,<GroupDrill>,<Measure>,<sort_order>
 - GroupDrill: drilldown name
 - Measure: measure name
 - sort order: `asc`/`desc`
+
+### RCA:
+RCA calculation, for dim 1 v. dim 2.
+
+External drills (like time) are allowed, and rca will be calculated within those groupings.
+Cuts on non-rca dims are allowed.
+Cuts on rca drilldown level are allowed only for `drill_1`. The example would be for rca of jobs by city. It doesn't make sense to cut on city, because you'd generally be comparing rca across cities, but it might be for only one job. (This behavior could be subject to change)
+Cuts on parents of the rca drilldowns are allowed, as they limit the space in which rca is calculated (e.g. product space of manufacturing, or countries in latam).
+
+RCA drills and measures do not have to be specified anywhere else in the query.
+
+```
+rca=<drill_1>,<drill_2>,<measure>
+```
+- `drill_1`: drilldown 1 name
+- `drill_2`: drilldown 2 name
+- measure : measure name
 
 ### parents:
 Parents will return metadata for all parent levels for a given drilldown on a level.

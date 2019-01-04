@@ -93,25 +93,28 @@ pub fn calculate(
     // In the future, would I allow more cuts? Maybe depending on use case
     //
     // The blacklist is the drilldowns contained in each of a, b, c, d
+    //
+    // Note: parent of rca drills are not filtered, because they are meant
+    // to limit the rca calculation space!
 
-    let ac_drill_keys_blacklist: Vec<_> = rca.drill_2.iter()
+    let ac_cut_cols_blacklist: Vec<_> = rca.drill_2.iter()
         .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()))
         .collect();
 
-    let bd_drill_keys_blacklist: Vec<_> = rca.drill_1.iter().chain(rca.drill_2.iter())
+    let bd_cut_cols_blacklist: Vec<_> = rca.drill_1.iter().chain(rca.drill_2.iter())
         .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()))
         .collect();
 
     let ac_cuts: Vec<_> = cuts.iter()
         .filter(|cut| {
-            ac_drill_keys_blacklist.iter().find(|k| **k == cut.column).is_none()
+            ac_cut_cols_blacklist.iter().find(|k| **k == cut.column).is_none()
         })
         .cloned()
         .collect();
 
     let bd_cuts: Vec<_> = cuts.iter()
         .filter(|cut| {
-            bd_drill_keys_blacklist.iter().find(|k| **k == cut.column).is_none()
+            bd_cut_cols_blacklist.iter().find(|k| **k == cut.column).is_none()
         })
         .cloned()
         .collect();
