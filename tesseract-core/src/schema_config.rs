@@ -1,6 +1,4 @@
-use failure:: {Error, format_err};
 use serde_derive::Deserialize;
-use serde_json;
 
 use crate::sql::MemberType;
 
@@ -9,15 +7,6 @@ pub struct SchemaConfig {
     pub name: String,
     pub shared_dimensions: Option<Vec<SharedDimensionConfig>>,
     pub cubes: Vec<CubeConfig>,
-}
-
-impl SchemaConfig {
-    pub fn from_json(input: &str) -> Result<Self, Error> {
-        serde_json::from_str(input)
-            .map_err(|err| {
-                format_err!("error reading json schema config: {}", err)
-            })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
