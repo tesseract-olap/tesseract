@@ -342,8 +342,9 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
         },
         None => {
             if let Some(cut) = cut {
-                let sql = format!("select {} from {} where {} in ({})",
+                let sql = format!("select {} as {} from {} where {} in ({})",
                     cut.primary_key.clone(),
+                    cut.foreign_key.clone(),
                     cut.table.full_name(),
                     cut.column.clone(),
                     cut.members_string(),
