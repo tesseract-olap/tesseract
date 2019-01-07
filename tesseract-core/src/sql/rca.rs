@@ -231,7 +231,7 @@ pub fn calculate(
 
     // adding final measures at the end
     let final_ext_meas = if !meas.is_empty() {
-        ", ".to_owned() + &join((1..meas.len()+1).map(|i| format!("m{}", i)), ", ")
+        ", ".to_owned() + &join((1..meas.len()+1).map(|i| format!("final_m{}", i)), ", ")
     } else {
         "".to_owned()
     };

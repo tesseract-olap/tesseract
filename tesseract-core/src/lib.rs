@@ -123,6 +123,10 @@ impl Schema {
                 .map(|m_or_c| {
                     match m_or_c {
                         MeaOrCalc::Mea(m) => {
+                            // NOTE: rca mea does not return the actual value, only rca. Since
+                            // mea value must be retrieved through explicit drilldown,
+                            // don't need to do an extra rca check here.
+
                             query.measures.iter()
                                 .position(|col| col == m )
                                 .map(|idx| format!("final_m{}", idx))
@@ -139,6 +143,13 @@ impl Schema {
             // check that by_dimension is in query.drilldowns
             // TODO check for rca drills too
             if let Some(ref rca) = query.rca {
+                let mut d = query.drilldowns.clone();
+                d.extend_from_slice(&[rca.drill_1.clone(), rca.drill_2.clone()]);
+
+                d.iter()
+                    .map(|d| &d.0)
+                    .find(|name| **name == t.by_dimension)
+                    .ok_or(format_err!("Top by_dimension must be in drilldowns (including rca)"))?;
             } else {
                 query.drilldowns.iter()
                     .map(|d| &d.0)
