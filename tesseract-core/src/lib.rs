@@ -239,7 +239,7 @@ impl Schema {
         // rca mea will always be first, so just put
         // in `Mea RCA` second
         if let Some(ref rca) = query.rca {
-            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &[], query.parents)
+            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &query.properties, query.parents)
                 .map_err(|err| format_err!("Error getting rca drill headers: {}", err))?;
             drill_headers.extend_from_slice(&rca_drill_headers);
 
