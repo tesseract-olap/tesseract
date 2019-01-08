@@ -66,12 +66,24 @@ impl Schema {
             return Err(format_err!("Either a drilldown or cut is required"));
         }
         // also check that properties have a matching drilldown
-        for property in &query.properties {
-            let has_drill = query.drilldowns.iter()
-                .any(|d| d.0 == property.level_name);
+        if let Some(ref rca) = query.rca {
+            let rca_drills = [&rca.drill_1, &rca.drill_2];
+            for property in &query.properties {
+                let has_drill = rca_drills.iter()
+                    .any(|d| d.0 == property.level_name);
 
-            if !has_drill {
-                return Err(format_err!("Property {} has no matching drilldown", property));
+                if !has_drill {
+                    return Err(format_err!("Property {} has no matching drilldown", property));
+                }
+            }
+        } else {
+            for property in &query.properties {
+                let has_drill = query.drilldowns.iter()
+                    .any(|d| d.0 == property.level_name);
+
+                if !has_drill {
+                    return Err(format_err!("Property {} has no matching drilldown", property));
+                }
             }
         }
 
