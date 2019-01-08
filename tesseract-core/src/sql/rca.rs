@@ -162,6 +162,19 @@ pub fn calculate(
         }));
     let join_array_rca_drill_2 = join(join_array_rca_drill_2, ", ");
 
+    // Do GroupArray and Array Join clauses for external measures, also
+    let mea_cols = (1..=meas.len())
+        .map(|m_idx| format!("final_m{col}", col=m_idx));
+    let mea_cols = join(mea_cols, ", ");
+
+    let group_array_ext_mea = (1..=meas.len())
+        .map(|m_idx| format!("groupArray(final_m{col}) as final_m{col}_s", col=m_idx));
+    let group_array_ext_mea = join(group_array_ext_mea, ", ");
+
+    let join_array_ext_mea = (1..=meas.len())
+        .map(|m_idx| format!("final_m{col}_s as final_m{col}", col=m_idx));
+    let join_array_ext_mea = join(join_array_ext_mea, ", ");
+
     // groupArray cols (the drill_2 from rca) can't be included in the group by or select
     let c_drills_minus_rca_drill_2 = c_drills.iter()
         .filter(|d| !rca.drill_2.contains(&d))
@@ -184,15 +197,21 @@ pub fn calculate(
 
 
     // Now add part c
-    let ac = format!("select {}, a, c from \
-                      (select {}, {}, groupArray(a) as a_s, sum(a) as c from ({}) group by {}) \
-                      Array Join {}, a_s as a",
+    let ac = format!("select {}, {}{} a, c from \
+                      (select {}, {}, {}{} groupArray(a) as a_s, sum(a) as c from ({}) group by {}) \
+                      Array Join {}, {}{} a_s as a",
         a_drills_str,
+        mea_cols,
+        if mea_cols.is_empty() { "" } else { "," },
         c_drills_minus_rca_drill_2,
         group_array_rca_drill_2,
+        group_array_ext_mea,
+        if group_array_ext_mea.is_empty() { "" } else { "," },
         a,
         c_drills_minus_rca_drill_2,
         join_array_rca_drill_2,
+        join_array_ext_mea,
+        if join_array_ext_mea.is_empty() { "" } else { "," },
     );
     println!("{}", ac);
 
