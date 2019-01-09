@@ -37,7 +37,7 @@ pub fn primary_agg(
         .filter(|d| d.table.name != table.name)
         .collect();
 
-    let mut ext_cuts: Vec<_> = cuts.iter()
+    let ext_cuts: Vec<_> = cuts.iter()
         .filter(|c| c.table.name != table.name)
         .collect();
     let ext_cuts_for_inline = ext_cuts.clone();

@@ -323,7 +323,7 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
             // Or will just making an alias for the primary key work?
             // Then don't add primary key here.
             // Also, make primary key optional?
-            let mut sql = format!("select {}, {} as {} from {}",
+            let sql = format!("select {}, {} as {} from {}",
                 drill.col_string(),
                 drill.primary_key.clone(),
                 drill.foreign_key.clone(),
