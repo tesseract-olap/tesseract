@@ -55,24 +55,26 @@ pub fn primary_agg(
     // external drill and cuts section
 
     while let Some(drill) = ext_drills.pop() {
-        if let Some(idx) = ext_cuts.iter().position(|c| c.table == drill.table) {
-            let cut = ext_cuts.swap_remove(idx);
-
-            dim_subqueries.push(
-                dim_subquery(Some(drill),Some(cut))
-            );
-        } else {
+        // TODO can this be removed?
+//        if let Some(idx) = ext_cuts.iter().position(|c| c.table == drill.table) { // TODO bug here, can't just match on table
+//            let cut = ext_cuts.swap_remove(idx);
+//
+//            dim_subqueries.push(
+//                dim_subquery(Some(drill),Some(cut))
+//            );
+//        } else {
             dim_subqueries.push(
                 dim_subquery(Some(drill), None)
             );
-        }
+//        }
     }
-
-    for cut in &ext_cuts {
-        dim_subqueries.push(
-            dim_subquery(None, Some(cut))
-        );
-    }
+    // TODO can this be removed entirely?
+//
+//    for cut in &ext_cuts {
+//        dim_subqueries.push(
+//            dim_subquery(None, Some(cut))
+//        );
+//    }
 
     if let Some(ref primary_key) = table.primary_key {
         if let Some(idx) = dim_subqueries.iter().position(|d| d.foreign_key == *primary_key) {
@@ -153,7 +155,7 @@ pub fn primary_agg(
         };
 
         // Now construct subquery
-        sub_queries = format!("select {}{} from ({}) all inner join ({}) using {}",
+        sub_queries = format!("select {}{} from ({}) all right join ({}) using {}",
             sub_queries_dim_cols,
             join((0..meas.len()).map(|i| format!("m{}", i)), ", "),
             dim_subquery.sql,

@@ -307,6 +307,7 @@ struct DimSubquery {
     dim_cols: Option<String>,
 }
 
+// TODO can this be removed, and all cuts put into the fact table scan using `IN`?
 /// Collects a drilldown and cut together to create a subquery for the dimension table
 /// Does not check for matching name, because that had to have been done
 /// before submitting to this fn.
@@ -328,18 +329,20 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
                 drill.foreign_key.clone(),
                 drill.table.full_name(),
             );
-            if let Some(cut) = cut {
-                sql.push_str(&format!(" where {} in ({})",
-                    cut.column.clone(),
-                    cut.members_string(),
-                )[..]);
-            }
+            // TODO can I delete this cut?
+//            if let Some(cut) = cut {
+//                sql.push_str(&format!(" where {} in ({})",
+//                    cut.column.clone(),
+//                    cut.members_string(),
+//                )[..]);
+//            }
             return DimSubquery {
                 sql,
                 foreign_key: drill.foreign_key.clone(),
                 dim_cols: Some(drill.col_string()),
             };
         },
+        // TODO remove this? This path should never be hit now.
         None => {
             if let Some(cut) = cut {
                 let sql = format!("select {} as {} from {} where {} in ({})",
