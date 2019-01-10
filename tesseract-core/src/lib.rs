@@ -402,7 +402,7 @@ impl Schema {
         let mut res = vec![];
 
         // now iterate throw drill/property tuples
-        for drill in drills {
+        for (alias_idx, drill) in drills.iter().enumerate() {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == drill.0.dimension)
                 .ok_or(format_err!("could not find dimension for drill {}", drill.0))?;
@@ -471,6 +471,7 @@ impl Schema {
             }
 
             res.push(DrilldownSql {
+                alias_idx,
                 table,
                 primary_key,
                 foreign_key,

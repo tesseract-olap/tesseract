@@ -94,11 +94,15 @@ pub fn primary_agg(
         .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
     let mea_cols = join(mea_cols, ", ");
 
-    let inline_dim_cols = inline_drills.iter().map(|d| d.col_string());
-    let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
-    let all_dim_cols = join(inline_dim_cols.chain(dim_idx_cols), ", ");
+    let inline_dim_cols = inline_drills.iter().map(|d| d.col_alias_string());
+    let inline_dim_aliass = inline_drills.iter().map(|d| d.col_alias_only_string());
 
-    let mut fact_sql = format!("select {}", all_dim_cols);
+    let dim_idx_cols = dim_subqueries.iter().map(|d| d.foreign_key.clone());
+
+    let all_fact_dim_cols = join(inline_dim_cols.chain(dim_idx_cols.clone()), ", ");
+    let all_fact_dim_aliass = join(inline_dim_aliass.chain(dim_idx_cols), ", ");
+
+    let mut fact_sql = format!("select {}", all_fact_dim_cols);
 
     fact_sql.push_str(
         &format!(", {} from {}", mea_cols, table.name)
@@ -130,7 +134,7 @@ pub fn primary_agg(
     }
 
     fact_sql.push_str(
-        &format!(" group by {}", all_dim_cols)
+        &format!(" group by {}", all_fact_dim_aliass)
     );
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
@@ -139,7 +143,7 @@ pub fn primary_agg(
     let mut sub_queries = fact_sql;
 
     // initialize current dim cols with inline drills and idx cols (all dim cols)
-    let mut current_dim_cols = vec![all_dim_cols];
+    let mut current_dim_cols = vec![all_fact_dim_aliass];
 
     for dim_subquery in dim_subqueries {
         // This section needed to accumulate the dim cols that are being selected over
@@ -165,7 +169,7 @@ pub fn primary_agg(
     }
 
     // Finally, wrap with final agg and result
-    let final_drill_cols = drills.iter().map(|drill| drill.col_string());
+    let final_drill_cols = drills.iter().map(|drill| drill.col_alias_only_string());
     let final_drill_cols = join(final_drill_cols, ", ");
 
     let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{}) as final_m{}", mea.aggregator, i, i));
