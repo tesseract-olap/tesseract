@@ -140,7 +140,7 @@ pub struct TableSql {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrilldownSql {
-    pub alias_idx: usize,
+    pub alias_postfix: String,
     pub table: Table,
     pub primary_key: String,
     pub foreign_key: String,
@@ -185,16 +185,16 @@ impl DrilldownSql {
                     format!("{} as {}_{}, {} as {}_{}",
                         l.key_column,
                         l.key_column,
-                        self.alias_idx,
+                        self.alias_postfix,
                         name_col,
                         name_col,
-                        self.alias_idx,
+                        self.alias_postfix,
                     )
                 } else {
                     format!("{} as {}_{}",
                         l.key_column,
                         l.key_column,
-                        self.alias_idx,
+                        self.alias_postfix,
                     )
                 }
             }).collect();
@@ -219,14 +219,14 @@ impl DrilldownSql {
                 if let Some(ref name_col) = l.name_column {
                     format!("{}_{}, {}_{}",
                         l.key_column,
-                        self.alias_idx,
+                        self.alias_postfix,
                         name_col,
-                        self.alias_idx,
+                        self.alias_postfix,
                     )
                 } else {
                     format!("{}_{}",
                         l.key_column,
-                        self.alias_idx,
+                        self.alias_postfix,
                     )
                 }
             }).collect();
