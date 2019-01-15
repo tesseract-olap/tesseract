@@ -34,6 +34,8 @@ use failure::{Error, format_err};
 use std::env;
 use structopt::StructOpt;
 
+use std::sync::{Arc, RwLock};
+
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -57,10 +59,11 @@ fn main() -> Result<(), Error> {
     let schema = schema_config::read_schema().unwrap_or_else(|err| {
         panic!(err);
     });
+    let schema_arc = Arc::new(RwLock::new(schema));
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema.clone()))
+    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema_arc.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();

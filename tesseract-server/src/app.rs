@@ -15,15 +15,18 @@ use crate::handlers::{
     metadata_all_handler,
 };
 
+use std::sync::{Arc, RwLock};
+
+
 pub struct AppState {
     pub backend: Box<dyn Backend + Sync + Send>,
     // TODO this is a hack, until a better interface is set up with the Backend Trait
     // to generate its own sql.
     pub db_type: Database,
-    pub schema: Schema,
+    pub schema: Arc<RwLock<Schema>>,
 }
 
-pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, schema: Schema) -> App<AppState> {
+pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, schema: Arc<RwLock<Schema>>) -> App<AppState> {
     App::with_state(AppState { backend, db_type, schema })
         .middleware(middleware::Logger::default())
         .resource("/", |r| {
