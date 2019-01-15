@@ -50,7 +50,7 @@ impl Schema {
     pub fn from_xml(raw_schema: &str) -> Result<Self, Error> {
         let schema_config: SchemaConfigXML = serde_xml::deserialize(raw_schema.as_bytes())?;
         // Serialize XML to JSON as intermediary step
-        let serialized = serde_json::to_string(&schema_config).unwrap();
+        let serialized = serde_json::to_string(&schema_config)?;
         Schema::from_json(&serialized)
     }
 
