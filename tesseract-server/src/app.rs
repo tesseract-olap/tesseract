@@ -9,6 +9,7 @@ use crate::db_config::Database;
 use crate::handlers::{
     aggregate_handler,
     aggregate_default_handler,
+    flush_handler,
     index_handler,
     metadata_handler,
     metadata_all_handler,
@@ -39,5 +40,9 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, sc
         })
         .resource("/cubes/{cube}/aggregate.{format}", |r| {
             r.method(Method::GET).with(aggregate_handler)
+        })
+        .resource("/flush", |r| {
+            // TODO: Change this to POST?
+            r.method(Method::GET).with(flush_handler)
         })
 }
