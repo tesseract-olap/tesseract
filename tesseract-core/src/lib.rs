@@ -4,8 +4,8 @@ pub mod format;
 pub mod names;
 mod schema;
 mod sql;
-mod query;
-mod query_ir;
+pub mod query;
+pub mod query_ir;
 
 use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
@@ -24,8 +24,8 @@ use self::names::{
     Property,
     LevelName,
 };
-pub use self::schema::{Schema, Cube};
-use self::sql::{
+pub use self::schema::{Schema, Cube, Table};
+use self::query_ir::{
     CutSql,
     DrilldownSql,
     MeasureSql,

@@ -3,11 +3,13 @@ use failure::Error;
 use futures::future::Future;
 use log::{debug, info};
 use std::time::Instant;
-use tesseract_core::{Backend, DataFrame};
+use tesseract_core::{Backend, DataFrame, QueryIr};
 
 mod df;
+mod sql;
 
 use self::df::block_to_df;
+use self::sql::clickhouse_sql;
 
 #[derive(Clone)]
 pub struct Clickhouse {
@@ -48,6 +50,20 @@ impl Backend for Clickhouse {
             });
 
         Box::new(fut)
+    }
+
+    fn generate_sql(&self, query_ir: QueryIr) -> String {
+        clickhouse_sql(
+            &query_ir.table,
+            &query_ir.cuts,
+            &query_ir.drills,
+            &query_ir.meas,
+            &query_ir.top,
+            &query_ir.sort,
+            &query_ir.limit,
+            &query_ir.rca,
+            &query_ir.growth,
+        )
     }
 
     // https://users.rust-lang.org/t/solved-is-it-possible-to-clone-a-boxed-trait-object/1714/4

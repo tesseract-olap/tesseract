@@ -12,7 +12,7 @@
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 
-use crate::sql::MemberType;
+use crate::query_ir::MemberType;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SchemaConfigXML {
