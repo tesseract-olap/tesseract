@@ -97,15 +97,19 @@ pub struct PropertyConfigXML {
 }
 
 
-#[test]
-fn xml_schema_config() {
-    let s = r##"
-        <Schema name="my_schema">
-            <Cube name="my_cube">
-                <Table name="my_table" />
-            <Cube />
-        </Schema>
-    "##;
-    let schema_config: SchemaConfigXML = serde_xml::deserialize(s.as_bytes())?;
-    println!("{:#?}", schema_config);
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn xml_schema_config() {
+        let s = r##"
+            <Schema name="my_schema">
+                <Cube name="my_cube">
+                    <Table name="my_table" />
+                <Cube />
+            </Schema>
+        "##;
+        let schema_config: SchemaConfigXML = serde_xml::deserialize(s.as_bytes()).unwrap();
+    }
 }
