@@ -25,6 +25,5 @@ path = "../tesseract-clickhouse"
 [dependencies.tesseract-mysql]
 path = "../tesseract-mysql"
 
-
 [dependencies.tesseract-core]
 path = "../tesseract-core"
