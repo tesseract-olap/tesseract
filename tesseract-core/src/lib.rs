@@ -182,7 +182,7 @@ impl Schema {
 
             Some(TopSql {
                 n: t.n,
-                by_column: self.get_dim_col(&cube, &t.by_dimension)?,
+                by_column: self.get_dim_col_alias(&cube, &t.by_dimension)?,
                 sort_columns: top_sort_columns,
                 sort_direction: t.sort_direction.clone(),
             })
@@ -481,7 +481,10 @@ impl Schema {
                 });
             }
 
+            let alias_postfix = dim.name.replace(" ", "_");
+
             res.push(DrilldownSql {
+                alias_postfix,
                 table,
                 primary_key,
                 foreign_key,
@@ -627,6 +630,27 @@ impl Schema {
             .ok_or(format_err!("could not find level for level name"))?;
 
         let column = level.key_column.clone();
+
+        Ok(column)
+    }
+
+    fn get_dim_col_alias(&self, cube_name: &str, level_name: &LevelName) -> Result<String, Error> {
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let dim = cube.dimensions.iter()
+            .find(|dim| dim.name == level_name.dimension)
+            .ok_or(format_err!("could not find dimension for level name"))?;
+        let hier = dim.hierarchies.iter()
+            .find(|hier| hier.name == level_name.hierarchy)
+            .ok_or(format_err!("could not find hierarchy for level name"))?;
+        let level = hier.levels.iter()
+            .find(|lvl| lvl.name == level_name.level)
+            .ok_or(format_err!("could not find level for level name"))?;
+
+        // TODO centralize where to get the alias
+        let column = format!("{}_{}", level.key_column, dim.name.replace(" ", "_"));
 
         Ok(column)
     }

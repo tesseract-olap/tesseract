@@ -96,6 +96,9 @@ pub fn calculate(
     //
     // Note: parent of rca drills are not filtered, because they are meant
     // to limit the rca calculation space!
+    //
+    // don't need to worry about aliases, because cuts don't use aliases,
+    // and are just matching against drill key col
 
     let ac_cut_cols_blacklist: Vec<_> = rca.drill_2.iter()
         .flat_map(|d| d.level_columns.iter().map(|l| l.key_column.clone()))
@@ -143,23 +146,29 @@ pub fn calculate(
     // (drill_2 would be needed if going from a to b)
     // TODO refacto these lines out to helpers
     let group_array_rca_drill_2 = rca.drill_2.iter()
-        .flat_map(|d| d.level_columns.iter().map(|l| {
-            if let Some(ref name_col) = l.name_column {
-                format!("groupArray({key_col}) as {key_col}_s, groupArray({name_col}) as {name_col}_s", key_col=l.key_column, name_col=name_col)
-            } else {
-                format!("groupArray({col}) as {col}_s", col=l.key_column)
-            }
-        }));
+        .flat_map(|d| {
+            let alias_postfix = &d.alias_postfix;
+            d.level_columns.iter().map(move |l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("groupArray({key_col}_{alias_postfix}) as {key_col}_{alias_postfix}_s, groupArray({name_col}_{alias_postfix}) as {name_col}_{alias_postfix}_s", key_col=l.key_column, name_col=name_col, alias_postfix=alias_postfix)
+                } else {
+                    format!("groupArray({col}_{alias_postfix}) as {col}_{alias_postfix}_s", col=l.key_column, alias_postfix=alias_postfix)
+                }
+            })
+        });
     let group_array_rca_drill_2 = join(group_array_rca_drill_2, ", ");
 
     let join_array_rca_drill_2 = rca.drill_2.iter()
-        .flat_map(|d| d.level_columns.iter().map(|l| {
-            if let Some(ref name_col) = l.name_column {
-                format!("{key_col}_s as {key_col}, {name_col}_s as {name_col}", key_col=l.key_column, name_col=name_col)
-            } else {
-                format!("{col}_s as {col}", col=l.key_column)
-            }
-        }));
+        .flat_map(|d| {
+            let alias_postfix = &d.alias_postfix;
+            d.level_columns.iter().map(move |l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("{key_col}_{alias_postfix}_s as {key_col}_{alias_postfix}, {name_col}_{alias_postfix}_s as {name_col}_{alias_postfix}", key_col=l.key_column, name_col=name_col, alias_postfix=alias_postfix)
+                } else {
+                    format!("{col}_{alias_postfix}_s as {col}_{alias_postfix}", col=l.key_column, alias_postfix=alias_postfix)
+                }
+            })
+        });
     let join_array_rca_drill_2 = join(join_array_rca_drill_2, ", ");
 
     // Do GroupArray and Array Join clauses for external measures, also
@@ -178,21 +187,21 @@ pub fn calculate(
     // groupArray cols (the drill_2 from rca) can't be included in the group by or select
     let c_drills_minus_rca_drill_2 = c_drills.iter()
         .filter(|d| !rca.drill_2.contains(&d))
-        .map(|d| d.col_string());
+        .map(|d| d.col_alias_only_string());
     let c_drills_minus_rca_drill_2 = join(c_drills_minus_rca_drill_2, ", ");
 
     let d_drills_minus_rca_drill_2 = d_drills.iter()
         .filter(|d| !rca.drill_2.contains(&d))
-        .map(|d| d.col_string());
+        .map(|d| d.col_alias_only_string());
     let d_drills_minus_rca_drill_2 = join(d_drills_minus_rca_drill_2, ", ");
 
     // a and c drills are kept as-is
     let a_drills_str = a_drills.iter()
-        .map(|d| d.col_string());
+        .map(|d| d.col_alias_only_string());
     let a_drills_str = join(a_drills_str, ", ");
 
     let b_drills_str = b_drills.iter()
-        .map(|d| d.col_string());
+        .map(|d| d.col_alias_only_string());
     let b_drills_str = join(b_drills_str, ", ");
 
 

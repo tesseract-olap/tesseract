@@ -140,6 +140,7 @@ pub struct TableSql {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrilldownSql {
+    pub alias_postfix: String,
     pub table: Table,
     pub primary_key: String,
     pub foreign_key: String,
@@ -160,6 +161,73 @@ impl DrilldownSql {
                     format!("{}, {}", l.key_column, name_col)
                 } else {
                     l.key_column.clone()
+                }
+            }).collect();
+
+        if self.property_columns.len() != 0 {
+            cols.push(
+                join(&self.property_columns, ", ")
+            );
+        }
+
+        cols
+    }
+
+    fn col_alias_string(&self) -> String {
+        let cols = self.col_alias_vec();
+        join(cols, ", ")
+    }
+
+    fn col_alias_vec(&self) -> Vec<String> {
+        let mut cols: Vec<_> = self.level_columns.iter()
+            .map(|l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("{} as {}_{}, {} as {}_{}",
+                        l.key_column,
+                        l.key_column,
+                        self.alias_postfix,
+                        name_col,
+                        name_col,
+                        self.alias_postfix,
+                    )
+                } else {
+                    format!("{} as {}_{}",
+                        l.key_column,
+                        l.key_column,
+                        self.alias_postfix,
+                    )
+                }
+            }).collect();
+
+        if self.property_columns.len() != 0 {
+            cols.push(
+                join(&self.property_columns, ", ")
+            );
+        }
+
+        cols
+    }
+
+    fn col_alias_only_string(&self) -> String {
+        let cols = self.col_alias_only_vec();
+        join(cols, ", ")
+    }
+
+    fn col_alias_only_vec(&self) -> Vec<String> {
+        let mut cols: Vec<_> = self.level_columns.iter()
+            .map(|l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("{}_{}, {}_{}",
+                        l.key_column,
+                        self.alias_postfix,
+                        name_col,
+                        self.alias_postfix,
+                    )
+                } else {
+                    format!("{}_{}",
+                        l.key_column,
+                        self.alias_postfix,
+                    )
                 }
             }).collect();
 
@@ -324,7 +392,7 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
             // Then don't add primary key here.
             // Also, make primary key optional?
             let sql = format!("select {}, {} as {} from {}",
-                drill.col_string(),
+                drill.col_alias_string(),
                 drill.primary_key.clone(),
                 drill.foreign_key.clone(),
                 drill.table.full_name(),
@@ -339,7 +407,7 @@ fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubque
             return DimSubquery {
                 sql,
                 foreign_key: drill.foreign_key.clone(),
-                dim_cols: Some(drill.col_string()),
+                dim_cols: Some(drill.col_alias_only_string()),
             };
         },
         // TODO remove this? This path should never be hit now.
