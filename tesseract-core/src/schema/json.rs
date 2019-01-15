@@ -3,74 +3,73 @@ use serde_derive::Deserialize;
 use crate::sql::MemberType;
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct SchemaConfig {
+pub struct SchemaConfigJson {
     pub name: String,
-    pub shared_dimensions: Option<Vec<SharedDimensionConfig>>,
-    pub cubes: Vec<CubeConfig>,
+    pub shared_dimensions: Option<Vec<SharedDimensionConfigJson>>,
+    pub cubes: Vec<CubeConfigJson>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct CubeConfig {
+pub struct CubeConfigJson {
     pub name: String,
-    pub table: TableConfig,
-    pub dimensions: Vec<DimensionConfig>,
-    pub dimension_usages: Option<Vec<DimensionUsage>>,
-    pub measures: Vec<MeasureConfig>,
+    pub table: TableConfigJson,
+    pub dimensions: Vec<DimensionConfigJson>,
+    pub dimension_usages: Option<Vec<DimensionUsageJson>>,
+    pub measures: Vec<MeasureConfigJson>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct DimensionConfig {
+pub struct DimensionConfigJson {
     pub name: String,
     pub foreign_key: Option<String>, // does not exist for shared dims
-    pub hierarchies: Vec<HierarchyConfig>,
+    pub hierarchies: Vec<HierarchyConfigJson>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct SharedDimensionConfig {
+pub struct SharedDimensionConfigJson {
     pub name: String,
-    pub hierarchies: Vec<HierarchyConfig>,
+    pub hierarchies: Vec<HierarchyConfigJson>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct DimensionUsage {
+pub struct DimensionUsageJson {
     pub name: String,
     pub foreign_key: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct HierarchyConfig {
+pub struct HierarchyConfigJson {
     pub name: String,
-    pub table: Option<TableConfig>,
+    pub table: Option<TableConfigJson>,
     pub primary_key: Option<String>,
-    pub levels: Vec<LevelConfig>,
+    pub levels: Vec<LevelConfigJson>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct LevelConfig {
+pub struct LevelConfigJson {
     pub name: String,
     pub key_column: String,
     pub name_column: Option<String>,
-    pub properties: Option<Vec<PropertyConfig>>,
+    pub properties: Option<Vec<PropertyConfigJson>>,
     pub key_type: Option<MemberType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct MeasureConfig {
+pub struct MeasureConfigJson {
     pub name: String,
     pub column: String,
     pub aggregator: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct TableConfig {
+pub struct TableConfigJson {
     pub name: String,
     pub schema: Option<String>,
     pub primary_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct PropertyConfig {
+pub struct PropertyConfigJson {
     pub name: String,
     pub column: String,
 }
-

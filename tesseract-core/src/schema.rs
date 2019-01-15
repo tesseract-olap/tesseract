@@ -1,14 +1,24 @@
 use serde_derive::Serialize;
 use std::convert::From;
 
-use crate::schema_config::{
-    SchemaConfig,
-    DimensionConfig,
-    HierarchyConfig,
-    LevelConfig,
-    MeasureConfig,
-    TableConfig,
-    PropertyConfig,
+mod json;
+mod xml;
+
+pub use crate::schema::{
+    json::SchemaConfigJson,
+    json::DimensionConfigJson,
+    json::HierarchyConfigJson,
+    json::LevelConfigJson,
+    json::MeasureConfigJson,
+    json::TableConfigJson,
+    json::PropertyConfigJson,
+    xml::SchemaConfigXML,
+    xml::DimensionConfigXML,
+    xml::HierarchyConfigXML,
+    xml::LevelConfigXML,
+    xml::MeasureConfigXML,
+    xml::TableConfigXML,
+    xml::PropertyConfigXML,
 };
 use crate::sql::MemberType;
 
@@ -18,8 +28,8 @@ pub struct Schema {
     pub cubes: Vec<Cube>,
 }
 
-impl From<SchemaConfig> for Schema {
-    fn from(schema_config: SchemaConfig) -> Self {
+impl From<SchemaConfigJson> for Schema {
+    fn from(schema_config: SchemaConfigJson) -> Self {
         // TODO
         // check for:
         // - duplicate cube names,
@@ -49,7 +59,6 @@ impl From<SchemaConfig> for Schema {
                                     name: shared_dim_config.name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
                                     hierarchies: hierarchies,
-
                                 });
                             }
                         }
@@ -89,8 +98,8 @@ pub struct Dimension {
     pub hierarchies: Vec<Hierarchy>,
 }
 
-impl From<DimensionConfig> for Dimension {
-    fn from(dimension_config: DimensionConfig) -> Self {
+impl From<DimensionConfigJson> for Dimension {
+    fn from(dimension_config: DimensionConfigJson) -> Self {
         let hierarchies = dimension_config.hierarchies.into_iter()
             .map(|h| h.into())
             .collect();
@@ -111,8 +120,8 @@ pub struct Hierarchy {
     pub levels: Vec<Level>,
 }
 
-impl From<HierarchyConfig> for Hierarchy {
-    fn from(hierarchy_config: HierarchyConfig) -> Self {
+impl From<HierarchyConfigJson> for Hierarchy {
+    fn from(hierarchy_config: HierarchyConfigJson) -> Self {
         let levels: Vec<Level> = hierarchy_config.levels.into_iter()
             .map(|l| l.into())
             .collect();
@@ -144,8 +153,8 @@ pub struct Level {
     pub key_type: Option<MemberType>,
 }
 
-impl From<LevelConfig> for Level {
-    fn from(level_config: LevelConfig) -> Self {
+impl From<LevelConfigJson> for Level {
+    fn from(level_config: LevelConfigJson) -> Self {
         let properties = level_config.properties
             .map(|ps| {
                 ps.into_iter()
@@ -170,8 +179,8 @@ pub struct Measure{
     pub aggregator: String,
 }
 
-impl From<MeasureConfig> for Measure {
-    fn from(measure_config: MeasureConfig) -> Self {
+impl From<MeasureConfigJson> for Measure {
+    fn from(measure_config: MeasureConfigJson) -> Self {
         Measure {
             name: measure_config.name,
             column: measure_config.column,
@@ -187,8 +196,8 @@ pub struct Table{
     pub primary_key: Option<String>,
 }
 
-impl From<TableConfig> for Table {
-    fn from(table_config: TableConfig) -> Self {
+impl From<TableConfigJson> for Table {
+    fn from(table_config: TableConfigJson) -> Self {
         Table {
             name: table_config.name,
             schema: table_config.schema,
@@ -213,12 +222,11 @@ pub struct Property{
     pub column: String,
 }
 
-impl From<PropertyConfig> for Property {
-    fn from(property_config: PropertyConfig) -> Self {
+impl From<PropertyConfigJson> for Property {
+    fn from(property_config: PropertyConfigJson) -> Self {
         Property {
             name: property_config.name,
             column: property_config.column,
         }
     }
 }
-

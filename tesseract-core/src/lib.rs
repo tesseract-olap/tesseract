@@ -3,11 +3,15 @@ mod dataframe;
 pub mod format;
 pub mod names;
 mod schema;
-mod schema_config;
 mod sql;
 mod query;
 
 use failure::{Error, format_err, bail};
+
+use crate::schema::{
+    SchemaConfigJson,
+    SchemaConfigXML}
+;
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -19,7 +23,6 @@ use self::names::{
     LevelName,
 };
 pub use self::schema::{Schema, Cube};
-use self::schema_config::SchemaConfig;
 use self::sql::{
     CutSql,
     DrilldownSql,
@@ -35,12 +38,20 @@ use self::sql::{
 pub use self::sql::SqlType;
 pub use self::query::{Query, MeaOrCalc};
 
+extern crate serde_xml_rs as serde_xml;
+
 
 impl Schema {
     pub fn from_json(raw_schema: &str) -> Result<Self, Error> {
-        let schema_config = serde_json::from_str::<SchemaConfig>(raw_schema)?;
-
+        let schema_config = serde_json::from_str::<SchemaConfigJson>(raw_schema)?;
         Ok(schema_config.into())
+    }
+
+    pub fn from_xml(raw_schema: &str) -> Result<Self, Error> {
+        let schema_config: SchemaConfigXML = serde_xml::deserialize(raw_schema.as_bytes())?;
+        // Serialize XML to JSON as intermediary step
+        let serialized = serde_json::to_string(&schema_config)?;
+        Schema::from_json(&serialized)
     }
 
     pub fn cube_metadata(&self, cube_name: &str) -> Option<Cube> {
