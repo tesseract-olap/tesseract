@@ -9,7 +9,7 @@ mod query;
 use failure::{Error, format_err, bail};
 
 use crate::schema::{
-    SchemaConfigJSON,
+    SchemaConfigJson,
     SchemaConfigXML}
 ;
 
@@ -43,7 +43,7 @@ extern crate serde_xml_rs as serde_xml;
 
 impl Schema {
     pub fn from_json(raw_schema: &str) -> Result<Self, Error> {
-        let schema_config = serde_json::from_str::<SchemaConfigJSON>(raw_schema)?;
+        let schema_config = serde_json::from_str::<SchemaConfigJson>(raw_schema)?;
         Ok(schema_config.into())
     }
 
