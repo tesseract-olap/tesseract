@@ -90,13 +90,13 @@ pub fn do_aggregate(
         Database::Clickhouse => {
             req
                 .state()
-                .schema
+                .schema.read().unwrap()
                 .sql_query(&cube, &ts_query, SqlType::Clickhouse)
         },
         _ => {
             req
                 .state()
-                .schema
+                .schema.read().unwrap()
                 .sql_query(&cube, &ts_query, SqlType::Standard)
         }
     };

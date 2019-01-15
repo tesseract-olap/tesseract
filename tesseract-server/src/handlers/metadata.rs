@@ -16,7 +16,7 @@ pub fn metadata_handler(
 
     // currently, we do not check that cube names are distinct
     // TODO fix this
-    match req.state().schema.cube_metadata(&cube) {
+    match req.state().schema.read().unwrap().cube_metadata(&cube) {
         Some(cube) => Ok(HttpResponse::Ok().json(cube)),
         None => Ok(HttpResponse::NotFound().finish()),
     }
@@ -28,6 +28,6 @@ pub fn metadata_all_handler(
 {
     info!("Metadata for all");
 
-    Ok(HttpResponse::Ok().json(req.state().schema.clone()))
+    Ok(HttpResponse::Ok().json(req.state().schema.read().unwrap().clone()))
 }
 
