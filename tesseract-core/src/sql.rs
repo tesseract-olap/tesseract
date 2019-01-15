@@ -13,14 +13,6 @@ use crate::sql::{
 };
 use crate::query::{LimitQuery, SortDirection};
 
-
-// Temporary, until we get an interface ready for generating different sql
-// per backend.
-pub enum SqlType {
-    Clickhouse,
-    Standard,
-}
-
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 /// Currently just does the standard aggregation.
