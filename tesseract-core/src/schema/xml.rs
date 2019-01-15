@@ -107,7 +107,7 @@ mod test {
             <Schema name="my_schema">
                 <Cube name="my_cube">
                     <Table name="my_table" />
-                <Cube />
+                </Cube>
             </Schema>
         "##;
         let schema_config: SchemaConfigXML = serde_xml::deserialize(s.as_bytes()).unwrap();

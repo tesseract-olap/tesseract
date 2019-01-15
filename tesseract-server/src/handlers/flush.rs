@@ -43,7 +43,7 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     if query.secret == db_secret {
         info!("Flush internal state");
 
-        // TODO: Re-read and set schema (watch for concorrency issues)
+        // Read schema again
         let schema = match schema_config::read_schema() {
             Ok(val) => val,
             Err(err) => {
@@ -52,7 +52,9 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
             },
         };
 
-        info!("{:?}", req.state().schema);
+        // Update shared schema
+        let mut w = req.state().schema.write().unwrap();
+        *w = schema.clone();
 
         // TODO: Clear internal cache once that's implemented
 
