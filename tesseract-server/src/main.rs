@@ -26,6 +26,7 @@
 mod app;
 mod db_config;
 mod handlers;
+mod schema_config;
 
 use actix_web::server;
 use dotenv::dotenv;
@@ -33,7 +34,6 @@ use failure::{Error, format_err};
 use std::env;
 use structopt::StructOpt;
 
-use tesseract_core::Schema;
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -43,8 +43,6 @@ fn main() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
-    let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
-        .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
     let db_url_full = env::var("TESSERACT_DATABASE_URL")
         .or(opt.database_url.ok_or(format_err!("")))
@@ -53,19 +51,12 @@ fn main() -> Result<(), Error> {
     let (db, db_url, db_type) = db_config::get_db(&db_url_full)?;
     let db_type_viz = db_type.clone();
 
-    // Initialize Schema
-    let schema_str = std::fs::read_to_string(&schema_path)
-        .map_err(|_| format_err!("Schema file not found at {}", schema_path))?;
+    let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
+        .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
-    let mut schema: Schema;
-
-    if schema_path.ends_with("xml") {
-        schema = Schema::from_xml(&schema_str)?;
-    } else if schema_path.ends_with("json") {
-        schema = Schema::from_json(&schema_str)?;
-    } else {
-        panic!("Schema format not supported");
-    }
+    let schema = schema_config::read_schema().unwrap_or_else(|err| {
+        panic!(err);
+    });
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
