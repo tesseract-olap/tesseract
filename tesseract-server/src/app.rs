@@ -17,15 +17,6 @@ use crate::handlers::{
 
 use std::sync::{Arc, RwLock};
 
-/// Represents the location of a local schema file.
-pub struct LocalSchema {
-    filepath: String,
-}
-
-/// Represents the location of a remote schema file.
-pub struct RemoteSchema {
-    endpoint: String,
-}
 
 /// Holds data about the source of a schema file.
 #[derive(Debug, Clone)]
