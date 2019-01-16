@@ -6,13 +6,12 @@
 //! Schema is held in the AppState struct to provide access from a route
 //!
 //! Each route instance will apply a tesseract_core::Query to tesseract_core::Schema to get sql.
-//! The route instance then sends sql to database and gets results back in a
-//! tesseract_core::Dataframe
+//! The route instance then sends sql to a database and gets results back in a
+//! tesseract_core::DataFrame. DataFrame is then applied to Schema to format result (jsonrecords
+//! or csv).
 //!
-//! Dataframe is then applied to Schema to format result. (for now, jsonrecords only)
 //!
-//!
-//! Backend trait: exec() takes in a sql string, outputs a dataframe.
+//! Backend trait: exec_sql() takes in a sql string, outputs a DataFrame.
 //! Because tesseract-core generates just sql (instead of taking a query and schema into a
 //! `Backend`, it allows different kinds of backends to be used. Don't have to worry about
 //! async/sync, which is the hardest difference to manage. Otherwise it would be easy to define
