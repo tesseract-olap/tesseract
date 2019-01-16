@@ -6,13 +6,12 @@
 //! Schema is held in the AppState struct to provide access from a route
 //!
 //! Each route instance will apply a tesseract_core::Query to tesseract_core::Schema to get sql.
-//! The route instance then sends sql to database and gets results back in a
-//! tesseract_core::Dataframe
+//! The route instance then sends sql to a database and gets results back in a
+//! tesseract_core::DataFrame. DataFrame is then applied to Schema to format result (jsonrecords
+//! or csv).
 //!
-//! Dataframe is then applied to Schema to format result. (for now, jsonrecords only)
 //!
-//!
-//! Backend trait: exec() takes in a sql string, outputs a dataframe.
+//! Backend trait: exec_sql() takes in a sql string, outputs a DataFrame.
 //! Because tesseract-core generates just sql (instead of taking a query and schema into a
 //! `Backend`, it allows different kinds of backends to be used. Don't have to worry about
 //! async/sync, which is the hardest difference to manage. Otherwise it would be easy to define
@@ -26,6 +25,7 @@
 mod app;
 mod db_config;
 mod handlers;
+mod schema_config;
 
 use actix_web::server;
 use dotenv::dotenv;
@@ -33,7 +33,10 @@ use failure::{Error, format_err};
 use std::env;
 use structopt::StructOpt;
 
-use tesseract_core::Schema;
+use std::sync::{Arc, RwLock};
+
+use app::{EnvVars, SchemaSource, create_app};
+
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -43,9 +46,10 @@ fn main() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
-    let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
-        .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
+    let flush_secret = env::var("TESSERACT_FLUSH_SECRET").ok();
+
+    // Database
     let db_url_full = env::var("TESSERACT_DATABASE_URL")
         .or(opt.database_url.ok_or(format_err!("")))
         .map_err(|_| format_err!("database url not found; either TESSERACT_DATABASE_URL or cli option required"))?;
@@ -53,23 +57,28 @@ fn main() -> Result<(), Error> {
     let (db, db_url, db_type) = db_config::get_db(&db_url_full)?;
     let db_type_viz = db_type.clone();
 
-    // Initialize Schema
-    let schema_str = std::fs::read_to_string(&schema_path)
-        .map_err(|_| format_err!("Schema file not found at {}", schema_path))?;
+    // Schema
+    let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
+        .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
-    let mut schema: Schema;
+    // NOTE: Local schema is the only supported SchemaSource for now
+    let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
-    if schema_path.ends_with("xml") {
-        schema = Schema::from_xml(&schema_str)?;
-    } else if schema_path.ends_with("json") {
-        schema = Schema::from_json(&schema_str)?;
-    } else {
-        panic!("Schema format not supported");
-    }
+    let schema = schema_config::read_schema(&schema_path).unwrap_or_else(|err| {
+        panic!(err);
+    });
+    let schema_arc = Arc::new(RwLock::new(schema));
+
+    // Env
+    let env_vars = EnvVars {
+        database_url: db_url.clone(),
+        schema_source,
+        flush_secret,
+    };
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema.clone()))
+    server::new(move|| create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
@@ -83,6 +92,7 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
+/// CLI arguments helper.
 #[derive(Debug, StructOpt)]
 #[structopt(name="tesseract")]
 struct Opt {
@@ -91,12 +101,5 @@ struct Opt {
 
     #[structopt(long="db-url")]
     database_url: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-struct EnvVars {
-    pub flush_secret: Option<String>,
-    pub database_url: String,
-    pub schema_filepath: Option<String>,
 }
 

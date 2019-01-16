@@ -42,11 +42,13 @@ pub use self::query_ir::QueryIr;
 
 
 impl Schema {
+    /// Deserializes JSON schema into a `Schema`.
     pub fn from_json(raw_schema: &str) -> Result<Self, Error> {
         let schema_config = serde_json::from_str::<SchemaConfigJson>(raw_schema)?;
         Ok(schema_config.into())
     }
 
+    /// Deserializes XML schema into a `Schema`.
     pub fn from_xml(raw_schema: &str) -> Result<Self, Error> {
         let schema_config: SchemaConfigXML = serde_xml::deserialize(raw_schema.as_bytes())?;
         // Serialize XML to JSON as intermediary step

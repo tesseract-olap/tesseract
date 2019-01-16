@@ -23,6 +23,7 @@ impl std::str::FromStr for FormatType {
     }
 }
 
+/// Wrapper to format `DataFrame` to the desired output format.
 pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType) -> Result<String, Error> {
     match format_type {
         FormatType::Csv => Ok(format_csv(headers, df)?),
@@ -30,6 +31,7 @@ pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType
     }
 }
 
+/// Formats response `DataFrame` to CSV.
 fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
     let mut wtr = csv::WriterBuilder::new()
         .from_writer(vec![]);
@@ -68,6 +70,7 @@ fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
     Ok(res)
 }
 
+/// Formats response `DataFrame` to JSON records.
 fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error> {
     // each HashMap is a row
     let mut rows = vec![];
