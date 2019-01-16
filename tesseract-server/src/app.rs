@@ -18,6 +18,7 @@ use crate::handlers::{
 use std::sync::{Arc, RwLock};
 
 
+/// Holds a struct of environment variables that will be accessed through the `AppState`.
 #[derive(Debug, Clone)]
 pub struct EnvVars {
     pub flush_secret: Option<String>,
@@ -25,6 +26,7 @@ pub struct EnvVars {
     pub schema_filepath: Option<String>,
 }
 
+/// Holds [ActixWeb State](https://actix.rs/docs/application/).
 pub struct AppState {
     pub backend: Box<dyn Backend + Sync + Send>,
     // TODO this is a hack, until a better interface is set up with the Backend Trait
@@ -34,6 +36,7 @@ pub struct AppState {
     pub env_vars: EnvVars,
 }
 
+/// Creates an ActixWeb application with an `AppState`.
 pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, schema: Arc<RwLock<Schema>>, env_vars: EnvVars) -> App<AppState> {
     App::with_state(AppState { backend, db_type, schema, env_vars })
         .middleware(middleware::Logger::default())

@@ -89,6 +89,7 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
+/// CLI arguments helper.
 #[derive(Debug, StructOpt)]
 #[structopt(name="tesseract")]
 struct Opt {

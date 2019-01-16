@@ -8,6 +8,8 @@ use structopt::clap::crate_version;
 
 use crate::app::AppState;
 
+
+/// Returns server status and Tesseract version.
 pub fn index_handler(_req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(
         Status {
@@ -18,6 +20,7 @@ pub fn index_handler(_req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     ))
 }
 
+/// Holds the contents of an `index_handler` handler response before serialization.
 #[derive(Debug, Serialize)]
 struct Status {
     status: String,
