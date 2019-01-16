@@ -3,7 +3,6 @@ use serde_derive::{Serialize, Deserialize};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
-use std::env;
 
 use actix_web::{
     HttpRequest,
@@ -32,12 +31,9 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
         },
     };
 
-    let db_secret = match env::var("TESSERACT_FLUSH_SECRET") {
-        Ok(val) => val,
-        Err(err) => {
-            error!("{}", err);
-            return Ok(HttpResponse::InternalServerError().finish());
-        },
+    let db_secret = match &req.state().env_vars.flush_secret {
+        Some(db_secret) => db_secret.clone(),
+        None => { return Ok(HttpResponse::Unauthorized().finish()); }
     };
 
     if query.secret == db_secret {

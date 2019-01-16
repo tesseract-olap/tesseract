@@ -46,6 +46,10 @@ fn main() -> Result<(), Error> {
 
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
 
+    // TODO: Test with no secret ENV
+    let db_secret = env::var("TESSERACT_FLUSH_SECRET").ok();
+
+    // Database
     let db_url_full = env::var("TESSERACT_DATABASE_URL")
         .or(opt.database_url.ok_or(format_err!("")))
         .map_err(|_| format_err!("database url not found; either TESSERACT_DATABASE_URL or cli option required"))?;
@@ -53,6 +57,7 @@ fn main() -> Result<(), Error> {
     let (db, db_url, db_type) = db_config::get_db(&db_url_full)?;
     let db_type_viz = db_type.clone();
 
+    // Schema
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
@@ -61,9 +66,16 @@ fn main() -> Result<(), Error> {
     });
     let schema_arc = Arc::new(RwLock::new(schema));
 
+    // Env
+    let env_vars = app::EnvVars {
+        flush_secret: db_secret,
+        database_url: db_url.clone(),
+        schema_filepath: Some(schema_path.clone())
+    };
+
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema_arc.clone()))
+    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
@@ -85,12 +97,5 @@ struct Opt {
 
     #[structopt(long="db-url")]
     database_url: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-struct EnvVars {
-    pub flush_secret: Option<String>,
-    pub database_url: String,
-    pub schema_filepath: Option<String>,
 }
 
