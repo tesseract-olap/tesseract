@@ -13,7 +13,7 @@ use actix_web::{
 use crate::app;
 use crate::schema_config;
 
-use app::{AppState, SchemaSource, LocalSchema, RemoteSchema};
+use app::{AppState, SchemaSource};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FlushQueryOpt {
