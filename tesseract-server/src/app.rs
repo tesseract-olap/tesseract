@@ -17,12 +17,25 @@ use crate::handlers::{
 
 use std::sync::{Arc, RwLock};
 
+pub struct LocalSchema {
+    filepath: String,
+}
+
+pub struct RemoteSchema {
+    endpoint: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum SchemaSource {
+    LocalSchema {filepath: String},
+    RemoteSchema {endpoint: String},
+}
 
 /// Holds a struct of environment variables that will be accessed through the `AppState`.
 #[derive(Debug, Clone)]
 pub struct EnvVars {
     pub database_url: String,
-    pub schema_filepath: String,
+    pub schema_source: SchemaSource,
     pub flush_secret: Option<String>,
 }
 

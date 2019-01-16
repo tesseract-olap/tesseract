@@ -1,14 +1,10 @@
 use failure::{Error, format_err};
-use std::env;
 
 use tesseract_core::Schema;
 
 
 /// Reads a schema from an XML or JSON file and converts it into a `tesseract_core::Schema` object.
 pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
-//    let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
-//        .expect("TESSERACT_SCHEMA_FILEPATH not found");
-
     let schema_str = std::fs::read_to_string(&schema_path)
         .map_err(|_| format_err!("Schema file not found at {}", schema_path))?;
 

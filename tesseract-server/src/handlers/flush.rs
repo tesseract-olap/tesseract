@@ -10,8 +10,10 @@ use actix_web::{
     Result as ActixResult,
 };
 
-use crate::app::AppState;
+use crate::app;
 use crate::schema_config;
+
+use app::{AppState, SchemaSource, LocalSchema, RemoteSchema};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FlushQueryOpt {
@@ -40,7 +42,12 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
         info!("Flush internal state");
 
         // Read schema again
-        let schema = match schema_config::read_schema(&req.state().env_vars.schema_filepath) {
+        // NOTE: This logic will change once we start supporting remote schemas
+        let schema_path = match &req.state().env_vars.schema_source {
+            SchemaSource::LocalSchema { ref filepath } => filepath,
+            SchemaSource::RemoteSchema { ref endpoint } => endpoint,
+        };
+        let schema = match schema_config::read_schema(&schema_path) {
             Ok(val) => val,
             Err(err) => {
                 error!("{}", err);

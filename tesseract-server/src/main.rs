@@ -36,6 +36,8 @@ use structopt::StructOpt;
 
 use std::sync::{Arc, RwLock};
 
+use app::{EnvVars, SchemaSource, create_app};
+
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -60,20 +62,24 @@ fn main() -> Result<(), Error> {
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
-    let env_vars = app::EnvVars {
-        database_url: db_url.clone(),
-        schema_filepath: schema_path.clone(),
-        flush_secret,
-    };
+    // NOTE: Local schema is the only supported SchemaSource for now
+    let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
-    let schema = schema_config::read_schema(&env_vars.schema_filepath).unwrap_or_else(|err| {
+    let schema = schema_config::read_schema(&schema_path).unwrap_or_else(|err| {
         panic!(err);
     });
     let schema_arc = Arc::new(RwLock::new(schema));
 
+    // Env
+    let env_vars = EnvVars {
+        database_url: db_url.clone(),
+        schema_source,
+        flush_secret,
+    };
+
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| app::create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone()))
+    server::new(move|| create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
