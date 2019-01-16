@@ -20,7 +20,7 @@ pub use crate::schema::{
     xml::TableConfigXML,
     xml::PropertyConfigXML,
 };
-use crate::sql::MemberType;
+use crate::query_ir::MemberType;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Schema {

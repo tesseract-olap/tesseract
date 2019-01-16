@@ -4,9 +4,11 @@ pub mod format;
 pub mod names;
 mod schema;
 mod sql;
-mod query;
+pub mod query;
+pub mod query_ir;
 
 use failure::{Error, format_err, bail};
+use serde_xml_rs as serde_xml;
 
 use crate::schema::{
     SchemaConfigJson,
@@ -22,8 +24,8 @@ use self::names::{
     Property,
     LevelName,
 };
-pub use self::schema::{Schema, Cube};
-use self::sql::{
+pub use self::schema::{Schema, Cube, Table};
+use self::query_ir::{
     CutSql,
     DrilldownSql,
     MeasureSql,
@@ -35,10 +37,8 @@ use self::sql::{
     RcaSql,
     GrowthSql,
 };
-pub use self::sql::SqlType;
 pub use self::query::{Query, MeaOrCalc};
-
-extern crate serde_xml_rs as serde_xml;
+pub use self::query_ir::QueryIr;
 
 
 impl Schema {
@@ -65,8 +65,7 @@ impl Schema {
         &self,
         cube: &str,
         query: &Query,
-        sql_type: SqlType,
-        ) -> Result<(String, Vec<String>), Error>
+        ) -> Result<(QueryIr, Vec<String>), Error>
     {
         // First do checks, like making sure there's a measure, and that there's
         // either a cut or drilldown
@@ -297,45 +296,21 @@ impl Schema {
         };
 
 
-        // now feed the database metadata into the sql generator
-        match sql_type {
-            SqlType::Clickhouse => {
-                Ok((
-                    sql::clickhouse_sql(
-                    &table,
-                    &cut_cols,
-                    &drill_cols,
-                    &mea_cols,
-                    &top,
-                    &sort,
-                    &limit,
-                    &rca,
-                    &growth,
-                    ),
-                    headers,
-                ))
+        Ok((
+            QueryIr {
+                table,
+                cuts: cut_cols,
+                drills: drill_cols,
+                meas: mea_cols,
+                top,
+                sort,
+                limit,
+                rca,
+                growth,
             },
-            SqlType::Standard => {
-                Ok((
-                    sql::standard_sql(
-                    &table,
-                    &cut_cols,
-                    &drill_cols,
-                    &mea_cols,
-                    &top,
-                    &sort,
-                    &limit,
-                    &rca,
-                    &growth,
-                    ),
-                    headers,
-                ))
-            },
-        }
+            headers,
+        ))
     }
-
-    //pub fn post_calculations(cal: &Calculations, df: DataFrame) -> DataFrame {
-    //}
 }
 
 impl Schema {

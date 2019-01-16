@@ -1,6 +1,6 @@
 use serde_derive::Deserialize;
 
-use crate::sql::MemberType;
+use crate::query_ir::MemberType;
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct SchemaConfigJson {
