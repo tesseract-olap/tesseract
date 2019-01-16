@@ -21,9 +21,9 @@ use std::sync::{Arc, RwLock};
 /// Holds a struct of environment variables that will be accessed through the `AppState`.
 #[derive(Debug, Clone)]
 pub struct EnvVars {
-    pub flush_secret: Option<String>,
     pub database_url: String,
-    pub schema_filepath: Option<String>,
+    pub schema_filepath: String,
+    pub flush_secret: Option<String>,
 }
 
 /// Holds [ActixWeb State](https://actix.rs/docs/application/).

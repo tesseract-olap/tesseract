@@ -40,7 +40,7 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
         info!("Flush internal state");
 
         // Read schema again
-        let schema = match schema_config::read_schema() {
+        let schema = match schema_config::read_schema(&req.state().env_vars.schema_filepath) {
             Ok(val) => val,
             Err(err) => {
                 error!("{}", err);

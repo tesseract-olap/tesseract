@@ -46,8 +46,7 @@ fn main() -> Result<(), Error> {
 
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
 
-    // TODO: Test with no secret ENV
-    let db_secret = env::var("TESSERACT_FLUSH_SECRET").ok();
+    let flush_secret = env::var("TESSERACT_FLUSH_SECRET").ok();
 
     // Database
     let db_url_full = env::var("TESSERACT_DATABASE_URL")
@@ -61,17 +60,16 @@ fn main() -> Result<(), Error> {
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
-    let schema = schema_config::read_schema().unwrap_or_else(|err| {
+    let env_vars = app::EnvVars {
+        database_url: db_url.clone(),
+        schema_filepath: schema_path.clone(),
+        flush_secret,
+    };
+
+    let schema = schema_config::read_schema(&env_vars.schema_filepath).unwrap_or_else(|err| {
         panic!(err);
     });
     let schema_arc = Arc::new(RwLock::new(schema));
-
-    // Env
-    let env_vars = app::EnvVars {
-        flush_secret: db_secret,
-        database_url: db_url.clone(),
-        schema_filepath: Some(schema_path.clone())
-    };
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
