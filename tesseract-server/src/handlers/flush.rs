@@ -54,7 +54,7 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 
         // Update shared schema
         let mut w = req.state().schema.write().unwrap();
-        *w = schema.clone();
+        *w = schema;
 
         // TODO: Clear internal cache once that's implemented
 
