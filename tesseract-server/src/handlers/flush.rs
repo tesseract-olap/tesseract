@@ -10,10 +10,8 @@ use actix_web::{
     Result as ActixResult,
 };
 
-use crate::app;
+use crate::app::{AppState, SchemaSource};
 use crate::schema_config;
-
-use app::{AppState, SchemaSource};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FlushQueryOpt {

@@ -35,7 +35,7 @@ use structopt::StructOpt;
 
 use std::sync::{Arc, RwLock};
 
-use app::{EnvVars, SchemaSource, create_app};
+use crate::app::{EnvVars, SchemaSource, create_app};
 
 
 fn main() -> Result<(), Error> {

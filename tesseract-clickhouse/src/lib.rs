@@ -1,8 +1,9 @@
-use clickhouse_rs::{Options, Pool};
+use clickhouse_rs::Pool;
+use clickhouse_rs::types::Options;
 use failure::Error;
 use futures::future::Future;
 use log::{debug, info};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tesseract_core::{Backend, DataFrame, QueryIr};
 
 mod df;
@@ -10,6 +11,9 @@ mod sql;
 
 use self::df::block_to_df;
 use self::sql::clickhouse_sql;
+
+// Ping timeout in millis
+const PING_TIMEOUT: u64 = 100_000;
 
 #[derive(Clone)]
 pub struct Clickhouse {
@@ -20,9 +24,12 @@ impl Clickhouse {
     pub fn from_addr(address: &str) -> Result<Self, Error> {
         let options = Options::new(
             address
-                .parse()
-                .expect("Could not parse Clickhouse db url")
         );
+
+        let options = options
+            // Ping timeout is necessary, because under heavy load (100 requests
+            // simultenously, each one taking 5s ordinarily) the client will timeout.
+            .ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
         let pool = Pool::new(options);
 
@@ -39,12 +46,12 @@ impl Backend for Clickhouse {
         let fut = self.pool
             .get_handle()
             .and_then(|c| c.ping())
-            .and_then(move |c| c.query_all(&sql[..]))
+            .and_then(move |c| c.query(&sql[..]).fetch_all())
             .from_err()
             .and_then(move |(_, block)| {
                 let timing = time_start.elapsed();
                 info!("Time for sql execution: {}.{:03}", timing.as_secs(), timing.subsec_millis());
-                debug!("Block: {:?}", block);
+                //debug!("Block: {:?}", block);
 
                 Ok(block_to_df(block)?)
             });

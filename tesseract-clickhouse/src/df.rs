@@ -2,7 +2,7 @@
 
 use failure::{Error, bail};
 
-use clickhouse_rs::{Block, SqlType};
+use clickhouse_rs::types::{Block, SqlType};
 use tesseract_core::{DataFrame, Column, ColumnData};
 
 // from source code of clickhouse_rs
