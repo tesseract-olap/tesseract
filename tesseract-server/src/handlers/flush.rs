@@ -32,11 +32,11 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     };
 
     let db_secret = match &req.state().env_vars.flush_secret {
-        Some(db_secret) => db_secret.clone(),
+        Some(db_secret) => db_secret,
         None => { return Ok(HttpResponse::Unauthorized().finish()); }
     };
 
-    if query.secret == db_secret {
+    if query.secret == *db_secret {
         info!("Flush internal state");
 
         // Read schema again
