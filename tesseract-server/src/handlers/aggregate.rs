@@ -86,7 +86,7 @@ pub fn do_aggregate(
 
     let query_ir_headers = req
         .state()
-        .schema
+        .schema.read().unwrap()
         .sql_query(&cube, &ts_query);
 
     let (query_ir, headers) = match query_ir_headers {
