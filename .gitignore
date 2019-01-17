@@ -1,6 +1,8 @@
 /target
+*.iml
 **/*.rs.bk
 .envrc
 .env
+.idea/
 bench-data
 test-schema
