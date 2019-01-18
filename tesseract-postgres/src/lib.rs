@@ -23,6 +23,10 @@ impl Postgres {
     }
 }
 
+// TODO:
+// 1. better connection lifecycle management!
+// 2. dataframe creation
+
 impl Backend for Postgres {
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
         let future = tokio_postgres::connect(&self.db_url, NoTls)
@@ -38,7 +42,7 @@ impl Backend for Postgres {
             .map(|rows| {
                 let r = rows[0].get::<_, i32>(0);
                 println!("{:?}", r);
-                assert_eq!(3, r);
+                assert_eq!(r, 4);
                 DataFrame::new()
             });
         Box::new(future)
@@ -54,13 +58,22 @@ impl Backend for Postgres {
 mod tests {
     use super::*;
     use std::env;
+    use tokio::runtime::current_thread::Runtime;
 
     #[test]
     fn test_pg_query() {
         let postgres_db= env::var("TESSERACT_DATABASE_URL").expect("Please provide TESSERACT_DATABASE_URL");
         let pg = Postgres::new(&postgres_db);
-        let x = pg.exec_sql("SELECT 1+3".to_string());
-        // WHY DOES THIS NOT WORK?
-        // tokio::run(x);
+        let future = pg.exec_sql("SELECT 1+3".to_string()).map(|df| {
+            println!("Result was: {:?}", df);
+            ()
+        })
+            .map_err(|err| {
+               println!("Got error {:?}", err);
+                ()
+            });
+
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(future).unwrap();
     }
 }
