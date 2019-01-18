@@ -2,9 +2,11 @@ use failure::{Error, format_err};
 use tesseract_core::{Backend, DataFrame};
 use futures::{Future, Stream};
 use tokio_postgres::NoTls;
-
 extern crate futures;
 extern crate tokio_postgres;
+
+mod df;
+use self::df::{rows_to_df};
 
 
 #[derive(Clone)]
@@ -21,6 +23,10 @@ impl Postgres {
     pub fn from_addr(address: &str) -> Result<Self, Error> {
         Ok(Postgres::new(address))
     }
+
+    pub fn hangup() -> () {
+        println!("Done with connection! TODO!");
+    }
 }
 
 // TODO:
@@ -35,15 +41,10 @@ impl Backend for Postgres {
                 tokio::spawn(connection);
                 client.prepare(&sql).map(|statement| (client, statement))
             })
-            .and_then(|(mut client, statement)| {
-                client.query(&statement, &[]).collect()
-            })
             .map_err(|err| format_err!("psql err {}", err))
-            .map(|rows| {
-                let r = rows[0].get::<_, i32>(0);
-                println!("{:?}", r);
-                assert_eq!(r, 4);
-                DataFrame::new()
+            .and_then(|(mut client, statement)| {
+                let rows_vec = client.query(&statement, &[]).collect();
+                rows_to_df(rows_vec, statement.columns())
             });
         Box::new(future)
     }
@@ -64,7 +65,7 @@ mod tests {
     fn test_pg_query() {
         let postgres_db= env::var("TESSERACT_DATABASE_URL").expect("Please provide TESSERACT_DATABASE_URL");
         let pg = Postgres::new(&postgres_db);
-        let future = pg.exec_sql("SELECT 1+3".to_string()).map(|df| {
+        let future = pg.exec_sql("SELECT id, moi from test;".to_string()).map(|df| {
             println!("Result was: {:?}", df);
             ()
         })
