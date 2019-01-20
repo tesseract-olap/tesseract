@@ -5,8 +5,8 @@ use tesseract_core::Column as TesseractColumn;
 use tesseract_core::DataFrame;
 use tesseract_core::ColumnData;
 use tokio_postgres::Column;
-use tokio_postgres::Query;
 use futures::stream::Collect;
+use tokio_postgres::impls::Query;
 
 //use postgres::types::{FromSql, Kind, ToSql, Type};
 //use num_traits::cast::ToPrimitive;

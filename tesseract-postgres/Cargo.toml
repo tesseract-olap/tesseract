@@ -5,7 +5,7 @@ name = "tesseract-postgres"
 version = "0.1.0"
 
 [dependencies]
-tokio-postgres = {git = "https://github.com/sfackler/rust-postgres"}
+tokio-postgres = {git = "https://github.com/sfackler/rust-postgres", rev = "e3a25ad"}
 failure = "0.1.2"
 futures = "0.1.25"
 log = "0.4.3"
