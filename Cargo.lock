@@ -352,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "clickhouse-rs"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1820,7 +1820,7 @@ version = "0.7.0"
 dependencies = [
  "actix 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 0.7.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "clickhouse-rs 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clickhouse-rs 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "dotenv 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1841,7 +1841,7 @@ dependencies = [
 name = "tesseract-clickhouse"
 version = "0.1.0"
 dependencies = [
- "clickhouse-rs 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clickhouse-rs 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2472,7 +2472,7 @@ dependencies = [
 "checksum chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "45912881121cb26fad7c38c17ba7daa18764771836b34fab7d3fbd93ed633878"
 "checksum chrono-tz 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "44420a821d3075c6b4dcdba557104274a240b5b6e323dc17136507e96ca2db59"
 "checksum clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b957d88f4b6a63b9d70d5f454ac8011819c6efa7727858f458ab71c756ce2d3e"
-"checksum clickhouse-rs 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "98cfddd1cd65e575849f2f64bf7e365f4aeb44eeae5c9ed746cce03dd4705335"
+"checksum clickhouse-rs 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "064a2caf972f01d9981e5ba1fbbc3d4d323a319a0021639f15d5a202bf75e9b5"
 "checksum clickhouse-rs-cityhash-sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "551a67cb2913d82f0fd5fd3973c6a6a8dc7b66986f8e1a060af3ffe0c587d8f7"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 "checksum cookie 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1465f8134efa296b4c19db34d909637cb2bf0f7aaf21299e23e18fa29ac557cf"
