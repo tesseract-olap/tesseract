@@ -1,4 +1,5 @@
 /target
+*.iml
 **/*.rs.bk
 .envrc
 .env

@@ -20,6 +20,7 @@ use std::str::FromStr;
 use tesseract_clickhouse::Clickhouse;
 use tesseract_core::Backend;
 use tesseract_mysql::MySql;
+use tesseract_postgres::Postgres;
 
 /// from a full url e.g. clickhouse://127.0.0.1:9000 returns
 /// the db client, url, and database type.
@@ -49,7 +50,10 @@ pub fn get_db(db_url_full: &str) -> Result<(Box<dyn Backend + Send + Sync>, Stri
             Box::new(MySql::from_addr(&db_url_full)?) as
                 Box<dyn Backend + Send + Sync>
         },
-        Database::Postgres => bail!("Postgres not yet supported"),
+        Database::Postgres => {
+            Box::new(Postgres::from_addr(&db_url_full)?) as
+                Box<dyn Backend + Send + Sync>
+        },
     };
 
     // Remove password when there's a user:password@host in the url
