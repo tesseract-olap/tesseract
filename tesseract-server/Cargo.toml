@@ -2,7 +2,7 @@
 authors = ["Walther Chen <walther.chen@gmail.com>"]
 edition = "2018"
 name = "tesseract"
-version = "0.7.0"
+version = "0.8.0"
 
 [dependencies]
 actix = "0.7.7"
@@ -24,6 +24,9 @@ path = "../tesseract-clickhouse"
 
 [dependencies.tesseract-mysql]
 path = "../tesseract-mysql"
+
+[dependencies.tesseract-postgres]
+path = "../tesseract-postgres"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"

@@ -2,6 +2,7 @@
 members = [
     "tesseract-clickhouse",
     "tesseract-mysql",
+    "tesseract-postgres",
     "tesseract-core",
     "tesseract-server",
     "data-gen"
