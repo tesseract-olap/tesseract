@@ -2,6 +2,7 @@ use log::*;
 use std::collections::HashMap;
 
 use tesseract_core::{Schema, Cube, Dimension};
+//use tesseract_core::Query as TsQuery;
 
 
 /// Holds cache information.
@@ -10,11 +11,39 @@ pub struct Cache {
     pub cube_info: Vec<CubeInfo>,
 }
 
+impl Cache {
+    /// Finds the CubeInfo object for a cube with a given name.
+    pub fn find_cube_info(&self, cube: &String) -> Option<CubeInfo> {
+        for cube_info in &self.cube_info {
+            if cube_info.name == *cube {
+                return Some(cube_info.clone());
+            }
+        }
+        return None;
+    }
+}
+
 /// Holds cache information for a given cube.
 #[derive(Debug, Clone)]
 pub struct CubeInfo {
     pub name: String,
+    pub time_dim: Dimension,
     pub years: HashMap<String, u32>,
+}
+
+impl CubeInfo {
+    /// Returns dimension name in the format: `Dimension.Hierarchy.Level`.
+    pub fn get_time_dim_name(&self) -> String {
+        format!("{}.{}.{}",
+            self.time_dim.name,
+            self.time_dim.hierarchies[0].name,
+            self.time_dim.hierarchies[0].levels[0].name,
+        ).to_string()
+    }
+
+    pub fn get_year_cut(&self, s: String) -> String {
+        format!("{}.{}", self.get_time_dim_name(), self.years[&s.clone()]).to_string()
+    }
 }
 
 
@@ -33,6 +62,12 @@ pub fn populate_cache(schema: Schema) -> Cache {
         // TODO: Use this dimension to get the most recent and latest year
         // println!("{:?}", preferred_time_dim);
 
+        // TODO: Need a TsQuery and a query_ir. then:
+        // let query_ir_headers = schema.read().unwrap()
+        //     .sql_query(&cube.name, &ts_query);
+        // let sql = backend.generate_sql(query_ir);
+        // let response = backend.exec_sql(sql);
+
         let mut years: HashMap<String, u32> = HashMap::new();
 
         years.insert("latest".to_string(), 2018);
@@ -41,6 +76,7 @@ pub fn populate_cache(schema: Schema) -> Cache {
         cube_info.push(
             CubeInfo {
                 name: cube.name.clone(),
+                time_dim: preferred_time_dim,
                 years
             }
         )

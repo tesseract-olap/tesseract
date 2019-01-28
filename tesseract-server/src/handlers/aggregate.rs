@@ -62,7 +62,7 @@ pub fn do_aggregate(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
-    let agg_query = match agg_query_res {
+    let mut agg_query = match agg_query_res {
         Ok(q) => q,
         Err(err) => {
             return Box::new(
@@ -74,10 +74,33 @@ pub fn do_aggregate(
     };
     info!("query opts:{:?}", agg_query);
 
-    // TODO: year query param is just another cut
-    // Need to decide where to add that information to the cuts list
-    // Extract cut value from state
-    // TODO: validate year as `latest`, `oldest`, or `all`
+    // Process year argument (latest/oldest)
+    match &agg_query.year {
+        Some(s) => {
+            println!("YEAR = {}", s);
+
+            if s == "latest" || s == "oldest" {
+                let cube_info = req.state().cache.find_cube_info(&cube);
+
+                match cube_info {
+                    Some(info) => {
+                        let cut = info.get_year_cut(s.to_string());
+
+                        agg_query.cuts = match agg_query.cuts {
+                            Some(mut cuts) => {
+                                cuts.push(cut);
+                                Some(cuts)
+                            },
+                            None => Some(vec![cut]),
+                        }
+                    },
+                    None => (),
+                };
+            }
+        },
+        None => (),
+    }
+    info!("query opts:{:?}", agg_query);
 
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
@@ -140,11 +163,11 @@ pub struct AggregateQueryOpt {
     limit: Option<String>,
     growth: Option<String>,
     rca: Option<String>,
+    year: Option<String>,
 //    debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
-    year: Option<String>,
 }
 
 impl TryFrom<AggregateQueryOpt> for TsQuery {
