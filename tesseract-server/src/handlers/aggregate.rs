@@ -17,6 +17,8 @@ use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 
+/// Handles default aggregation when a format is not specified.
+/// Default format is CSV.
 pub fn aggregate_default_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
     ) -> FutureResponse<HttpResponse>
@@ -25,6 +27,7 @@ pub fn aggregate_default_handler(
     do_aggregate(req, cube_format)
 }
 
+/// Handles aggregation when a format is specified.
 pub fn aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
     ) -> FutureResponse<HttpResponse>
@@ -32,6 +35,7 @@ pub fn aggregate_handler(
     do_aggregate(req, cube_format.into_inner())
 }
 
+/// Performs data aggregation.
 pub fn do_aggregate(
     req: HttpRequest<AppState>,
     cube_format: (String, String),
@@ -70,8 +74,12 @@ pub fn do_aggregate(
     };
     info!("query opts:{:?}", agg_query);
 
-    // TODO turn AggregateQueryOpt into Query
-    // Then write the sql query thing.
+    // TODO: year query param is just another cut
+    // Need to decide where to add that information to the cuts list
+    // Extract cut value from state
+    // TODO: validate year as `latest`, `oldest`, or `all`
+
+    // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = match ts_query {
         Ok(q) => q,
@@ -136,6 +144,7 @@ pub struct AggregateQueryOpt {
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
+    year: Option<String>,
 }
 
 impl TryFrom<AggregateQueryOpt> for TsQuery {
@@ -169,8 +178,9 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
         let drilldowns = drilldowns?;
         let cuts = cuts?;
         let measures = measures?;
-        let parents = agg_query_opt.parents.unwrap_or(false);
         let properties = properties?;
+
+        let parents = agg_query_opt.parents.unwrap_or(false);
 
         let top = agg_query_opt.top
             .map(|t| t.parse())

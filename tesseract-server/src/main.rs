@@ -25,6 +25,7 @@
 mod app;
 mod db_config;
 mod handlers;
+mod logic_layer;
 mod schema_config;
 
 use actix_web::server;
@@ -67,7 +68,7 @@ fn main() -> Result<(), Error> {
     let schema = schema_config::read_schema(&schema_path).unwrap_or_else(|err| {
         panic!(err);
     });
-    let schema_arc = Arc::new(RwLock::new(schema));
+    let schema_arc = Arc::new(RwLock::new(schema.clone()));
 
     // Env
     let env_vars = EnvVars {
@@ -75,6 +76,9 @@ fn main() -> Result<(), Error> {
         schema_source,
         flush_secret,
     };
+
+    // TODO: Populate internal cache
+    logic_layer::populate_cache(schema.clone());
 
     // Initialize Server
     let sys = actix::System::new("tesseract");

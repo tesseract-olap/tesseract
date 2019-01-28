@@ -12,8 +12,8 @@ use serde_xml_rs as serde_xml;
 
 use crate::schema::{
     SchemaConfigJson,
-    SchemaConfigXML}
-;
+    SchemaConfigXML
+};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -24,7 +24,7 @@ use self::names::{
     Property,
     LevelName,
 };
-pub use self::schema::{Schema, Cube, Table};
+pub use self::schema::{Schema, Cube, Dimension, Table};
 use self::query_ir::{
     CutSql,
     DrilldownSql,

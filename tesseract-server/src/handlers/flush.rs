@@ -57,7 +57,7 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
         let mut w = req.state().schema.write().unwrap();
         *w = schema;
 
-        // TODO: Clear internal cache once that's implemented
+        // TODO: Clear and re-populate cache once that's implemented
 
         Ok(HttpResponse::Ok().finish())
     } else {
