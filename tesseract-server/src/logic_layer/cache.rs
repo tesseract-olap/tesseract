@@ -1,27 +1,54 @@
 use log::*;
+use std::collections::HashMap;
 
 use tesseract_core::{Schema, Cube, Dimension};
 
 
+/// Holds cache information.
+#[derive(Debug, Clone)]
+pub struct Cache {
+    pub cube_info: Vec<CubeInfo>,
+}
+
+/// Holds cache information for a given cube.
+#[derive(Debug, Clone)]
+pub struct CubeInfo {
+    pub name: String,
+    pub years: HashMap<String, u32>,
+}
+
+
 /// Populates a cache with that will be shared in `AppState`
-pub fn populate_cache(schema: Schema) {
+pub fn populate_cache(schema: Schema) -> Cache {
     info!("Populating cache...");
 
-    // TODO: Get a list of all the cubes
-    for cube in schema.cubes {
-        let preferred_time_dim = find_years(cube.clone());
+    let mut cube_info: Vec<CubeInfo> = vec![];
 
-        println!("{}", cube.name);
-        println!("{:?}", preferred_time_dim);
+    for cube in schema.cubes {
+        let preferred_time_dim = match find_years(cube.clone()) {
+            Some(dim) => dim,
+            None => { continue; }
+        };
+
+        // TODO: Use this dimension to get the most recent and latest year
+        // println!("{:?}", preferred_time_dim);
+
+        let mut years: HashMap<String, u32> = HashMap::new();
+
+        years.insert("latest".to_string(), 2018);
+        years.insert("oldest".to_string(), 2016);
+
+        cube_info.push(
+            CubeInfo {
+                name: cube.name.clone(),
+                years
+            }
+        )
     }
 
-    // TODO: Create HashMap with measures and metadata
-
-    // TODO: Find cubes with a year/time dimension and store relevant information
-
-    // TODO: Create shared state object and add it to `AppState`
-
     info!("Cache ready!");
+
+    Cache { cube_info }
 }
 
 /// Finds cubes and dimensions with year/time information

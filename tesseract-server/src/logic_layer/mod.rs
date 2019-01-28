@@ -1,3 +1,3 @@
 mod cache;
 
-pub use self::cache::populate_cache;
+pub use self::cache::{Cache, populate_cache};

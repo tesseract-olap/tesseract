@@ -78,11 +78,11 @@ fn main() -> Result<(), Error> {
     };
 
     // TODO: Populate internal cache
-    logic_layer::populate_cache(schema.clone());
+    let cache = logic_layer::populate_cache(schema.clone());
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone()))
+    server::new(move|| create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone(), cache.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
