@@ -78,7 +78,10 @@ fn main() -> Result<(), Error> {
     };
 
     // Populate internal cache
-    let cache = logic_layer::populate_cache(schema.clone(), db.clone());
+    let cache = match logic_layer::populate_cache(schema.clone(), db.clone()) {
+        Ok(cache) => cache,
+        Err(_) => panic!("Cache population failed."),
+    };
 
     // Initialize Server
     let sys = actix::System::new("tesseract");

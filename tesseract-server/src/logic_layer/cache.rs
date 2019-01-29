@@ -1,3 +1,4 @@
+use failure::Error;
 use log::*;
 use std::collections::HashMap;
 
@@ -47,7 +48,7 @@ impl CubeCache {
 
 
 /// Populates a `Cache` object that will be shared through `AppState`.
-pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -> Cache {
+pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -> Result<Cache, Error> {
     info!("Populating cache...");
 
     let mut sys = actix::System::new("cache");
@@ -55,8 +56,11 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
 
     for cube in schema.cubes {
         let preferred_time_dim = match find_years(cube.clone()) {
-            Some(dim) => dim,
-            None => { continue; }
+            Ok(r) => match r {
+                Some(dim) => dim,
+                None => continue
+            },
+            Err(_) => continue
         };
         let year_column = get_year_column(&preferred_time_dim);
 
@@ -98,7 +102,7 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
 
     info!("Cache ready!");
 
-    Cache { cubes }
+    Ok(Cache { cubes })
 }
 
 /// Helper to get the name of the year column in a given cube.
@@ -122,7 +126,7 @@ pub fn get_year_column(dim: &Dimension) -> String {
 /// Finds cubes and dimensions with year/time information.
 /// The current logic is similar to the one for the existing Mondrian logic
 /// layer, but we may want to change this in the future.
-fn find_years(cube: Cube) -> Option<Dimension> {
+fn find_years(cube: Cube) -> Result<Option<Dimension>, Error> {
     let mut time_dimensions: Vec<Dimension> = vec![];
 
     for dimension in cube.dimensions {
@@ -133,29 +137,29 @@ fn find_years(cube: Cube) -> Option<Dimension> {
     }
 
     if time_dimensions.len() == 0 {
-        return None;
+        return Ok(None);
     } else if time_dimensions.len() == 1 {
-        return Some(time_dimensions[0].clone());
+        return Ok(Some(time_dimensions[0].clone()));
     } else {
         for dim in &time_dimensions {
             if dim.name == "Year" {
                 println!("SUP");
-                return Some(dim.clone());
+                return Ok(Some(dim.clone()));
             }
         }
 
         for dim in &time_dimensions {
             if dim.name.contains("End") {
-                return Some(dim.clone());
+                return Ok(Some(dim.clone()));
             }
         }
 
         for dim in &time_dimensions {
             if dim.name.contains("Year") {
-                return Some(dim.clone());
+                return Ok(Some(dim.clone()));
             }
         }
     }
 
-    return Some(time_dimensions[0].clone());
+    return Ok(Some(time_dimensions[0].clone()));
 }
