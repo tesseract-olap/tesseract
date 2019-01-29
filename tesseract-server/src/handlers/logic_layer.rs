@@ -19,27 +19,27 @@ use crate::app::AppState;
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub fn aggregate_default_handler(
+pub fn ll_aggregate_default_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
-    ) -> FutureResponse<HttpResponse>
+) -> FutureResponse<HttpResponse>
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
-    do_aggregate(req, cube_format)
+    ll_do_aggregate(req, cube_format)
 }
 
 /// Handles aggregation when a format is specified.
-pub fn aggregate_handler(
+pub fn ll_aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
-    ) -> FutureResponse<HttpResponse>
+) -> FutureResponse<HttpResponse>
 {
-    do_aggregate(req, cube_format.into_inner())
+    ll_do_aggregate(req, cube_format.into_inner())
 }
 
 /// Performs data aggregation.
-pub fn do_aggregate(
+pub fn ll_do_aggregate(
     req: HttpRequest<AppState>,
     cube_format: (String, String),
-    ) -> FutureResponse<HttpResponse>
+) -> FutureResponse<HttpResponse>
 {
     let (cube, format) = cube_format;
 
@@ -72,6 +72,40 @@ pub fn do_aggregate(
             );
         },
     };
+    info!("query opts:{:?}", agg_query);
+
+    // TODO: Should probably refactor this method a bit before it gets much bigger
+    // Process year argument (latest/oldest)
+    match &agg_query.year {
+        Some(s) => {
+            let cube_info = req.state().cache.find_cube_info(&cube);
+
+            match cube_info {
+                Some(info) => {
+                    let cut = match info.get_year_cut(s.to_string()) {
+                        Ok(cut) => cut,
+                        Err(err) => {
+                            return Box::new(
+                                future::result(
+                                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                                )
+                            );
+                        }
+                    };
+
+                    agg_query.cuts = match agg_query.cuts {
+                        Some(mut cuts) => {
+                            cuts.push(cut);
+                            Some(cuts)
+                        },
+                        None => Some(vec![cut]),
+                    }
+                },
+                None => (),
+            };
+        },
+        None => (),
+    }
     info!("query opts:{:?}", agg_query);
 
     // Turn AggregateQueryOpt into Query
