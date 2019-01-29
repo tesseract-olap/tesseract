@@ -9,6 +9,7 @@ use tesseract_core::query_ir::{
     DrilldownSql,
     MeasureSql,
     TopSql,
+    TopWhereSql,
     SortSql,
     LimitSql,
     RcaSql,
@@ -27,6 +28,7 @@ pub fn clickhouse_sql(
     meas: &[MeasureSql],
     // TODO put Filters and Calculations into own structs
     top: &Option<TopSql>,
+    top_where: &Option<TopWhereSql>,
     sort: &Option<SortSql>,
     limit: &Option<LimitSql>,
     rca: &Option<RcaSql>,
@@ -47,7 +49,7 @@ pub fn clickhouse_sql(
         final_drill_cols = drill_cols;
     }
 
-    final_sql = wrap_options(final_sql, &final_drill_cols, top, sort, limit);
+    final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, limit);
 
     final_sql
 }

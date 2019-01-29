@@ -1,7 +1,7 @@
 use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::query::{LimitQuery, SortDirection};
+use crate::query::{LimitQuery, SortDirection, Constraint};
 use crate::schema::Table;
 
 pub struct QueryIr {
@@ -11,6 +11,7 @@ pub struct QueryIr {
     pub meas: Vec<MeasureSql>,
     // TODO put Filters and Calculations into own structs
     pub top: Option<TopSql>,
+    pub top_where: Option<TopWhereSql>,
     pub sort: Option<SortSql>,
     pub limit: Option<LimitSql>,
     pub rca: Option<RcaSql>,
@@ -217,6 +218,12 @@ pub struct TopSql {
     pub by_column: String,
     pub sort_columns: Vec<String>,
     pub sort_direction: SortDirection,
+}
+
+#[derive(Debug, Clone)]
+pub struct TopWhereSql {
+    pub by_column: String,
+    pub constraint: Constraint,
 }
 
 #[derive(Debug, Clone)]

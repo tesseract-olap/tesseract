@@ -17,6 +17,7 @@ pub struct Query {
     pub properties: Vec<Property>,
     pub parents: bool,
     pub top: Option<TopQuery>,
+    pub top_where: Option<TopWhereQuery>,
     pub sort: Option<SortQuery>,
     pub limit: Option<LimitQuery>,
     pub rca: Option<RcaQuery>,
@@ -33,6 +34,7 @@ impl Query {
             properties: vec![],
             parents: false,
             top: None,
+            top_where: None,
             sort: None,
             limit: None,
             rca: None,
@@ -128,6 +130,107 @@ impl FromStr for Calculation {
     }
 }
 
+/// For filtering on a measure before Top is calculated
+#[derive(Debug, Clone)]
+pub struct TopWhereQuery {
+    pub by_mea_or_calc: MeaOrCalc,
+    pub constraint: Constraint,
+}
+
+// Currently only allows one sort_measure
+impl FromStr for TopWhereQuery {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.split(",").collect::<Vec<_>>()[..] {
+            [by_mea, constraint] => {
+
+                let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
+                let constraint = constraint.parse::<Constraint>()?;
+
+                Ok(TopWhereQuery {
+                    by_mea_or_calc,
+                    constraint,
+                })
+            },
+            _ => bail!("Could not parse a top_where query"),
+        }
+    }
+}
+
+// Constraint: less than, greater than a number
+// This is a little less straightforward, so we should
+// probably test this
+#[derive(Debug, Clone)]
+pub struct Constraint {
+    pub comparison: Comparison,
+    pub n: i64,
+}
+
+impl Constraint {
+    pub fn sql_string(&self) -> String {
+        format!("{} {}", self.comparison.sql_string(), self.n)
+    }
+}
+
+impl FromStr for Constraint {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.split(".").collect::<Vec<_>>()[..] {
+            [comparison, n] => {
+
+                let comparison = comparison.parse::<Comparison>()?;
+                let n = n.parse::<i64>()?;
+
+                Ok(Constraint {
+                    comparison,
+                    n,
+                })
+            },
+            _ => bail!("Could not parse a Constraint"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Comparison {
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+}
+
+impl Comparison {
+    pub fn sql_string(&self) -> String {
+        match self {
+            Comparison::Equal => "=".to_owned(),
+            Comparison::NotEqual => "<>".to_owned(),
+            Comparison::LessThan => "<".to_owned(),
+            Comparison::LessThanOrEqual => "<=".to_owned(),
+            Comparison::GreaterThan => ">".to_owned(),
+            Comparison::GreaterThanOrEqual => ">=".to_owned(),
+        }
+    }
+}
+
+impl FromStr for Comparison {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "eq" => Ok(Comparison::Equal),
+            "neq" => Ok(Comparison::NotEqual),
+            "lt" => Ok(Comparison::LessThan),
+            "lte" => Ok(Comparison::LessThanOrEqual),
+            "gt" => Ok(Comparison::GreaterThan),
+            "gte" => Ok(Comparison::GreaterThanOrEqual),
+            _ => bail!("Could not parse a comparison operator"),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct LimitQuery {

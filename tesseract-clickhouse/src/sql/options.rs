@@ -4,12 +4,14 @@ use super::{
     LimitSql,
     SortSql,
     TopSql,
+    TopWhereSql,
 };
 
 pub fn wrap_options(
     final_sql: String,
     final_drill_cols: &str,
     top: &Option<TopSql>,
+    top_where: &Option<TopWhereSql>,
     sort: &Option<SortSql>,
     limit: &Option<LimitSql>,
     ) -> String
@@ -19,8 +21,9 @@ pub fn wrap_options(
     // Now that final groupings are done, do wrapping options
     // like top, filter, sort
     if let Some(top) = top {
-        final_sql = format!("select * from ({}) order by {} {} limit {} by {}",
+        final_sql = format!("select * from ({}) {} order by {} {} limit {} by {}",
             final_sql,
+            if let Some(tw) = top_where { format!("where {} {}", tw.by_column, tw.constraint.sql_string()) } else { "".into() },
             join(&top.sort_columns, ", "),
             top.sort_direction.sql_string(),
             top.n,

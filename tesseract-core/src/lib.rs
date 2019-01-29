@@ -33,6 +33,7 @@ use self::query_ir::{
     TableSql,
     LevelColumn,
     TopSql,
+    TopWhereSql,
     SortSql,
     RcaSql,
     GrowthSql,
@@ -99,6 +100,9 @@ impl Schema {
             }
         }
 
+        // TODO check that top dim and mea are in here?
+        // TODO check that top_where maps to a mea that's not in top, but is in meas.
+
         // for growth, check if time dim and mea are in drilldown and measures
         if let Some(ref growth) = query.growth {
             if !query.drilldowns.contains(&growth.time_drill) {
@@ -151,6 +155,8 @@ impl Schema {
                             // mea value must be retrieved through explicit drilldown,
                             // don't need to do an extra rca check here.
 
+                            // TODO idx should be +1 if Some(rca)
+                            // check topWhere implementation
                             query.measures.iter()
                                 .position(|col| col == m )
                                 .map(|idx| format!("final_m{}", idx))
@@ -186,6 +192,39 @@ impl Schema {
                 by_column: self.get_dim_col_alias(&cube, &t.by_dimension)?,
                 sort_columns: top_sort_columns,
                 sort_direction: t.sort_direction.clone(),
+            })
+        } else {
+            None
+        };
+
+        // TopWhere, from Query to Query IR
+        let top_where = if let Some(ref tw) = query.top_where {
+            let by_column = match &tw.by_mea_or_calc {
+                MeaOrCalc::Mea(m) => {
+                    // NOTE: rca mea does not return the actual value, only rca. Since
+                    // mea value must be retrieved through explicit drilldown,
+                    // don't need to do an extra rca check here.
+
+                    query.measures.iter()
+                        .position(|col| col == m )
+                        .map(|idx| {
+                            let idx = if query.rca.is_some() {
+                                idx + 1
+                            } else {
+                                idx
+                            };
+                            format!("final_m{}", idx)
+                        })
+                        .ok_or(format_err!("measure {} for Top must be in measures", m))?
+                },
+                MeaOrCalc::Calc(c) => {
+                    c.sql_string()
+                }
+            };
+
+            Some(TopWhereSql {
+                by_column,
+                constraint: tw.constraint.clone(),
             })
         } else {
             None
@@ -311,6 +350,7 @@ impl Schema {
                 drills: drill_cols,
                 meas: mea_cols,
                 top,
+                top_where,
                 sort,
                 limit,
                 rca,
