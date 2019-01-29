@@ -41,7 +41,7 @@ impl CubeCache {
     }
 
     pub fn get_year_cut(&self, s: String) -> Result<String, Error> {
-        let mut year_opt;
+        let year_opt;
 
         if s == "latest" {
             year_opt = self.max_year();
@@ -97,31 +97,39 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
                 format!("select distinct {} from {}", year_column, cube.table.name)
                         .to_string()
             );
-        let df = sys.block_on(future).expect("Error populating cache with backend data.");
-
-        let mut original_years = match &df.columns[0].column_data {
-            ColumnData::Int8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::Int16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::Int32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::Int64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::UInt8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::UInt16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::UInt32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::UInt64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::Float32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::Float64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-            ColumnData::Text(v) => { let s: Vec<i16> = v.iter().map(|e| e.parse::<i16>().unwrap().clone()).collect(); s },
+        let df = match sys.block_on(future) {
+            Ok(df) => df,
+            Err(err) => {
+                return Err(format_err!("Error populating cache with backend data: {}", err));
+            }
         };
 
-        original_years.sort();
+        // TODO: Do we want to return an error if no columns are returned?
+        if df.columns.len() >= 1 {
+            let mut original_years = match &df.columns[0].column_data {
+                ColumnData::Int8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::Int16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::Int32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::Int64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::UInt8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::UInt16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::UInt32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::UInt64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::Float32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::Float64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+                ColumnData::Text(v) => { let s: Vec<i16> = v.iter().map(|e| e.parse::<i16>().unwrap().clone()).collect(); s },
+            };
 
-        cubes.push(
-            CubeCache {
-                name: cube.name.clone(),
-                time_dim: preferred_time_dim,
-                years: original_years
-            }
-        )
+            original_years.sort();
+
+            cubes.push(
+                CubeCache {
+                    name: cube.name.clone(),
+                    time_dim: preferred_time_dim,
+                    years: original_years
+                }
+            )
+        }
     }
 
     info!("Cache ready!");
