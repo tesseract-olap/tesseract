@@ -245,6 +245,7 @@ pub struct RcaSql {
     // level col for dim 2
     pub drill_2: Vec<DrilldownSql>,
     pub mea: MeasureSql,
+    pub debug: bool,
 }
 
 #[derive(Debug, Clone)]

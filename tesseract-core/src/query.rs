@@ -21,6 +21,7 @@ pub struct Query {
     pub limit: Option<LimitQuery>,
     pub rca: Option<RcaQuery>,
     pub growth: Option<GrowthQuery>,
+    pub debug: bool,
 }
 
 impl Query {
@@ -36,6 +37,7 @@ impl Query {
             limit: None,
             rca: None,
             growth: None,
+            debug: false,
         }
     }
 }
