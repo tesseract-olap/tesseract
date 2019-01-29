@@ -165,12 +165,13 @@ pub struct AggregateQueryOpt {
     properties: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,
+    top_where: Option<String>,
     sort: Option<String>,
     limit: Option<String>,
     growth: Option<String>,
     rca: Option<String>,
     year: Option<String>,
-//    debug: Option<bool>,
+    debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
@@ -214,6 +215,9 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
         let top = agg_query_opt.top
             .map(|t| t.parse())
             .transpose()?;
+        let top_where = agg_query_opt.top_where
+            .map(|t| t.parse())
+            .transpose()?;
         let sort = agg_query_opt.sort
             .map(|s| s.parse())
             .transpose()?;
@@ -229,6 +233,8 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             .map(|r| r.parse())
             .transpose()?;
 
+        let debug = agg_query_opt.debug.unwrap_or(false);
+
         Ok(TsQuery {
             drilldowns,
             cuts,
@@ -236,10 +242,12 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             parents,
             properties,
             top,
+            top_where,
             sort,
             limit,
             rca,
             growth,
+            debug,
         })
     }
 }

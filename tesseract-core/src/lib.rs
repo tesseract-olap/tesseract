@@ -33,6 +33,7 @@ use self::query_ir::{
     TableSql,
     LevelColumn,
     TopSql,
+    TopWhereSql,
     SortSql,
     RcaSql,
     GrowthSql,
@@ -99,6 +100,9 @@ impl Schema {
             }
         }
 
+        // TODO check that top dim and mea are in here?
+        // TODO check that top_where maps to a mea that's not in top, but is in meas.
+
         // for growth, check if time dim and mea are in drilldown and measures
         if let Some(ref growth) = query.growth {
             if !query.drilldowns.contains(&growth.time_drill) {
@@ -151,6 +155,8 @@ impl Schema {
                             // mea value must be retrieved through explicit drilldown,
                             // don't need to do an extra rca check here.
 
+                            // TODO idx should be +1 if Some(rca)
+                            // check topWhere implementation
                             query.measures.iter()
                                 .position(|col| col == m )
                                 .map(|idx| format!("final_m{}", idx))
@@ -191,6 +197,39 @@ impl Schema {
             None
         };
 
+        // TopWhere, from Query to Query IR
+        let top_where = if let Some(ref tw) = query.top_where {
+            let by_column = match &tw.by_mea_or_calc {
+                MeaOrCalc::Mea(m) => {
+                    // NOTE: rca mea does not return the actual value, only rca. Since
+                    // mea value must be retrieved through explicit drilldown,
+                    // don't need to do an extra rca check here.
+
+                    query.measures.iter()
+                        .position(|col| col == m )
+                        .map(|idx| {
+                            let idx = if query.rca.is_some() {
+                                idx + 1
+                            } else {
+                                idx
+                            };
+                            format!("final_m{}", idx)
+                        })
+                        .ok_or(format_err!("measure {} for Top must be in measures", m))?
+                },
+                MeaOrCalc::Calc(c) => {
+                    c.sql_string()
+                }
+            };
+
+            Some(TopWhereSql {
+                by_column,
+                constraint: tw.constraint.clone(),
+            })
+        } else {
+            None
+        };
+
         let sort = if let Some(ref s) = query.sort {
             let sort_column = self.get_mea_col(&cube, &s.measure)?;
 
@@ -216,6 +255,7 @@ impl Schema {
                 drill_1,
                 drill_2,
                 mea,
+                debug: query.debug,
             })
         } else {
             None
@@ -253,7 +293,12 @@ impl Schema {
         if let Some(ref rca) = query.rca {
             let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &query.properties, query.parents)
                 .map_err(|err| format_err!("Error getting rca drill headers: {}", err))?;
+
             drill_headers.extend_from_slice(&rca_drill_headers);
+
+            if query.debug {
+                drill_headers.extend_from_slice(&["a".into(), "b".into(), "c".into(), "d".into()]);
+            }
 
             mea_headers.insert(0, format!("{} RCA", rca.mea.0.clone()));
         }
@@ -305,6 +350,7 @@ impl Schema {
                 drills: drill_cols,
                 meas: mea_cols,
                 top,
+                top_where,
                 sort,
                 limit,
                 rca,

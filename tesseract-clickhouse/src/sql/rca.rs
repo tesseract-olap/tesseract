@@ -264,8 +264,9 @@ pub fn calculate(
         "".to_owned()
     };
 
-    final_sql = format!("select {}, ((a/b) / (c/d)) as rca{} from ({})",
+    final_sql = format!("select {}, {}((a/b) / (c/d)) as rca{} from ({})",
         a_final_drills,
+        if rca.debug { "a, b, c, d, " } else { "" },
         final_ext_meas,
         final_sql,
     );
