@@ -74,6 +74,7 @@ pub fn do_aggregate(
     };
     info!("query opts:{:?}", agg_query);
 
+    // TODO: Should probably refactor this method a bit before it gets much bigger
     // Process year argument (latest/oldest)
     match &agg_query.year {
         Some(s) => {

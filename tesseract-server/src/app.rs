@@ -47,9 +47,6 @@ pub struct AppState {
 
 /// Creates an ActixWeb application with an `AppState`.
 pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, schema: Arc<RwLock<Schema>>, env_vars: EnvVars, cache: Cache) -> App<AppState> {
-//    // TODO: Populate internal cache
-//    let cache = populate_cache(schema.read().unwrap().clone());
-
     App::with_state(AppState { backend, db_type, schema, env_vars, cache })
         .middleware(middleware::Logger::default())
         .resource("/", |r| {
@@ -71,6 +68,4 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, sc
             // TODO: Change this to POST?
             r.method(Method::GET).with(flush_handler)
         })
-        // TODO: Will need another endpoint where the cube is not specified in the URL and can be
-        // inferred intelligently
 }

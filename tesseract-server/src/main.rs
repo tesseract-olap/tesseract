@@ -77,7 +77,7 @@ fn main() -> Result<(), Error> {
         flush_secret,
     };
 
-    // TODO: Populate internal cache
+    // Populate internal cache
     let cache = logic_layer::populate_cache(schema.clone(), db.clone());
 
     // Initialize Server

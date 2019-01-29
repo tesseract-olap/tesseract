@@ -2,21 +2,20 @@ use log::*;
 use std::collections::HashMap;
 
 use tesseract_core::{Schema, Cube, Dimension, Backend, ColumnData};
-//use tesseract_core::Query as TsQuery;
 
 
 /// Holds cache information.
 #[derive(Debug, Clone)]
 pub struct Cache {
-    pub cube_info: Vec<CubeInfo>,
+    pub cubes: Vec<CubeCache>,
 }
 
 impl Cache {
-    /// Finds the CubeInfo object for a cube with a given name.
-    pub fn find_cube_info(&self, cube: &String) -> Option<CubeInfo> {
-        for cube_info in &self.cube_info {
-            if cube_info.name == *cube {
-                return Some(cube_info.clone());
+    /// Finds the `CubeCache` object for a cube with a given name.
+    pub fn find_cube_info(&self, cube: &String) -> Option<CubeCache> {
+        for cube_cache in &self.cubes {
+            if cube_cache.name == *cube {
+                return Some(cube_cache.clone());
             }
         }
         return None;
@@ -25,13 +24,13 @@ impl Cache {
 
 /// Holds cache information for a given cube.
 #[derive(Debug, Clone)]
-pub struct CubeInfo {
+pub struct CubeCache {
     pub name: String,
     pub time_dim: Dimension,
     pub years: HashMap<String, i16>,
 }
 
-impl CubeInfo {
+impl CubeCache {
     /// Returns dimension name in the format: `Dimension.Hierarchy.Level`.
     pub fn get_time_dim_name(&self) -> String {
         format!("{}.{}.{}",
@@ -47,28 +46,26 @@ impl CubeInfo {
 }
 
 
-/// Populates a `Cache` with that will be shared through `AppState`.
+/// Populates a `Cache` object that will be shared through `AppState`.
 pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -> Cache {
     info!("Populating cache...");
 
-    let mut cube_info: Vec<CubeInfo> = vec![];
+    let mut sys = actix::System::new("cache");
+    let mut cubes: Vec<CubeCache> = vec![];
 
     for cube in schema.cubes {
         let preferred_time_dim = match find_years(cube.clone()) {
             Some(dim) => dim,
             None => { continue; }
         };
+        let year_column = get_year_column(&preferred_time_dim);
 
-        let mut sys = actix::System::new("cache");
-
-        // TODO: How are we getting the column name for `year`
         let future = backend
             .exec_sql(
-                format!("select distinct {} from {}", "year", cube.table.name)
+                format!("select distinct {} from {}", year_column, cube.table.name)
                         .to_string()
             );
-
-        let df = sys.block_on(future).unwrap();
+        let df = sys.block_on(future).expect("Error populating cache with backend data.");
 
         let mut original_years = match &df.columns[0].column_data {
             ColumnData::Int8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
@@ -90,10 +87,8 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
         years.insert("oldest".to_string(), original_years[0]);
         years.insert("latest".to_string(), original_years.last().unwrap().clone());
 
-        println!("{:?}", years);
-
-        cube_info.push(
-            CubeInfo {
+        cubes.push(
+            CubeCache {
                 name: cube.name.clone(),
                 time_dim: preferred_time_dim,
                 years
@@ -103,10 +98,30 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
 
     info!("Cache ready!");
 
-    Cache { cube_info }
+    Cache { cubes }
 }
 
-/// Finds cubes and dimensions with year/time information
+/// Helper to get the name of the year column in a given cube.
+/// Right now it assumes that the first level provided containing the word
+/// `year` in its `key_column` value is the one we're looking for.
+/// If such level is not found, the method returns a default value of `year`.
+pub fn get_year_column(dim: &Dimension) -> String {
+    for hierarchy in &dim.hierarchies {
+        if hierarchy.name.contains("Year") {
+            for level in &hierarchy.levels {
+                if level.key_column.contains("year") {
+                    return level.key_column.clone();
+                }
+            }
+        }
+    }
+
+    String::from("year")
+}
+
+/// Finds cubes and dimensions with year/time information.
+/// The current logic is similar to the one for the existing Mondrian logic
+/// layer, but we may want to change this in the future.
 fn find_years(cube: Cube) -> Option<Dimension> {
     let mut time_dimensions: Vec<Dimension> = vec![];
 
@@ -122,9 +137,9 @@ fn find_years(cube: Cube) -> Option<Dimension> {
     } else if time_dimensions.len() == 1 {
         return Some(time_dimensions[0].clone());
     } else {
-        // TODO: Refactor
         for dim in &time_dimensions {
             if dim.name == "Year" {
+                println!("SUP");
                 return Some(dim.clone());
             }
         }
