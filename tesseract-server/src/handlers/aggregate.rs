@@ -77,8 +77,6 @@ pub fn do_aggregate(
     // Process year argument (latest/oldest)
     match &agg_query.year {
         Some(s) => {
-            println!("YEAR = {}", s);
-
             if s == "latest" || s == "oldest" {
                 let cube_info = req.state().cache.find_cube_info(&cube);
 

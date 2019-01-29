@@ -78,7 +78,7 @@ fn main() -> Result<(), Error> {
     };
 
     // TODO: Populate internal cache
-    let cache = logic_layer::populate_cache(schema.clone());
+    let cache = logic_layer::populate_cache(schema.clone(), db.clone());
 
     // Initialize Server
     let sys = actix::System::new("tesseract");

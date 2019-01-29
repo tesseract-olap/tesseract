@@ -1,7 +1,7 @@
 use log::*;
 use std::collections::HashMap;
 
-use tesseract_core::{Schema, Cube, Dimension};
+use tesseract_core::{Schema, Cube, Dimension, Backend, DataFrame, ColumnData};
 //use tesseract_core::Query as TsQuery;
 
 
@@ -28,7 +28,7 @@ impl Cache {
 pub struct CubeInfo {
     pub name: String,
     pub time_dim: Dimension,
-    pub years: HashMap<String, u32>,
+    pub years: HashMap<String, i16>,
 }
 
 impl CubeInfo {
@@ -47,8 +47,8 @@ impl CubeInfo {
 }
 
 
-/// Populates a cache with that will be shared in `AppState`
-pub fn populate_cache(schema: Schema) -> Cache {
+/// Populates a `Cache` with that will be shared through `AppState`.
+pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -> Cache {
     info!("Populating cache...");
 
     let mut cube_info: Vec<CubeInfo> = vec![];
@@ -59,19 +59,46 @@ pub fn populate_cache(schema: Schema) -> Cache {
             None => { continue; }
         };
 
-        // TODO: Use this dimension to get the most recent and latest year
-        // println!("{:?}", preferred_time_dim);
+        let mut sys = actix::System::new("cache");
 
-        // TODO: Need a TsQuery and a query_ir. then:
-        // let query_ir_headers = schema.read().unwrap()
-        //     .sql_query(&cube.name, &ts_query);
-        // let sql = backend.generate_sql(query_ir);
-        // let response = backend.exec_sql(sql);
+        let future = backend
+            .exec_sql("select distinct year from example".to_string());
 
-        let mut years: HashMap<String, u32> = HashMap::new();
+        let df = sys.block_on(future).unwrap();
 
-        years.insert("latest".to_string(), 2018);
-        years.insert("oldest".to_string(), 2016);
+        let mut original_years = match &df.columns[0].column_data {
+            // TODO: Refactor
+            ColumnData::Int8(v) => {
+                let mut temp: Vec<i16> = vec![];
+                for x in v {
+                    temp.push(x.clone() as i16)
+                }
+                temp
+            },
+            ColumnData::Int16(v) => {
+                let mut temp: Vec<i16> = vec![];
+                for x in v {
+                    temp.push(x.clone() as i16)
+                }
+                temp
+            },
+            ColumnData::Int32(v) => {
+                let mut temp: Vec<i16> = vec![];
+                for x in v {
+                    temp.push(x.clone() as i16)
+                }
+                temp
+            },
+            _ => panic!("Something")
+        };
+
+        original_years.sort();
+
+        let mut years: HashMap<String, i16> = HashMap::new();
+        years.insert("latest".to_string(), original_years.last().unwrap().clone());
+        years.insert("oldest".to_string(), original_years[0]);
+
+        println!("{:?}", years);
 
         cube_info.push(
             CubeInfo {
