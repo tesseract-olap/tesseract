@@ -78,24 +78,31 @@ pub fn do_aggregate(
     // Process year argument (latest/oldest)
     match &agg_query.year {
         Some(s) => {
-            if s == "latest" || s == "oldest" {
-                let cube_info = req.state().cache.find_cube_info(&cube);
+            let cube_info = req.state().cache.find_cube_info(&cube);
 
-                match cube_info {
-                    Some(info) => {
-                        let cut = info.get_year_cut(s.to_string());
-
-                        agg_query.cuts = match agg_query.cuts {
-                            Some(mut cuts) => {
-                                cuts.push(cut);
-                                Some(cuts)
-                            },
-                            None => Some(vec![cut]),
+            match cube_info {
+                Some(info) => {
+                    let cut = match info.get_year_cut(s.to_string()) {
+                        Ok(cut) => cut,
+                        Err(err) => {
+                            return Box::new(
+                                future::result(
+                                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                                )
+                            );
                         }
-                    },
-                    None => (),
-                };
-            }
+                    };
+
+                    agg_query.cuts = match agg_query.cuts {
+                        Some(mut cuts) => {
+                            cuts.push(cut);
+                            Some(cuts)
+                        },
+                        None => Some(vec![cut]),
+                    }
+                },
+                None => (),
+            };
         },
         None => (),
     }

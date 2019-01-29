@@ -1,6 +1,5 @@
-use failure::Error;
+use failure::{Error, format_err};
 use log::*;
-use std::collections::HashMap;
 
 use tesseract_core::{Schema, Cube, Dimension, Backend, ColumnData};
 
@@ -19,7 +18,7 @@ impl Cache {
                 return Some(cube_cache.clone());
             }
         }
-        return None;
+        None
     }
 }
 
@@ -28,7 +27,7 @@ impl Cache {
 pub struct CubeCache {
     pub name: String,
     pub time_dim: Dimension,
-    pub years: HashMap<String, i16>,
+    pub years: Vec<i16>,
 }
 
 impl CubeCache {
@@ -41,8 +40,37 @@ impl CubeCache {
         ).to_string()
     }
 
-    pub fn get_year_cut(&self, s: String) -> String {
-        format!("{}.{}", self.get_time_dim_name(), self.years[&s.clone()]).to_string()
+    pub fn get_year_cut(&self, s: String) -> Result<String, Error> {
+        let mut year_opt;
+
+        if s == "latest" {
+            year_opt = self.max_year();
+        } else if s == "oldest" {
+            year_opt = self.min_year();
+        } else {
+            return Err(format_err!("Unknown year filter. Try either 'latest' or 'oldest'"));
+        }
+
+        let year = match year_opt {
+            None => { return Err(format_err!("Unable to get {} year.", s)); }
+            Some(year) => year
+        };
+
+        Ok(format!("{}.{}", self.get_time_dim_name(), year).to_string())
+    }
+
+    pub fn min_year(&self) -> Option<i16> {
+        if self.years.len() >= 1 {
+            return Some(self.years[0]);
+        }
+        None
+    }
+
+    pub fn max_year(&self) -> Option<i16> {
+        if self.years.len() >= 1 {
+            return Some(*self.years.last().unwrap());
+        }
+        None
     }
 }
 
@@ -87,15 +115,11 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
 
         original_years.sort();
 
-        let mut years: HashMap<String, i16> = HashMap::new();
-        years.insert("oldest".to_string(), original_years[0]);
-        years.insert("latest".to_string(), original_years.last().unwrap().clone());
-
         cubes.push(
             CubeCache {
                 name: cube.name.clone(),
                 time_dim: preferred_time_dim,
-                years
+                years: original_years
             }
         )
     }
@@ -143,7 +167,6 @@ fn find_years(cube: Cube) -> Result<Option<Dimension>, Error> {
     } else {
         for dim in &time_dimensions {
             if dim.name == "Year" {
-                println!("SUP");
                 return Ok(Some(dim.clone()));
             }
         }
