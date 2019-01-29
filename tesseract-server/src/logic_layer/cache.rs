@@ -1,7 +1,7 @@
 use log::*;
 use std::collections::HashMap;
 
-use tesseract_core::{Schema, Cube, Dimension, Backend, DataFrame, ColumnData};
+use tesseract_core::{Schema, Cube, Dimension, Backend, ColumnData};
 //use tesseract_core::Query as TsQuery;
 
 
@@ -61,42 +61,34 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
 
         let mut sys = actix::System::new("cache");
 
+        // TODO: How are we getting the column name for `year`
         let future = backend
-            .exec_sql("select distinct year from example".to_string());
+            .exec_sql(
+                format!("select distinct {} from {}", "year", cube.table.name)
+                        .to_string()
+            );
 
         let df = sys.block_on(future).unwrap();
 
         let mut original_years = match &df.columns[0].column_data {
-            // TODO: Refactor
-            ColumnData::Int8(v) => {
-                let mut temp: Vec<i16> = vec![];
-                for x in v {
-                    temp.push(x.clone() as i16)
-                }
-                temp
-            },
-            ColumnData::Int16(v) => {
-                let mut temp: Vec<i16> = vec![];
-                for x in v {
-                    temp.push(x.clone() as i16)
-                }
-                temp
-            },
-            ColumnData::Int32(v) => {
-                let mut temp: Vec<i16> = vec![];
-                for x in v {
-                    temp.push(x.clone() as i16)
-                }
-                temp
-            },
-            _ => panic!("Something")
+            ColumnData::Int8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::Int16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::Int32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::Int64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::UInt8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::UInt16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::UInt32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::UInt64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::Float32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::Float64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
+            ColumnData::Text(v) => { let s: Vec<i16> = v.iter().map(|e| e.parse::<i16>().unwrap().clone()).collect(); s },
         };
 
         original_years.sort();
 
         let mut years: HashMap<String, i16> = HashMap::new();
-        years.insert("latest".to_string(), original_years.last().unwrap().clone());
         years.insert("oldest".to_string(), original_years[0]);
+        years.insert("latest".to_string(), original_years.last().unwrap().clone());
 
         println!("{:?}", years);
 
