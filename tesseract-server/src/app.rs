@@ -11,6 +11,8 @@ use crate::handlers::{
     aggregate_default_handler,
     ll_aggregate_handler,
     ll_aggregate_default_handler,
+    ll_detect_default_handler,
+    ll_detect_handler,
     flush_handler,
     index_handler,
     metadata_handler,
@@ -66,12 +68,22 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
         .resource("/cubes/{cube}/aggregate.{format}", |r| {
             r.method(Method::GET).with(aggregate_handler)
         })
+
+        // Logic Layer
         .resource("/cubes/{cube}/logic-layer", |r| {
             r.method(Method::GET).with(ll_aggregate_default_handler)
         })
         .resource("/cubes/{cube}/logic-layer.{format}", |r| {
             r.method(Method::GET).with(ll_aggregate_handler)
         })
+
+        .resource("/logic-layer", |r| {
+            r.method(Method::GET).with(ll_detect_default_handler)
+        })
+        .resource("/logic-layer.{format}", |r| {
+            r.method(Method::GET).with(ll_detect_handler)
+        })
+
         .resource("/flush", |r| {
             // TODO: Change this to POST?
             r.method(Method::GET).with(flush_handler)
