@@ -82,10 +82,11 @@ fn main() -> Result<(), Error> {
         Ok(cache) => cache,
         Err(_) => panic!("Cache population failed."),
     };
+    let cache_arc = Arc::new(RwLock::new(cache));
 
     // Initialize Server
     let sys = actix::System::new("tesseract");
-    server::new(move|| create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone(), cache.clone()))
+    server::new(move|| create_app(db.clone(), db_type.clone(), env_vars.clone(), schema_arc.clone(), cache_arc.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();

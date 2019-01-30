@@ -78,7 +78,7 @@ pub fn ll_do_aggregate(
     // Process year argument (latest/oldest)
     match &agg_query.year {
         Some(s) => {
-            let cube_info = req.state().cache.find_cube_info(&cube);
+            let cube_info = req.state().cache.read().unwrap().find_cube_info(&cube);
 
             match cube_info {
                 Some(info) => {

@@ -42,14 +42,14 @@ pub struct AppState {
     // TODO this is a hack, until a better interface is set up with the Backend Trait
     // to generate its own sql.
     pub db_type: Database,
-    pub schema: Arc<RwLock<Schema>>,
     pub env_vars: EnvVars,
-    pub cache: Cache,
+    pub schema: Arc<RwLock<Schema>>,
+    pub cache: Arc<RwLock<Cache>>,
 }
 
 /// Creates an ActixWeb application with an `AppState`.
-pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, schema: Arc<RwLock<Schema>>, env_vars: EnvVars, cache: Cache) -> App<AppState> {
-    App::with_state(AppState { backend, db_type, schema, env_vars, cache })
+pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, env_vars: EnvVars, schema: Arc<RwLock<Schema>>, cache: Arc<RwLock<Cache>>) -> App<AppState> {
+    App::with_state(AppState { backend, db_type, env_vars, schema, cache })
         .middleware(middleware::Logger::default())
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)
