@@ -43,15 +43,17 @@ pub fn ll_detect_handler(
 pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<String, Error> {
     // TODO: Don't assume this is coming in 3's
     let drilldowns = match agg_query.drilldowns {
-        Some(drilldowns) => drilldowns,
+        Some(drilldowns) => {
+            drilldowns
+        },
         None => vec![],
     };
 
-    // TODO: Don't assume this is coming in 3's
-    let cuts = match agg_query.cuts {
-        Some(cuts) => cuts,
-        None => vec![],
-    };
+//    // TODO: Remove anything after the level
+//    let cuts = match agg_query.cuts {
+//        Some(cuts) => cuts,
+//        None => vec![],
+//    };
 
     let measures = match agg_query.measures {
         Some(measures) => measures,
@@ -63,17 +65,27 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
         let dimension_names = get_all_dimension_names(cube.clone());
         let measure_names = get_all_measure_names(cube.clone());
 
+        // If this is true, we already know this is not the right cube, so need
+        // to continue to next iteration of the loop
+        let mut exit = false;
+
         for drilldown in &drilldowns {
             if !dimension_names.contains(drilldown) {
+                println!("It is breaking!");
+                exit = true;
                 break;
             }
         }
 
-        for cut in &cuts {
-            if !dimension_names.contains(cut) {
-                break;
-            }
+        if exit {
+            continue;
         }
+
+//        for cut in &cuts {
+//            if !dimension_names.contains(cut) {
+//                break;
+//            }
+//        }
 
         for measure in &measures {
             if !measure_names.contains(measure) {
