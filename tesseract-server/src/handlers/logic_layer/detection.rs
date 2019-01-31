@@ -41,10 +41,22 @@ pub fn ll_detect_handler(
 /// In case the arguments are present in more than one cube, the first cube to match all
 /// requirements is returned.
 pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<String, Error> {
-    // TODO: Don't assume this is coming in 3's
     let drilldowns = match agg_query.drilldowns {
         Some(drilldowns) => {
-            drilldowns
+            let mut d: Vec<String> = vec![];
+            for drilldown in drilldowns {
+                let e: Vec<&str> = drilldown.split(".").collect();
+                let mut final_drilldown = String::from("");
+                if e.len() == 2 {
+                    final_drilldown = format!("{}.{}.{}", e[0], e[0], e[1]).to_string();
+                } else if e.len() == 3 {
+                    final_drilldown = drilldown;
+                } else {
+                    return Err(format_err!("Wrong drilldown format. Make sure your drilldown names are correct."));
+                }
+                d.push(final_drilldown);
+            }
+            d
         },
         None => vec![],
     };
@@ -71,7 +83,6 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
 
         for drilldown in &drilldowns {
             if !dimension_names.contains(drilldown) {
-                println!("It is breaking!");
                 exit = true;
                 break;
             }
