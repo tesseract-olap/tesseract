@@ -109,7 +109,7 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
                 } else if e.len() == 3 {
                     final_drilldown = drilldown;
                 } else {
-                    return Err(format_err!("Wrong drilldown format. Make sure your drilldown names are correct."));
+                    return Err(format_err!("Wrong drilldown format. Ensure your drilldowns are correct."));
                 }
                 d.push(final_drilldown);
             }
@@ -118,11 +118,25 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
         None => vec![],
     };
 
-//    // TODO: Remove anything after the level
-//    let cuts = match agg_query.cuts {
-//        Some(cuts) => cuts,
-//        None => vec![],
-//    };
+    let cuts = match agg_query.cuts {
+        Some(cuts) => {
+            let mut c: Vec<String> = vec![];
+            for cut in cuts {
+                let e: Vec<&str> = cut.split(".").collect();
+                let mut final_cut = String::from("");
+                if e.len() == 3 {
+                    final_cut = format!("{}.{}.{}", e[0], e[0], e[1]).to_string();
+                } else if e.len() == 4 {
+                    final_cut = format!("{}.{}.{}", e[0], e[1], e[2]).to_string();
+                } else {
+                    return Err(format_err!("Wrong cut format. Ensure your cuts are correct."));
+                }
+                c.push(final_cut);
+            }
+            c
+        },
+        None => vec![],
+    };
 
     let measures = match agg_query.measures {
         Some(measures) => measures,
@@ -149,11 +163,16 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
             continue;
         }
 
-//        for cut in &cuts {
-//            if !dimension_names.contains(cut) {
-//                break;
-//            }
-//        }
+        for cut in &cuts {
+            if !dimension_names.contains(cut) {
+                exit = true;
+                break;
+            }
+        }
+
+        if exit {
+            continue;
+        }
 
         for measure in &measures {
             if !measure_names.contains(measure) {
