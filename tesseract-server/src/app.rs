@@ -53,6 +53,7 @@ pub struct AppState {
 pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, env_vars: EnvVars, schema: Arc<RwLock<Schema>>, cache: Arc<RwLock<Cache>>) -> App<AppState> {
     App::with_state(AppState { backend, db_type, env_vars, schema, cache })
         .middleware(middleware::Logger::default())
+        // Metadata
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)
         })
@@ -62,6 +63,8 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
         .resource("/cubes/{cube}", |r| {
             r.method(Method::GET).with(metadata_handler)
         })
+
+        // Aggregation
         .resource("/cubes/{cube}/aggregate", |r| {
             r.method(Method::GET).with(aggregate_default_handler)
         })
@@ -69,23 +72,23 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
             r.method(Method::GET).with(aggregate_handler)
         })
 
-        // Logic Layer
+        // Aggregation + Logic Layer
+        // TODO: Consolidate these routes into the aggregate routes above
         .resource("/cubes/{cube}/logic-layer", |r| {
             r.method(Method::GET).with(ll_aggregate_default_handler)
         })
         .resource("/cubes/{cube}/logic-layer.{format}", |r| {
             r.method(Method::GET).with(ll_aggregate_handler)
         })
-
-        .resource("/logic-layer", |r| {
+        .resource("/aggregate", |r| {
             r.method(Method::GET).with(ll_detect_default_handler)
         })
-        .resource("/logic-layer.{format}", |r| {
+        .resource("/aggregate.{format}", |r| {
             r.method(Method::GET).with(ll_detect_handler)
         })
 
+        // Helpers
         .resource("/flush", |r| {
-            // TODO: Change this to POST?
-            r.method(Method::GET).with(flush_handler)
+            r.method(Method::POST).with(flush_handler)
         })
 }
