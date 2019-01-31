@@ -63,7 +63,7 @@ pub fn ll_do_aggregate(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
-    let mut agg_query = match agg_query_res {
+    let agg_query = match agg_query_res {
         Ok(q) => q,
         Err(err) => {
             return Box::new(
@@ -73,10 +73,19 @@ pub fn ll_do_aggregate(
             );
         },
     };
-    info!("query opts:{:?}", agg_query);
 
-    // TODO: Should probably refactor this method a bit before it gets much bigger
-    // Process year argument (latest/oldest)
+    finish_aggregation(req, agg_query, cube, format)
+}
+
+/// The last few aggregation operations are common across all different routes.
+/// This method implements that step to avoid duplication.
+pub fn finish_aggregation(
+    req: HttpRequest<AppState>,
+    mut agg_query: AggregateQueryOpt,
+    cube: String,
+    format: FormatType
+) -> FutureResponse<HttpResponse> {
+    // Process `year` param (latest/oldest)
     match &agg_query.year {
         Some(s) => {
             let cube_info = req.state().cache.read().unwrap().find_cube_info(&cube);
@@ -109,7 +118,7 @@ pub fn ll_do_aggregate(
     }
     info!("query opts:{:?}", agg_query);
 
-    // Turn AggregateQueryOpt into Query
+    // Turn AggregateQueryOpt into TsQuery
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = match ts_query {
         Ok(q) => q,
@@ -158,21 +167,21 @@ pub fn ll_do_aggregate(
         .responder()
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {
-    drilldowns: Option<Vec<String>>,
-    cuts: Option<Vec<String>>,
-    measures: Option<Vec<String>>,
-    properties: Option<Vec<String>>,
-    parents: Option<bool>,
-    top: Option<String>,
-    top_where: Option<String>,
-    sort: Option<String>,
-    limit: Option<String>,
-    growth: Option<String>,
-    rca: Option<String>,
-    year: Option<String>,
-    debug: Option<bool>,
+    pub drilldowns: Option<Vec<String>>,
+    pub cuts: Option<Vec<String>>,
+    pub measures: Option<Vec<String>>,
+    pub properties: Option<Vec<String>>,
+    pub parents: Option<bool>,
+    pub top: Option<String>,
+    pub top_where: Option<String>,
+    pub sort: Option<String>,
+    pub limit: Option<String>,
+    pub growth: Option<String>,
+    pub rca: Option<String>,
+    pub year: Option<String>,
+    pub debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
