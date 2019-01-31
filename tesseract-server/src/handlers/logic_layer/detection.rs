@@ -74,8 +74,8 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
 
     // TODO: Avoid clone here?
     for cube in schema.cubes {
-        let dimension_names = get_all_dimension_names(cube.clone());
-        let measure_names = get_all_measure_names(cube.clone());
+        let dimension_names = cube.get_all_dimension_names();
+        let measure_names = cube.get_all_measure_names();
 
         // If this is true, we already know this is not the right cube, so need
         // to continue to next iteration of the loop
@@ -109,36 +109,6 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
 
     Err(format_err!("No cubes found with the requested drilldowns/cuts/measures."))
 }
-
-/// Returns a Vec<String> of all the dimension name options for a given Cube.
-pub fn get_all_dimension_names(cube: Cube) -> Vec<String> {
-    let mut dimension_names: Vec<String> = vec![];
-
-    for dimension in cube.dimensions {
-        let dimension_name = dimension.name;
-        for hierarchy in dimension.hierarchies {
-            let hierarchy_name = hierarchy.name;
-            for level in hierarchy.levels {
-                let level_name = level.name;
-                dimension_names.push(format!("{}.{}.{}", dimension_name, hierarchy_name, level_name).to_string());
-            }
-        }
-    }
-
-    dimension_names
-}
-
-/// Returns a Vec<String> of all the measure names for a given Cube.
-pub fn get_all_measure_names(cube: Cube) -> Vec<String> {
-    let mut measure_names: Vec<String> = vec![];
-
-    for measure in cube.measures {
-        measure_names.push(measure.name);
-    }
-
-    measure_names
-}
-
 
 /// Performs first step of data aggregation, including cube detection.
 pub fn ll_do_detection(

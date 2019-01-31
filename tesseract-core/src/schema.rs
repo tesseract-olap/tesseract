@@ -91,6 +91,38 @@ pub struct Cube {
     pub measures: Vec<Measure>,
 }
 
+impl Cube {
+    /// Returns a Vec<String> of all the dimension name options for a given Cube.
+    pub fn get_all_dimension_names(&self) -> Vec<String> {
+        let mut dimension_names: Vec<String> = vec![];
+
+        for dimension in &self.dimensions {
+            let dimension_name = dimension.name.clone();
+            for hierarchy in &dimension.hierarchies {
+                let hierarchy_name = hierarchy.name.clone();
+                for level in &hierarchy.levels {
+                    let level_name = level.name.clone();
+                    dimension_names.push(format!("{}.{}.{}", dimension_name, hierarchy_name, level_name).to_string());
+                }
+            }
+        }
+
+        dimension_names
+    }
+
+    /// Returns a Vec<String> of all the measure names for a given Cube.
+    pub fn get_all_measure_names(&self) -> Vec<String> {
+        let mut measure_names: Vec<String> = vec![];
+
+        for measure in &self.measures {
+            measure_names.push(measure.name.clone());
+        }
+
+        measure_names
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Dimension {
     pub name: String,
