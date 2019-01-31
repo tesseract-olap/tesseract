@@ -123,11 +123,12 @@ pub fn do_aggregate(
         .responder()
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {
-    drilldowns: Option<Vec<String>>,
-    cuts: Option<Vec<String>>,
-    measures: Option<Vec<String>>,
+    pub drilldowns: Option<Vec<String>>,
+    pub cuts: Option<Vec<String>>,
+    pub measures: Option<Vec<String>>,
+    pub year: Option<String>,
     properties: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,
@@ -136,7 +137,6 @@ pub struct AggregateQueryOpt {
     limit: Option<String>,
     growth: Option<String>,
     rca: Option<String>,
-    year: Option<String>,
     debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,

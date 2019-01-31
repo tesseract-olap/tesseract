@@ -11,8 +11,8 @@ use crate::handlers::{
     aggregate_default_handler,
     ll_aggregate_handler,
     ll_aggregate_default_handler,
-    ll_detect_default_handler,
-    ll_detect_handler,
+    cube_detection_aggregation_default_handler,
+    cube_detection_aggregation_handler,
     flush_handler,
     index_handler,
     metadata_handler,
@@ -81,10 +81,10 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
             r.method(Method::GET).with(ll_aggregate_handler)
         })
         .resource("/aggregate", |r| {
-            r.method(Method::GET).with(ll_detect_default_handler)
+            r.method(Method::GET).with(cube_detection_aggregation_default_handler)
         })
         .resource("/aggregate.{format}", |r| {
-            r.method(Method::GET).with(ll_detect_handler)
+            r.method(Method::GET).with(cube_detection_aggregation_handler)
         })
 
         // Helpers

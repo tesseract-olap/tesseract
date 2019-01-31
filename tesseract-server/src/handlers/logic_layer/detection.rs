@@ -17,24 +17,81 @@ use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::aggregate::{finish_aggregation, AggregateQueryOpt};
+use crate::handlers::aggregate::AggregateQueryOpt;
+use crate::handlers::logic_layer::aggregate::finish_aggregation;
 
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub fn ll_detect_default_handler(
+pub fn cube_detection_aggregation_default_handler(
     (req, cube): (HttpRequest<AppState>, Path<()>)
 ) -> FutureResponse<HttpResponse>
 {
-    ll_do_detection(req, "csv".to_owned())
+    do_cube_detection_aggregation(req, "csv".to_owned())
 }
 
 /// Handles aggregation when a format is specified.
-pub fn ll_detect_handler(
+pub fn cube_detection_aggregation_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String)>)
 ) -> FutureResponse<HttpResponse>
 {
-    ll_do_detection(req, cube_format.to_owned())
+    do_cube_detection_aggregation(req, cube_format.to_owned())
+}
+
+/// Performs first step of data aggregation, including cube detection.
+pub fn do_cube_detection_aggregation(
+    req: HttpRequest<AppState>,
+    format: String,
+) -> FutureResponse<HttpResponse>
+{
+    let format = format.parse::<FormatType>();
+    let format = match format {
+        Ok(f) => f,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
+    info!("format: {:?}", format);
+
+    let query = req.query_string();
+    lazy_static!{
+        static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
+    }
+    let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
+    let agg_query = match agg_query_res {
+        Ok(q) => q,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
+    // Detect cube based on the query parameters
+    let cube = detect_cube(
+        req.state().schema.read().unwrap().clone(),
+        agg_query.clone()
+    );
+    let cube = match cube {
+        Ok(cube) => cube,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        }
+    };
+    info!("cube: {:?}", cube);
+
+    finish_aggregation(req, agg_query, cube, format)
 }
 
 /// Detects which cube to use based on the drilldowns, cuts and measures provided.
@@ -108,60 +165,4 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
     }
 
     Err(format_err!("No cubes found with the requested drilldowns/cuts/measures."))
-}
-
-/// Performs first step of data aggregation, including cube detection.
-pub fn ll_do_detection(
-    req: HttpRequest<AppState>,
-    format: String,
-) -> FutureResponse<HttpResponse>
-{
-    let format = format.parse::<FormatType>();
-    let format = match format {
-        Ok(f) => f,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                )
-            );
-        },
-    };
-
-    info!("format: {:?}", format);
-
-    let query = req.query_string();
-    lazy_static!{
-        static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
-    }
-    let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
-    let agg_query = match agg_query_res {
-        Ok(q) => q,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                )
-            );
-        },
-    };
-
-    // Detect cube based on the query
-    let cube = detect_cube(
-        req.state().schema.read().unwrap().clone(),
-        agg_query.clone()
-    );
-    let cube = match cube {
-        Ok(cube) => cube,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                )
-            );
-        }
-    };
-    info!("cube: {:?}", cube);
-
-    finish_aggregation(req, agg_query, cube, format)
 }
