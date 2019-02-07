@@ -12,6 +12,6 @@ pub fn agg_sql_string(col: &str, aggregator: &Aggregator) -> String {
         Aggregator::WeightedAverage => format!("avg({})", col),
         Aggregator::Moe => format!("sqrt(sum(power({} / 1.645, 2))) * 1.645", col),
         // TODO uses find and replace; the placeholder is {}
-        Aggregator::Custom(s) => format!("{}{}", s, col),
+        Aggregator::Custom(s) => s.replace("{}", col),
     }
 }

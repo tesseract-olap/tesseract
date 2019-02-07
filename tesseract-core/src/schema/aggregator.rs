@@ -24,12 +24,29 @@ pub enum Aggregator {
     Custom(String),
 }
 
-//#[cfg(test)]
-//mod test {
-//    use super::*;
-//
-//    #[test]
-//    fn parse_aggregator() {
-//        let 
-//    }
-//}
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde_json;
+
+    // temp struct for doing serde test
+    #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+    struct Measure {
+        col: String,
+        aggregator: Aggregator,
+    }
+
+    #[test]
+    fn parse_basic() {
+        let sum = r#"{ "col": "testcol", "aggregator": "sum" }"#;
+        let parsed: Measure = serde_json::from_str(sum).unwrap();
+        assert_eq!(parsed.aggregator, Aggregator::Sum);
+    }
+
+    #[test]
+    fn parse_custom() {
+        let sum = r#"{ "col": "testcol", "aggregator": { "custom": "{}*{}" } }"#;
+        let parsed: Measure = serde_json::from_str(sum).unwrap();
+        assert_eq!(parsed.aggregator, Aggregator::Custom("{}*{}".to_owned()));
+    }
+}
