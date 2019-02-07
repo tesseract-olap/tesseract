@@ -20,6 +20,7 @@ pub use crate::schema::{
     xml::TableConfigXML,
     xml::PropertyConfigXML,
 };
+use crate::names::{LevelName, Measure as MeasureName};
 use crate::query_ir::MemberType;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -93,8 +94,8 @@ pub struct Cube {
 
 impl Cube {
     /// Returns a Vec<String> of all the dimension name options for a given Cube.
-    pub fn get_all_dimension_names(&self) -> Vec<String> {
-        let mut dimension_names: Vec<String> = vec![];
+    pub fn get_all_level_names(&self) -> Vec<LevelName> {
+        let mut dimension_names: Vec<LevelName> = vec![];
 
         for dimension in &self.dimensions {
             let dimension_name = dimension.name.clone();
@@ -102,7 +103,13 @@ impl Cube {
                 let hierarchy_name = hierarchy.name.clone();
                 for level in &hierarchy.levels {
                     let level_name = level.name.clone();
-                    dimension_names.push(format!("{}.{}.{}", dimension_name, hierarchy_name, level_name).to_string());
+                    dimension_names.push(
+                        LevelName {
+                            dimension: dimension_name.clone(),
+                            hierarchy: hierarchy_name.clone(),
+                            level: level_name,
+                        }
+                    );
                 }
             }
         }
@@ -111,11 +118,13 @@ impl Cube {
     }
 
     /// Returns a Vec<String> of all the measure names for a given Cube.
-    pub fn get_all_measure_names(&self) -> Vec<String> {
-        let mut measure_names: Vec<String> = vec![];
+    pub fn get_all_measure_names(&self) -> Vec<MeasureName> {
+        let mut measure_names: Vec<MeasureName> = vec![];
 
         for measure in &self.measures {
-            measure_names.push(measure.name.clone());
+            measure_names.push(
+                MeasureName::new(measure.name.clone())
+            );
         }
 
         measure_names

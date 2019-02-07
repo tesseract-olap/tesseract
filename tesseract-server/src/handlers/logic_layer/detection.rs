@@ -15,6 +15,7 @@ use std::convert::{TryFrom, TryInto};
 use tesseract_core::{Schema, Cube};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
+use tesseract_core::names::{LevelName, Measure as MeasureName};
 
 use crate::app::AppState;
 use crate::handlers::aggregate::AggregateQueryOpt;
@@ -100,18 +101,14 @@ pub fn do_cube_detection_aggregation(
 pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<String, Error> {
     let drilldowns = match agg_query.drilldowns {
         Some(drilldowns) => {
-            let mut d: Vec<String> = vec![];
+            let mut d: Vec<LevelName> = vec![];
             for drilldown in drilldowns {
                 let e: Vec<&str> = drilldown.split(".").collect();
-                let mut final_drilldown = String::from("");
-                if e.len() == 2 {
-                    final_drilldown = format!("{}.{}.{}", e[0], e[0], e[1]).to_string();
-                } else if e.len() == 3 {
-                    final_drilldown = drilldown;
-                } else {
-                    return Err(format_err!("Wrong drilldown format. Ensure your drilldowns are correct."));
-                }
-                d.push(final_drilldown);
+                let ln = match LevelName::from_vec(e) {
+                    Ok(ln) => ln,
+                    Err(_) => break,
+                };
+                d.push(ln);
             }
             d
         },
@@ -120,18 +117,17 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
 
     let cuts = match agg_query.cuts {
         Some(cuts) => {
-            let mut c: Vec<String> = vec![];
+            let mut c: Vec<LevelName> = vec![];
             for cut in cuts {
                 let e: Vec<&str> = cut.split(".").collect();
-                let mut final_cut = String::from("");
-                if e.len() == 3 {
-                    final_cut = format!("{}.{}.{}", e[0], e[0], e[1]).to_string();
-                } else if e.len() == 4 {
-                    final_cut = format!("{}.{}.{}", e[0], e[1], e[2]).to_string();
-                } else {
-                    return Err(format_err!("Wrong cut format. Ensure your cuts are correct."));
-                }
-                c.push(final_cut);
+                // TODO: Fix
+                let ln = match LevelName::from_vec(
+                    e[..e.len()-1].to_vec()
+                ) {
+                    Ok(ln) => ln,
+                    Err(_) => break,
+                };
+                c.push(ln);
             }
             c
         },
@@ -139,13 +135,19 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
     };
 
     let measures = match agg_query.measures {
-        Some(measures) => measures,
+        Some(measures) => {
+            let mut m: Vec<MeasureName> = vec![];
+            for measure in measures {
+                m.push(MeasureName::new(measure));
+            }
+            m
+        },
         None => vec![],
     };
 
     // TODO: Avoid clone here?
     for cube in schema.cubes {
-        let dimension_names = cube.get_all_dimension_names();
+        let level_names = cube.get_all_level_names();
         let measure_names = cube.get_all_measure_names();
 
         // If this is true, we already know this is not the right cube, so need
@@ -153,7 +155,7 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
         let mut exit = false;
 
         for drilldown in &drilldowns {
-            if !dimension_names.contains(drilldown) {
+            if !level_names.contains(drilldown) {
                 exit = true;
                 break;
             }
@@ -164,7 +166,7 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
         }
 
         for cut in &cuts {
-            if !dimension_names.contains(cut) {
+            if !level_names.contains(cut) {
                 exit = true;
                 break;
             }
