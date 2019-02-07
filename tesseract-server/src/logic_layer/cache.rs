@@ -4,7 +4,7 @@ use log::*;
 use tesseract_core::{Schema, Cube, Dimension, Backend, ColumnData};
 use tesseract_core::names::LevelName;
 
-use super::super::handlers::logic_layer::shared::Year;
+use super::super::handlers::logic_layer::shared::{Time, TimeValue};
 
 
 /// Holds cache information.
@@ -43,12 +43,15 @@ impl CubeCache {
         }
     }
 
-    pub fn get_year_cut(&self, y: Year) -> Result<String, Error> {
+    pub fn get_year_cut(&self, t: Time) -> Result<String, Error> {
         let year_opt;
 
-        match y {
-            Year::Last => year_opt = self.max_year(),
-            Year::First => year_opt = self.min_year(),
+        // TODO: Add time value support?
+        // TODO: Add check for precision type
+        // How does this play out with the new API
+        match t.value {
+            TimeValue::Last => year_opt = self.max_year(),
+            TimeValue::First => year_opt = self.min_year(),
             _ => return Err(format_err!("Unknown year filter. Try either 'latest' or 'oldest'")),
         }
 

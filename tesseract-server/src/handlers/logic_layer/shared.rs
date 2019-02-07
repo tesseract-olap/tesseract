@@ -17,24 +17,73 @@ use crate::app::AppState;
 
 
 #[derive(Debug, Clone)]
-pub enum Year {
+pub enum TimeValue {
     First,
     Last,
     Value(u32),
 }
 
-impl Year {
+impl TimeValue {
     pub fn from_str(raw: String) -> Result<Self, Error> {
         if raw == "latest" {
-            Ok(Year::Last)
+            Ok(TimeValue::Last)
         } else if raw == "oldest" {
-            Ok(Year::First)
+            Ok(TimeValue::First)
         } else {
             match raw.parse::<u32>() {
-                Ok(n) => Ok(Year::Value(n)),
-                Err(_) => Err(format_err!("Wrong type for year argument."))
+                Ok(n) => Ok(TimeValue::Value(n)),
+                Err(_) => Err(format_err!("Wrong type for time argument."))
             }
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TimePrecision {
+    Year,
+    Quarter,
+    Month,
+    Week,
+    Day,
+}
+
+impl TimePrecision {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        match raw.as_ref() {
+            "year" => Ok(TimePrecision::Year),
+            "quarter" => Ok(TimePrecision::Quarter),
+            "month" => Ok(TimePrecision::Month),
+            "week" => Ok(TimePrecision::Week),
+            "day" => Ok(TimePrecision::Day),
+            _ => Err(format_err!("Wrong type for time precision argument."))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Time {
+    pub precision: TimePrecision,
+    pub value: TimeValue,
+}
+
+impl Time {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        let e: Vec<&str> = raw.split(".").collect();
+
+        if e.len() != 2 {
+            return Err(format_err!("Wrong format for time argument."));
+        }
+
+        let precision = match TimePrecision::from_str(e[0].to_string()) {
+            Ok(precision) => precision,
+            Err(err) => return Err(err),
+        };
+        let value = match TimeValue::from_str(e[1].to_string()) {
+            Ok(value) => value,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Time {precision, value})
     }
 }
 
@@ -47,13 +96,13 @@ pub fn finish_aggregation(
     format: FormatType
 ) -> FutureResponse<HttpResponse> {
     // Process `year` param (latest/oldest)
-    match &agg_query.year {
+    match &agg_query.time {
         Some(s) => {
             let cube_info = req.state().cache.read().unwrap().find_cube_info(&cube);
 
             // TODO: Transform this year string into a `Year` enum
-            let year = match Year::from_str(s.clone()) {
-                Ok(year) => year,
+            let time = match Time::from_str(s.clone()) {
+                Ok(time) => time,
                 Err(err) => {
                     return Box::new(
                         future::result(
@@ -65,7 +114,7 @@ pub fn finish_aggregation(
 
             match cube_info {
                 Some(info) => {
-                    let cut = match info.get_year_cut(year) {
+                    let cut = match info.get_year_cut(time) {
                         Ok(cut) => cut,
                         Err(err) => {
                             return Box::new(
@@ -145,7 +194,7 @@ pub struct LogicLayerQueryOpt {
     pub drilldowns: Option<Vec<String>>,
     pub cuts: Option<Vec<String>>,
     pub measures: Option<Vec<String>>,
-    pub year: Option<String>,
+    pub time: Option<String>,
     properties: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,

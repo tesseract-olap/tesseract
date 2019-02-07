@@ -80,10 +80,10 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
         .resource("/cubes/{cube}/logic-layer.{format}", |r| {
             r.method(Method::GET).with(ll_aggregate_handler)
         })
-        .resource("/aggregate", |r| {
+        .resource("/logic-layer", |r| {
             r.method(Method::GET).with(cube_detection_aggregation_default_handler)
         })
-        .resource("/aggregate.{format}", |r| {
+        .resource("/logic-layer.{format}", |r| {
             r.method(Method::GET).with(cube_detection_aggregation_handler)
         })
 

@@ -20,7 +20,7 @@ use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, finish_aggregatio
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
 pub fn cube_detection_aggregation_default_handler(
-    (req, cube): (HttpRequest<AppState>, Path<()>)
+    (req, _cube): (HttpRequest<AppState>, Path<()>)
 ) -> FutureResponse<HttpResponse>
 {
     do_cube_detection_aggregation(req, "csv".to_owned())
