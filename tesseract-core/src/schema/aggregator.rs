@@ -1,4 +1,3 @@
-use failure::{Error, bail};
 use serde_derive::{Deserialize, Serialize};
 
 // TODO move this to a better place? Does this belong in query_ir?
@@ -10,7 +9,6 @@ use serde_derive::{Deserialize, Serialize};
 // the col is referred to as {},
 // and find and replace is used later to insert the col name
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-#[serde(untagged)]
 pub enum Aggregator {
     #[serde(rename="sum")]
     Sum,
@@ -26,3 +24,12 @@ pub enum Aggregator {
     Custom(String),
 }
 
+//#[cfg(test)]
+//mod test {
+//    use super::*;
+//
+//    #[test]
+//    fn parse_aggregator() {
+//        let 
+//    }
+//}

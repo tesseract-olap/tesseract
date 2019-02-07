@@ -1,6 +1,9 @@
+use log::*;
 use tesseract_core::Aggregator;
 
 pub fn agg_sql_string(col: &str, aggregator: &Aggregator) -> String {
+    info!("{:?}", aggregator);
+
     match aggregator {
         Aggregator::Sum => format!("sum({})", col),
         Aggregator::Average => format!("avg({})", col),
