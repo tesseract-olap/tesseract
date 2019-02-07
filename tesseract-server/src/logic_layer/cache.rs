@@ -2,6 +2,7 @@ use failure::{Error, format_err};
 use log::*;
 
 use tesseract_core::{Schema, Cube, Dimension, Backend, ColumnData};
+use tesseract_core::names::LevelName;
 
 
 /// Holds cache information.
@@ -32,12 +33,12 @@ pub struct CubeCache {
 
 impl CubeCache {
     /// Returns dimension name in the format: `Dimension.Hierarchy.Level`.
-    pub fn get_time_dim_name(&self) -> String {
-        format!("{}.{}.{}",
-            self.time_dim.name,
-            self.time_dim.hierarchies[0].name,
-            self.time_dim.hierarchies[0].levels[0].name,
-        ).to_string()
+    pub fn get_time_level_name(&self) -> LevelName {
+        LevelName {
+            dimension: self.time_dim.name.clone(),
+            hierarchy: self.time_dim.hierarchies[0].name.clone(),
+            level: self.time_dim.hierarchies[0].levels[0].name.clone(),
+        }
     }
 
     pub fn get_year_cut(&self, s: String) -> Result<String, Error> {
@@ -56,7 +57,9 @@ impl CubeCache {
             Some(year) => year
         };
 
-        Ok(format!("{}.{}", self.get_time_dim_name(), year).to_string())
+        let ln = self.get_time_level_name();
+
+        Ok(format!("{}.{}.{}.{}", ln.dimension(), ln.hierarchy(), ln.level(), year).to_string())
     }
 
     pub fn min_year(&self) -> Option<i16> {

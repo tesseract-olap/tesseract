@@ -14,11 +14,10 @@ use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::{Schema, Cube};
 use tesseract_core::format::{format_records, FormatType};
-use tesseract_core::Query as TsQuery;
 use tesseract_core::names::{LevelName, Measure as MeasureName};
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::aggregate::{finish_aggregation, AggregateQueryOpt};
+use crate::handlers::logic_layer::aggregate::{finish_aggregation, LogicLayerQueryOpt};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -62,7 +61,7 @@ pub fn do_cube_detection_aggregation(
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
-    let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
+    let agg_query_res = QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(&query);
     let agg_query = match agg_query_res {
         Ok(q) => q,
         Err(err) => {
@@ -97,7 +96,7 @@ pub fn do_cube_detection_aggregation(
 /// Detects which cube to use based on the drilldowns, cuts and measures provided.
 /// In case the arguments are present in more than one cube, the first cube to match all
 /// requirements is returned.
-pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<String, Error> {
+pub fn detect_cube(schema: Schema, agg_query: LogicLayerQueryOpt) -> Result<String, Error> {
     let drilldowns = match agg_query.drilldowns {
         Some(drilldowns) => {
             let mut d: Vec<LevelName> = vec![];
@@ -144,35 +143,20 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
         None => vec![],
     };
 
-    // TODO: Avoid clone here?
-    for cube in schema.cubes {
+    let result = schema.cubes.iter().filter(|cube| {
         let level_names = cube.get_all_level_names();
         let measure_names = cube.get_all_measure_names();
 
-        // If this is true, we already know this is not the right cube, so need
-        // to continue to next iteration of the loop
-        let mut exit = false;
-
         for drilldown in &drilldowns {
             if !level_names.contains(drilldown) {
-                exit = true;
                 break;
             }
-        }
-
-        if exit {
-            continue;
         }
 
         for cut in &cuts {
             if !level_names.contains(cut) {
-                exit = true;
                 break;
             }
-        }
-
-        if exit {
-            continue;
         }
 
         for measure in &measures {
@@ -181,8 +165,11 @@ pub fn detect_cube(schema: Schema, agg_query: AggregateQueryOpt) -> Result<Strin
             }
         }
 
-        return Ok(String::from(cube.name));
-    }
+        true
+    }).nth(0);
 
-    Err(format_err!("No cubes found with the requested drilldowns/cuts/measures."))
+    match result {
+        Some(cube) => Ok(String::from(cube.clone().name)),
+        None => Err(format_err!("No cubes found with the requested drilldowns/cuts/measures.")),
+    }
 }

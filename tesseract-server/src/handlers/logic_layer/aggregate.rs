@@ -62,7 +62,7 @@ pub fn ll_do_aggregate(
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
-    let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
+    let agg_query_res = QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(&query);
     let agg_query = match agg_query_res {
         Ok(q) => q,
         Err(err) => {
@@ -81,7 +81,7 @@ pub fn ll_do_aggregate(
 /// This method implements that step to avoid duplication.
 pub fn finish_aggregation(
     req: HttpRequest<AppState>,
-    mut agg_query: AggregateQueryOpt,
+    mut agg_query: LogicLayerQueryOpt,
     cube: String,
     format: FormatType
 ) -> FutureResponse<HttpResponse> {
@@ -168,7 +168,7 @@ pub fn finish_aggregation(
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AggregateQueryOpt {
+pub struct LogicLayerQueryOpt {
     pub drilldowns: Option<Vec<String>>,
     pub cuts: Option<Vec<String>>,
     pub measures: Option<Vec<String>>,
@@ -187,10 +187,10 @@ pub struct AggregateQueryOpt {
 //    sparse: Option<bool>,
 }
 
-impl TryFrom<AggregateQueryOpt> for TsQuery {
+impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
 
-    fn try_from(agg_query_opt: AggregateQueryOpt) -> Result<Self, Self::Error> {
+    fn try_from(agg_query_opt: LogicLayerQueryOpt) -> Result<Self, Self::Error> {
         let drilldowns: Result<Vec<_>, _> = agg_query_opt.drilldowns
             .map(|ds| {
                 ds.iter().map(|d| d.parse()).collect()
