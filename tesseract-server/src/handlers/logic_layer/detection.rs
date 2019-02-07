@@ -1,23 +1,20 @@
 use actix_web::{
-    AsyncResponder,
     FutureResponse,
     HttpRequest,
     HttpResponse,
     Path,
 };
 use failure::{Error, format_err};
-use futures::future::{self, Future};
+use futures::future::{self};
 use lazy_static::lazy_static;
 use log::*;
-use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
-use std::convert::{TryFrom, TryInto};
-use tesseract_core::{Schema, Cube};
-use tesseract_core::format::{format_records, FormatType};
+use tesseract_core::{Schema};
+use tesseract_core::format::{FormatType};
 use tesseract_core::names::{LevelName, Measure as MeasureName};
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::aggregate::{finish_aggregation, LogicLayerQueryOpt};
+use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, finish_aggregation};
 
 
 /// Handles default aggregation when a format is not specified.

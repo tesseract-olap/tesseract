@@ -11,7 +11,6 @@ use actix_web::{
 };
 
 use crate::app::{AppState, SchemaSource};
-use crate::logic_layer::populate_cache;
 use crate::schema_config;
 
 

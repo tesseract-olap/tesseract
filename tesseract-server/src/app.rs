@@ -18,7 +18,7 @@ use crate::handlers::{
     metadata_handler,
     metadata_all_handler,
 };
-use crate::logic_layer::{Cache, populate_cache};
+use crate::logic_layer::{Cache};
 
 use std::sync::{Arc, RwLock};
 
