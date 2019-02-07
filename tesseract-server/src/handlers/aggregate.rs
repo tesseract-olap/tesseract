@@ -62,7 +62,7 @@ pub fn do_aggregate(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
-    let mut agg_query = match agg_query_res {
+    let agg_query = match agg_query_res {
         Ok(q) => q,
         Err(err) => {
             return Box::new(
@@ -125,10 +125,9 @@ pub fn do_aggregate(
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {
-    pub drilldowns: Option<Vec<String>>,
-    pub cuts: Option<Vec<String>>,
-    pub measures: Option<Vec<String>>,
-    pub year: Option<String>,
+    drilldowns: Option<Vec<String>>,
+    cuts: Option<Vec<String>>,
+    measures: Option<Vec<String>>,
     properties: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,

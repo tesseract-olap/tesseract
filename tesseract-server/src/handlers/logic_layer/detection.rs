@@ -18,8 +18,7 @@ use tesseract_core::Query as TsQuery;
 use tesseract_core::names::{LevelName, Measure as MeasureName};
 
 use crate::app::AppState;
-use crate::handlers::aggregate::AggregateQueryOpt;
-use crate::handlers::logic_layer::aggregate::finish_aggregation;
+use crate::handlers::logic_layer::aggregate::{finish_aggregation, AggregateQueryOpt};
 
 
 /// Handles default aggregation when a format is not specified.
