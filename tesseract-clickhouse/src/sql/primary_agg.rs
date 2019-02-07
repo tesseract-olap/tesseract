@@ -1,5 +1,6 @@
 use itertools::join;
 
+use super::aggregator::agg_sql_string;
 use super::{
     TableSql,
     CutSql,
@@ -91,7 +92,7 @@ pub fn primary_agg(
     let mea_cols = meas
         .iter()
         .enumerate()
-        .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
+        .map(|(i, m)| format!("{} as m{}", agg_sql_string(&m.column, &m.aggregator), i));
     let mea_cols = join(mea_cols, ", ");
 
     let inline_dim_cols = inline_drills.iter().map(|d| d.col_alias_string());
@@ -172,7 +173,13 @@ pub fn primary_agg(
     let final_drill_cols = drills.iter().map(|drill| drill.col_alias_only_string());
     let final_drill_cols = join(final_drill_cols, ", ");
 
-    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{}) as final_m{}", mea.aggregator, i, i));
+    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| {
+            let col = format!("m{}", i);
+            format!("{} as final_m{}",
+                agg_sql_string(&col, &mea.aggregator),
+                i,
+            )
+        });
     let final_mea_cols = join(final_mea_cols, ", ");
 
     // This is the final result of the groupings.

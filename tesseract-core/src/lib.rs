@@ -24,7 +24,7 @@ use self::names::{
     Property,
     LevelName,
 };
-pub use self::schema::{Schema, Cube, Table};
+pub use self::schema::{Schema, Cube, Table, Aggregator};
 use self::query_ir::{
     CutSql,
     DrilldownSql,

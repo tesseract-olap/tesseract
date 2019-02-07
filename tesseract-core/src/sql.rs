@@ -1,5 +1,6 @@
 use itertools::join;
 
+use crate::Aggregator;
 use crate::query_ir::{
     TableSql,
     CutSql,
@@ -29,6 +30,18 @@ pub(crate) fn standard_sql(
     _growth: &Option<GrowthSql>,
     ) -> String
 {
+    // hack for now... remove later
+    fn agg_sql_string(m: &MeasureSql) -> String {
+        match &m.aggregator {
+            Aggregator::Sum => format!("sum"),
+            Aggregator::Average => format!("avg"),
+            // median doesn't work like this
+            Aggregator::Median => format!("median"),
+            Aggregator::WeightedAverage => format!("avg"),
+            Aggregator::Moe => format!(""),
+            Aggregator::Custom(s) => format!("{}", s),
+        }
+    }
     // --------------------------------------------------
     // copied from primary_agg for clickhouse
     let ext_drills: Vec<_> = drills.iter()
@@ -50,7 +63,7 @@ pub(crate) fn standard_sql(
     // --------------------------------------------------
 
     let drill_cols = join(drills.iter().map(|d| d.col_qual_string()), ", ");
-    let mea_cols = join(meas.iter().map(|m| m.agg_col_string()), ", ");
+    let mea_cols = join(meas.iter().map(|m| agg_sql_string(m)), ", ");
 
     let mut final_sql = format!("select {}, {} from {}",
         drill_cols,

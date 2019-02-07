@@ -3,6 +3,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::query::{LimitQuery, SortDirection, Constraint};
 use crate::schema::Table;
+use crate::schema::aggregator::Aggregator;
 
 pub struct QueryIr {
     pub table: TableSql,
@@ -202,15 +203,17 @@ pub enum MemberType {
 
 #[derive(Debug, Clone)]
 pub struct MeasureSql {
-    pub aggregator: String,
+    pub aggregator: Aggregator,
     pub column: String,
 }
 
-impl MeasureSql {
-    pub fn agg_col_string(&self) -> String {
-        format!("{}({})", self.aggregator, self.column)
-    }
-}
+// NOTE: This is now specific to each db, because of the custom aggregators
+// e.g. median
+//impl MeasureSql {
+//    pub fn agg_col_string(&self) -> String {
+//        format!("{}({})", self.aggregator, self.column)
+//    }
+//}
 
 #[derive(Debug, Clone)]
 pub struct TopSql {

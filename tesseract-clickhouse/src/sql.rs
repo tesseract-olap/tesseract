@@ -1,3 +1,4 @@
+mod aggregator;
 mod growth;
 mod options;
 mod primary_agg;
