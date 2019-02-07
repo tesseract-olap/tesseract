@@ -62,11 +62,10 @@ pub fn finish_aggregation(
                     );
                 },
             };
-            println!("HHHHHHH: {:?}", year);
 
             match cube_info {
                 Some(info) => {
-                    let cut = match info.get_year_cut(s.to_string()) {
+                    let cut = match info.get_year_cut(year) {
                         Ok(cut) => cut,
                         Err(err) => {
                             return Box::new(

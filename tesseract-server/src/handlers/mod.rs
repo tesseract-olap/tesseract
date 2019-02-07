@@ -2,7 +2,7 @@ mod aggregate;
 mod flush;
 mod index;
 mod metadata;
-mod logic_layer;
+pub mod logic_layer;
 
 pub use self::aggregate::aggregate_handler;
 pub use self::aggregate::aggregate_default_handler;

@@ -4,6 +4,8 @@ use log::*;
 use tesseract_core::{Schema, Cube, Dimension, Backend, ColumnData};
 use tesseract_core::names::LevelName;
 
+use super::super::handlers::logic_layer::shared::Year;
+
 
 /// Holds cache information.
 #[derive(Debug, Clone)]
@@ -41,19 +43,17 @@ impl CubeCache {
         }
     }
 
-    pub fn get_year_cut(&self, s: String) -> Result<String, Error> {
+    pub fn get_year_cut(&self, y: Year) -> Result<String, Error> {
         let year_opt;
 
-        if s == "latest" {
-            year_opt = self.max_year();
-        } else if s == "oldest" {
-            year_opt = self.min_year();
-        } else {
-            return Err(format_err!("Unknown year filter. Try either 'latest' or 'oldest'"));
+        match y {
+            Year::Last => year_opt = self.max_year(),
+            Year::First => year_opt = self.min_year(),
+            _ => return Err(format_err!("Unknown year filter. Try either 'latest' or 'oldest'")),
         }
 
         let year = match year_opt {
-            None => { return Err(format_err!("Unable to get {} year.", s)); }
+            None => { return Err(format_err!("Unable to get requested year.")); }
             Some(year) => year
         };
 

@@ -24,7 +24,7 @@
 
 mod app;
 mod db_config;
-mod handlers;
+pub mod handlers;
 mod logic_layer;
 mod schema_config;
 

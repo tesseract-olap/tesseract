@@ -1,6 +1,6 @@
 mod aggregate;
 mod detection;
-mod shared;
+pub mod shared;
 
 pub use self::aggregate::ll_aggregate_handler;
 pub use self::aggregate::ll_aggregate_default_handler;
