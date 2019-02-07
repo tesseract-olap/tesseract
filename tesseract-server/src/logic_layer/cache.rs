@@ -30,7 +30,7 @@ impl Cache {
 pub struct CubeCache {
     pub name: String,
     pub time_dim: Dimension,
-    pub years: Vec<i16>,
+    pub years: Vec<u32>,
 }
 
 impl CubeCache {
@@ -43,16 +43,14 @@ impl CubeCache {
         }
     }
 
-    pub fn get_year_cut(&self, t: Time) -> Result<String, Error> {
+    pub fn get_time_cut(&self, t: Time) -> Result<String, Error> {
         let year_opt;
 
-        // TODO: Add time value support?
         // TODO: Add check for precision type
-        // How does this play out with the new API
         match t.value {
             TimeValue::Last => year_opt = self.max_year(),
             TimeValue::First => year_opt = self.min_year(),
-            _ => return Err(format_err!("Unknown year filter. Try either 'latest' or 'oldest'")),
+            TimeValue::Value(time) => year_opt = Some(time),
         }
 
         let year = match year_opt {
@@ -65,14 +63,14 @@ impl CubeCache {
         Ok(format!("{}.{}.{}.{}", ln.dimension(), ln.hierarchy(), ln.level(), year).to_string())
     }
 
-    pub fn min_year(&self) -> Option<i16> {
+    pub fn min_year(&self) -> Option<u32> {
         if self.years.len() >= 1 {
             return Some(self.years[0]);
         }
         None
     }
 
-    pub fn max_year(&self) -> Option<i16> {
+    pub fn max_year(&self) -> Option<u32> {
         if self.years.len() >= 1 {
             return Some(*self.years.last().unwrap());
         }
@@ -113,17 +111,17 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
         // TODO: Do we want to return an error if no columns are returned?
         if df.columns.len() >= 1 {
             let mut original_years = match &df.columns[0].column_data {
-                ColumnData::Int8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::Int16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::Int32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::Int64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::UInt8(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::UInt16(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::UInt32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::UInt64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::Float32(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::Float64(v) => { let s: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect(); s },
-                ColumnData::Text(v) => { let s: Vec<i16> = v.iter().map(|e| e.parse::<i16>().unwrap().clone()).collect(); s },
+                ColumnData::Int8(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::Int16(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::Int32(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::Int64(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::UInt8(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::UInt16(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::UInt32(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::UInt64(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::Float32(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::Float64(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
+                ColumnData::Text(v) => { let s: Vec<u32> = v.iter().map(|e| e.parse::<u32>().unwrap().clone()).collect(); s },
             };
 
             original_years.sort();

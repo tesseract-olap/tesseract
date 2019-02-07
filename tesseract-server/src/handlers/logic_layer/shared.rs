@@ -95,12 +95,11 @@ pub fn finish_aggregation(
     cube: String,
     format: FormatType
 ) -> FutureResponse<HttpResponse> {
-    // Process `year` param (latest/oldest)
+    // Process `time` param (latest/oldest)
     match &agg_query.time {
         Some(s) => {
             let cube_info = req.state().cache.read().unwrap().find_cube_info(&cube);
 
-            // TODO: Transform this year string into a `Year` enum
             let time = match Time::from_str(s.clone()) {
                 Ok(time) => time,
                 Err(err) => {
@@ -114,7 +113,7 @@ pub fn finish_aggregation(
 
             match cube_info {
                 Some(info) => {
-                    let cut = match info.get_year_cut(time) {
+                    let cut = match info.get_time_cut(time) {
                         Ok(cut) => cut,
                         Err(err) => {
                             return Box::new(
