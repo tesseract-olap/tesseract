@@ -60,6 +60,7 @@ pub struct DimensionUsageXML {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct HierarchyConfigXML {
     pub name: String,
+    #[serde(rename(deserialize="Table"))]
     pub table: Option<TableConfigXML>,
     pub primary_key: Option<String>,
     #[serde(rename(deserialize="Level"))]
