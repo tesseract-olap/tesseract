@@ -14,12 +14,29 @@ pub enum Aggregator {
     Sum,
     #[serde(rename="avg")]
     Average,
+    // Not yet allowed; needs to be able to roll-up across two times
     #[serde(rename="median")]
     Median,
+    /// Weighted Average is calculated against the measure's value column.
+    /// sum(column * weight_column) / sum(weight_column)
     #[serde(rename="weighted-avg")]
-    WeightedAverage,
+    WeightedAverage {
+        weight_column: String,
+
+    },
+    /// Where the measure column is the primary value,
+    /// and a list of secondary column is provided to the MO aggregator:
+    ///
+    /// The general equation for Margin of Error is
+    /// ```
+    /// 1.645 * pow(0.05 * (pow(sum(column) - sum(secondary_columns[0]), 2) + pow(sum(column) - sum(secondar_columns_[1]), 2) + ...), 0.5)
+    /// ```
     #[serde(rename="moe")]
-    Moe,
+    Moe {
+        secondary_columns: Vec<String>,
+    },
+    // This only works for straightforward aggregations, which will work across
+    // two roll-ups. For example, median won't work across two roll-ups
     #[serde(rename="custom")]
     Custom(String),
 }

@@ -37,8 +37,8 @@ pub(crate) fn standard_sql(
             Aggregator::Average => format!("avg"),
             // median doesn't work like this
             Aggregator::Median => format!("median"),
-            Aggregator::WeightedAverage => format!("avg"),
-            Aggregator::Moe => format!(""),
+            Aggregator::WeightedAverage {..} => format!("avg"),
+            Aggregator::Moe {..} => format!(""),
             Aggregator::Custom(s) => format!("{}", s),
         }
     }
