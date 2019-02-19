@@ -2,7 +2,7 @@ mod backend;
 mod dataframe;
 pub mod format;
 pub mod names;
-mod schema;
+pub mod schema;
 mod sql;
 pub mod query;
 pub mod query_ir;

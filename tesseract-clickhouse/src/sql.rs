@@ -59,6 +59,9 @@ pub fn clickhouse_sql(
 #[cfg(test)]
 mod test {
     use super::*;
+    use tesseract_core::Table;
+    use tesseract_core::query_ir::{LevelColumn, MemberType};
+    use tesseract_core::schema::aggregator::Aggregator;
 
     #[test]
     /// Tests:
@@ -89,6 +92,7 @@ mod test {
             // this dim is inline, so should use the fact table
             // also has parents, so has 
             DrilldownSql {
+                alias_postfix: "".into(),
                 foreign_key: "date_id".into(),
                 primary_key: "date_id".into(),
                 table: Table { name: "sales".into(), schema: None, primary_key: None },
@@ -111,6 +115,7 @@ mod test {
             // this comes second, but should join first because of primary key match
             // on fact table
             DrilldownSql {
+                alias_postfix: "".into(),
                 foreign_key: "product_id".into(),
                 primary_key: "product_id".into(),
                 table: Table { name: "dim_products".into(), schema: None, primary_key: None },
@@ -127,12 +132,13 @@ mod test {
                 property_columns: vec![],
             },
         ];
+
         let meas = vec![
-            MeasureSql { aggregator: "sum".into(), column: "quantity".into() }
+            MeasureSql { aggregator: Aggregator::Sum, column: "quantity".into() }
         ];
 
         assert_eq!(
-            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
+            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None, &None),
             "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id as product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
         );
     }
@@ -169,7 +175,8 @@ mod test {
     }
     #[test]
     fn drilldown_with_properties() {
-        let drill = DrilldownSql {
+        let _drill = DrilldownSql {
+            alias_postfix: "".into(),
             foreign_key: "product_id".into(),
             primary_key: "product_id".into(),
             table: Table { name: "dim_products".into(), schema: None, primary_key: None },
@@ -186,15 +193,17 @@ mod test {
             property_columns: vec!["hexcode".to_owned(), "form".to_owned()],
         };
 
-        assert_eq!(
-            drill.col_string(),
-            "product_group_id, product_group_label, product_id_raw, product_label, hexcode, form".to_owned(),
-        );
+//TODO move this to core
+//        assert_eq!(
+//            drill.col_string(),
+//            "product_group_id, product_group_label, product_id_raw, product_label, hexcode, form".to_owned(),
+//        );
     }
 
     #[test]
     fn drilldown_with_properties_qual() {
         let drill = DrilldownSql {
+            alias_postfix: "".into(),
             foreign_key: "product_id".into(),
             primary_key: "product_id".into(),
             table: Table { name: "dim_products".into(), schema: None, primary_key: None },
@@ -217,54 +226,6 @@ mod test {
         );
     }
 
+}
     // TODO test: drilldowns%5B%5D=Date.Year&measures%5B%5D=Quantity, which has only inline dim
 
-    #[test]
-    /// Tests:
-    /// - basic standard sql generation
-    /// - join dim table or inline
-    /// - cuts on multi-level dim
-    /// - parents
-    ///
-    fn test_standard_sql() {
-        //"select valid_projects.id, name, sum(commits) from project_facts inner join valid_projects on project_facts.project_id = valid_projects.id where valid_projects.id=442841 group by name;"
-        let table = TableSql {
-            name: "project_facts".into(),
-            primary_key: Some("id".into()),
-        };
-        let cuts = vec![
-            CutSql {
-                foreign_key: "project_id".into(),
-                primary_key: "id".into(),
-                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
-                column: "id".into(),
-                members: vec!["3".into()],
-                member_type: MemberType::NonText,
-            },
-        ];
-        let drills = vec![
-            // this dim is inline, so should use the fact table
-            // also has parents, so has 
-            DrilldownSql {
-                foreign_key: "project_id".into(),
-                primary_key: "id".into(),
-                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
-                level_columns: vec![
-                    LevelColumn {
-                        key_column: "id".into(),
-                        name_column: Some("name".to_owned()),
-                    },
-                ],
-                property_columns: vec![],
-            },
-        ];
-        let meas = vec![
-            MeasureSql { aggregator: "sum".into(), column: "commits".into() }
-        ];
-
-        assert_eq!(
-            standard_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
-            "select valid_projects.id, valid_projects.name, sum(commits) from project_facts inner join valid_projects on valid_projects.id = project_facts.project_id where valid_projects.id in (3) group by valid_projects.id, valid_projects.name;".to_owned()
-        );
-    }
-}

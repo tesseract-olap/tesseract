@@ -156,11 +156,15 @@ mod test {
     use super::*;
     use super::super::*;
 
+    use tesseract_core::Table;
+    use tesseract_core::query_ir::LevelColumn;
+
     #[test]
     fn test_growth() {
         let (growth, _headers) = calculate("select * from test".to_owned(), "date, language, framework, ex_complete", 1,
             &GrowthSql {
                 time_drill: DrilldownSql {
+                    alias_postfix: "".into(),
                     table: Table { name: "".to_owned(), primary_key: None, schema: None },
                     primary_key: "".to_owned(),
                     foreign_key: "".to_owned(),
