@@ -45,7 +45,7 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
                     format!("sum({}) as m{}_moe_secondary_{}", col, mea_idx, n)
                 });
 
-            format!("{} as m{}_moe_primary, {}",
+            format!("sum({}) as m{}_moe_primary, {}",
                 col,
                 mea_idx,
                 join(secondaries, ", "),
@@ -65,8 +65,8 @@ pub fn agg_sql_string_select_mea(aggregator: &Aggregator, mea_idx: usize) -> Str
         Aggregator::Sum => format!("m{0}", mea_idx),
         Aggregator::Average => format!("m{0}", mea_idx),
         Aggregator::Median => format!("m{0}", mea_idx),
-        Aggregator::WeightedAverage { weight_column } => {
-            format!("m{0}_weighted_avg_num), sum(m{0}_weighted_avg_denom)",
+        Aggregator::WeightedAverage { .. } => {
+            format!("m{0}_weighted_avg_num, m{0}_weighted_avg_denom",
                 mea_idx,
             )
         },
@@ -96,7 +96,7 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
         Aggregator::Sum => format!("sum(m{0}) as final_m{0}", mea_idx),
         Aggregator::Average => format!("avg(m{0}) as final_m{0}", mea_idx),
         Aggregator::Median => format!("median(m{0}) as final_m{0}", mea_idx),
-        Aggregator::WeightedAverage { weight_column } => {
+        Aggregator::WeightedAverage { .. } => {
             format!("(sum(m{0}_weighted_avg_num) / sum(m{0}_weighted_avg_denom)) as final_m{0}",
                 mea_idx,
             )
@@ -126,8 +126,68 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
 mod test {
     use super::*;
 
+    use tesseract_core::schema::aggregator::Aggregator;
+
     #[test]
-    fn pass_1_basic() {
-        panic!()
+    fn basic_aggs() {
+        assert_eq!(
+            agg_sql_string_pass_1("col_1".into(), &Aggregator::Sum, 0),
+            "sum(col_1) as m0".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_pass_2(&Aggregator::Sum, 0),
+            "sum(m0) as final_m0".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_select_mea(&Aggregator::Sum, 0),
+            "m0".to_owned(),
+        );
+    }
+
+    #[test]
+    fn weighted_avg() {
+        let agg = Aggregator::WeightedAverage {
+            weight_column: "weight_col".into(),
+        };
+        assert_eq!(
+            agg_sql_string_pass_1("col_1".into(), &agg, 0),
+            "sum(col_1 * weight_col) as m0_weighted_avg_num, sum(weight_col) as m0_weighted_avg_denom".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_pass_2(&agg, 0),
+            "(sum(m0_weighted_avg_num) / sum(m0_weighted_avg_denom)) as final_m0".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_select_mea(&agg, 0),
+            "m0_weighted_avg_num, m0_weighted_avg_denom".to_owned(),
+        );
+    }
+
+    #[test]
+    fn moe() {
+        let agg = Aggregator::Moe {
+            secondary_columns: vec!["s0".into(), "s1".into(), "s2".into()],
+        };
+        assert_eq!(
+            agg_sql_string_pass_1("col_1".into(), &agg, 0),
+            "sum(col_1) as m0_moe_primary, \
+                sum(s0) as m0_moe_secondary_0, \
+                sum(s1) as m0_moe_secondary_1, \
+                sum(s2) as m0_moe_secondary_2\
+            ".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_pass_2(&agg, 0),
+            "1.645 * sqrt(0.05 * (\
+                pow(sum(m0_moe_primary) - sum(m0_moe_secondary_0), 2) + \
+                pow(sum(m0_moe_primary) - sum(m0_moe_secondary_1), 2) + \
+                pow(sum(m0_moe_primary) - sum(m0_moe_secondary_2), 2)\
+                ))\
+            ".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_select_mea(&agg, 0),
+            "m0_moe_primary, m0_moe_secondary_0, m0_moe_secondary_1, m0_moe_secondary_2".to_owned(),
+        );
     }
 }
