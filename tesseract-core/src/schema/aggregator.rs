@@ -19,7 +19,7 @@ pub enum Aggregator {
     Median,
     /// Weighted Average is calculated against the measure's value column.
     /// sum(column * weight_column) / sum(weight_column)
-    #[serde(rename="weighted-avg")]
+    #[serde(rename="weighted_avg")]
     WeightedAverage {
         weight_column: String,
 
