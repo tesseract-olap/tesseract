@@ -13,6 +13,7 @@ use serde_derive::Deserialize;
 use serde_derive::Serialize;
 
 use crate::query_ir::MemberType;
+use super::aggregator::Aggregator;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SchemaConfigXML {
@@ -81,7 +82,7 @@ pub struct LevelConfigXML {
 pub struct MeasureConfigXML {
     pub name: String,
     pub column: String,
-    pub aggregator: String,
+    pub aggregator: Aggregator,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -101,6 +102,7 @@ pub struct PropertyConfigXML {
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde_xml_rs as serde_xml;
 
     #[test]
     fn xml_schema_config() {
