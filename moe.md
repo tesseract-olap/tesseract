@@ -4,8 +4,13 @@ Setup was the same as for weighted avg, just rename the cols val and weight to v
 
 The general equation is
 ```
-1.645 * pow(0.05 * (pow(sum(val1) - sum(val2), 2) + pow(sum(val1) - sum(val3), 2) + ...), 0.5)
+1.645 * pow(d/len(secondary_vals) * (pow(sum(val1) - sum(val2), 2) + pow(sum(val1) - sum(val3), 2) + ...), 0.5)
 ```
+
+d is the design factor, a magic number (see pums technical docs)
+the sequence is the variance,
+the sqrt of variance is standard error
+1.645 * standard error is moe
 
 For the calculation, I'll need to specify the primary value, and then all the secondary values in a list.
 

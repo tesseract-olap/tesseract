@@ -35,6 +35,7 @@ pub enum Aggregator {
     /// ```
     #[serde(rename="moe")]
     Moe {
+        design_factor: f64,
         secondary_columns: Vec<String>,
     },
     /// Where the measure column is the primary value,
@@ -46,6 +47,7 @@ pub enum Aggregator {
     /// ```
     #[serde(rename="weighted_average_moe")]
     WeightedAverageMoe {
+        design_factor: f64,
         primary_weight: String,
         secondary_weight_columns: Vec<String>,
     },

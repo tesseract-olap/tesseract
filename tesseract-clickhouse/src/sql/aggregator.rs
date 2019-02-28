@@ -40,7 +40,7 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
                 mea_idx,
             )
         },
-        Aggregator::Moe { secondary_columns }=> {
+        Aggregator::Moe { secondary_columns, .. }=> {
             let secondaries = secondary_columns.iter().enumerate()
                 .map(|(n, s_col)| {
                     format!("sum({}) as m{}_moe_secondary_{}", s_col, mea_idx, n)
@@ -52,7 +52,7 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
                 join(secondaries, ", "),
             )
         },
-        Aggregator::WeightedAverageMoe { primary_weight, secondary_weight_columns }=> {
+        Aggregator::WeightedAverageMoe { primary_weight, secondary_weight_columns, .. }=> {
             let secondaries = secondary_weight_columns.iter().enumerate()
                 .map(|(n, s_col)| {
                     format!("sum({} * {}) as m{}_moe_secondary_weighted_avg_num_{}, sum({}) as m{}_moe_secondary_weighted_avg_denom_{}",
@@ -95,7 +95,7 @@ pub fn agg_sql_string_select_mea(aggregator: &Aggregator, mea_idx: usize) -> Str
                 mea_idx,
             )
         },
-        Aggregator::Moe { secondary_columns }=> {
+        Aggregator::Moe { secondary_columns, .. }=> {
             let secondaries = secondary_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("m{}_moe_secondary_{}", mea_idx, n)
@@ -139,7 +139,7 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
                 mea_idx,
             )
         },
-        Aggregator::Moe { secondary_columns }=> {
+        Aggregator::Moe { design_factor, secondary_columns }=> {
             let inner_seq = secondary_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("pow(sum(m{0}_moe_primary) - sum(m{0}_moe_secondary_{1}), 2)",
@@ -149,11 +149,12 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
                 });
             let inner_seq = join(inner_seq, " + ");
 
-            format!("1.645 * sqrt(0.05 * ({}))",
+            format!("1.645 * sqrt({} * ({}))",
+                design_factor / secondary_columns.len() as f64,
                 inner_seq,
             )
         },
-        Aggregator::WeightedAverageMoe { secondary_weight_columns, .. }=> {
+        Aggregator::WeightedAverageMoe { design_factor, secondary_weight_columns, .. }=> {
             let inner_seq = secondary_weight_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("pow(\
@@ -166,7 +167,8 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
                 });
             let inner_seq = join(inner_seq, " + ");
 
-            format!("1.645 * sqrt(0.05 * ({}))",
+            format!("1.645 * sqrt({} * ({}))",
+                design_factor / secondary_weight_columns.len() as f64,
                 inner_seq,
             )
         },
@@ -221,6 +223,7 @@ mod test {
     #[test]
     fn moe() {
         let agg = Aggregator::Moe {
+            design_factor: 3.0,
             secondary_columns: vec!["s0".into(), "s1".into(), "s2".into()],
         };
         assert_eq!(
@@ -233,7 +236,7 @@ mod test {
         );
         assert_eq!(
             agg_sql_string_pass_2(&agg, 0),
-            "1.645 * sqrt(0.05 * (\
+            "1.645 * sqrt(1 * (\
                 pow(sum(m0_moe_primary) - sum(m0_moe_secondary_0), 2) + \
                 pow(sum(m0_moe_primary) - sum(m0_moe_secondary_1), 2) + \
                 pow(sum(m0_moe_primary) - sum(m0_moe_secondary_2), 2)\
@@ -249,6 +252,7 @@ mod test {
     #[test]
     fn weighted_average_moe() {
         let agg = Aggregator::WeightedAverageMoe {
+            design_factor: 3.0,
             primary_weight: "w".into(),
             secondary_weight_columns: vec!["w0".into(), "w1".into(), "w2".into()],
         };
@@ -266,7 +270,7 @@ mod test {
         );
         assert_eq!(
             agg_sql_string_pass_2(&agg, 0),
-            "1.645 * sqrt(0.05 * (\
+            "1.645 * sqrt(1 * (\
                 pow((sum(m0_moe_primary_weighted_avg_num) / sum(m0_moe_primary_weighted_avg_denom)) - (sum(m0_moe_secondary_weighted_avg_num_0) / sum(m0_moe_secondary_weighted_avg_denom_0)), 2) + \
                 pow((sum(m0_moe_primary_weighted_avg_num) / sum(m0_moe_primary_weighted_avg_denom)) - (sum(m0_moe_secondary_weighted_avg_num_1) / sum(m0_moe_secondary_weighted_avg_denom_1)), 2) + \
                 pow((sum(m0_moe_primary_weighted_avg_num) / sum(m0_moe_primary_weighted_avg_denom)) - (sum(m0_moe_secondary_weighted_avg_num_2) / sum(m0_moe_secondary_weighted_avg_denom_2)), 2)\
