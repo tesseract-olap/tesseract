@@ -31,11 +31,23 @@ pub enum Aggregator {
     ///
     /// The general equation for Margin of Error is
     /// ```
-    /// 1.645 * pow(0.05 * (pow(sum(column) - sum(secondary_columns[0]), 2) + pow(sum(column) - sum(secondar_columns_[1]), 2) + ...), 0.5)
+    /// 1.645 * pow(0.05 * (pow(sum(column) - sum(secondary_columns[0]), 2) + pow(sum(column) - sum(secondary_columns_[1]), 2) + ...), 0.5)
     /// ```
     #[serde(rename="moe")]
     Moe {
         secondary_columns: Vec<String>,
+    },
+    /// Where the measure column is the primary value,
+    /// and a list of secondary weight columns is provided to the MO aggregator:
+    ///
+    /// The general equation for Margin of Error is
+    /// ```
+    /// 1.645 * pow(0.05 * (pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[0])/sum(secondary_weight_columns[0]) ), 2) + pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[1]/sum(secondary_weight_columns[1]) ), 2) + ...), 0.5)
+    /// ```
+    #[serde(rename="weighted_average_moe")]
+    WeightedAverageMoe {
+        primary_weight: String,
+        secondary_weight_columns: Vec<String>,
     },
     // This only works for straightforward aggregations, which will work across
     // two roll-ups. For example, median won't work across two roll-ups
