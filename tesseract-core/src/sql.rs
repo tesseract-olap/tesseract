@@ -34,6 +34,7 @@ pub(crate) fn standard_sql(
     fn agg_sql_string(m: &MeasureSql) -> String {
         match &m.aggregator {
             Aggregator::Sum => format!("sum"),
+            Aggregator::Count => format!("count"),
             Aggregator::Average => format!("avg"),
             // median doesn't work like this
             Aggregator::Median => format!("median"),

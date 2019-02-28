@@ -12,6 +12,8 @@ use serde_derive::{Deserialize, Serialize};
 pub enum Aggregator {
     #[serde(rename="sum")]
     Sum,
+    #[serde(rename="count")]
+    Count,
     #[serde(rename="avg")]
     Average,
     // Not yet allowed; needs to be able to roll-up across two times
