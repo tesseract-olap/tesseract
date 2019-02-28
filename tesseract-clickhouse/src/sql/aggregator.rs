@@ -42,8 +42,8 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
         },
         Aggregator::Moe { secondary_columns }=> {
             let secondaries = secondary_columns.iter().enumerate()
-                .map(|(n, col)| {
-                    format!("sum({}) as m{}_moe_secondary_{}", col, mea_idx, n)
+                .map(|(n, s_col)| {
+                    format!("sum({}) as m{}_moe_secondary_{}", s_col, mea_idx, n)
                 });
 
             format!("sum({}) as m{}_moe_primary, {}",
@@ -54,12 +54,21 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
         },
         Aggregator::WeightedAverageMoe { primary_weight, secondary_weight_columns }=> {
             let secondaries = secondary_weight_columns.iter().enumerate()
-                .map(|(n, col)| {
-                    format!("sum({}) as m{}_moe_secondary_weight_{}", col, mea_idx, n)
+                .map(|(n, s_col)| {
+                    format!("sum({} * {}) as m{}_moe_secondary_weighted_avg_num_{}, sum({}) as m{}_moe_secondary_weighted_avg_denom_{}",
+                        col,
+                        s_col,
+                        mea_idx,
+                        n,
+                        s_col,
+                        mea_idx,
+                        n,
+                    )
                 });
 
-            format!("sum({}) as m{}_moe_primary, sum({}) as m{}_moe_primary_weight, {}",
+            format!("sum({} * {}) as m{}_moe_primary_weighted_avg_num, sum({}) as m{}_moe_primary_weighted_avg_denom, {}",
                 col,
+                primary_weight,
                 mea_idx,
                 primary_weight,
                 mea_idx,
@@ -100,10 +109,10 @@ pub fn agg_sql_string_select_mea(aggregator: &Aggregator, mea_idx: usize) -> Str
         Aggregator::WeightedAverageMoe { secondary_weight_columns, .. }=> {
             let secondaries = secondary_weight_columns.iter().enumerate()
                 .map(|(n, _)| {
-                    format!("m{}_moe_secondary_weight_{}", mea_idx, n)
+                    format!("m{0}_moe_secondary_weighted_avg_num_{1}, m{0}_moe_secondary_weighted_avg_denom_{1}", mea_idx, n)
                 });
 
-            format!("m{}_moe_primary, m{}_moe_primary_weight, {}",
+            format!("m{}_moe_primary_weighted_avg_num, m{}_moe_primary_weighted_avg_denom, {}",
                 mea_idx,
                 mea_idx,
                 join(secondaries, ", "),
@@ -148,8 +157,8 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
             let inner_seq = secondary_weight_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("pow(\
-                        (sum(m{0}_moe_primary * m{0}_moe_primary_weight)/sum(m{0}_moe_primary_weight)) - \
-                        (sum(m{0}_moe_primary * m{0}_moe_secondary_weight_{1})/sum(m{0}_moe_secondary_weight_{1}))\
+                        (sum(m{0}_moe_primary_weighted_avg_num) / sum(m{0}_moe_primary_weighted_avg_denom)) - \
+                        (sum(m{0}_moe_secondary_weighted_avg_num_{1}) / sum(m{0}_moe_secondary_weighted_avg_denom_{1}))\
                         , 2)",
                         mea_idx,
                         n,
@@ -245,25 +254,31 @@ mod test {
         };
         assert_eq!(
             agg_sql_string_pass_1("col_1".into(), &agg, 0),
-            "sum(col_1) as m0_moe_primary, \
-                sum(w) as m0_moe_primary_weight, \
-                sum(w0) as m0_moe_secondary_weight_0, \
-                sum(w1) as m0_moe_secondary_weight_1, \
-                sum(w2) as m0_moe_secondary_weight_2\
+            "sum(col_1 * w) as m0_moe_primary_weighted_avg_num, \
+                sum(w) as m0_moe_primary_weighted_avg_denom, \
+                sum(col_1 * w0) as m0_moe_secondary_weighted_avg_num_0, \
+                sum(w0) as m0_moe_secondary_weighted_avg_denom_0, \
+                sum(col_1 * w1) as m0_moe_secondary_weighted_avg_num_1, \
+                sum(w1) as m0_moe_secondary_weighted_avg_denom_1, \
+                sum(col_1 * w2) as m0_moe_secondary_weighted_avg_num_2, \
+                sum(w2) as m0_moe_secondary_weighted_avg_denom_2\
             ".to_owned(),
         );
         assert_eq!(
             agg_sql_string_pass_2(&agg, 0),
             "1.645 * sqrt(0.05 * (\
-                pow((sum(m0_moe_primary * m0_moe_primary_weight)/sum(m0_moe_primary_weight)) - (sum(m0_moe_primary * m0_moe_secondary_weight_0)/sum(m0_moe_secondary_weight_0)), 2) + \
-                pow((sum(m0_moe_primary * m0_moe_primary_weight)/sum(m0_moe_primary_weight)) - (sum(m0_moe_primary * m0_moe_secondary_weight_1)/sum(m0_moe_secondary_weight_1)), 2) + \
-                pow((sum(m0_moe_primary * m0_moe_primary_weight)/sum(m0_moe_primary_weight)) - (sum(m0_moe_primary * m0_moe_secondary_weight_2)/sum(m0_moe_secondary_weight_2)), 2)\
+                pow((sum(m0_moe_primary_weighted_avg_num) / sum(m0_moe_primary_weighted_avg_denom)) - (sum(m0_moe_secondary_weighted_avg_num_0) / sum(m0_moe_secondary_weighted_avg_denom_0)), 2) + \
+                pow((sum(m0_moe_primary_weighted_avg_num) / sum(m0_moe_primary_weighted_avg_denom)) - (sum(m0_moe_secondary_weighted_avg_num_1) / sum(m0_moe_secondary_weighted_avg_denom_1)), 2) + \
+                pow((sum(m0_moe_primary_weighted_avg_num) / sum(m0_moe_primary_weighted_avg_denom)) - (sum(m0_moe_secondary_weighted_avg_num_2) / sum(m0_moe_secondary_weighted_avg_denom_2)), 2)\
                 ))\
             ".to_owned(),
         );
         assert_eq!(
             agg_sql_string_select_mea(&agg, 0),
-            "m0_moe_primary, m0_moe_primary_weight, m0_moe_secondary_weight_0, m0_moe_secondary_weight_1, m0_moe_secondary_weight_2".to_owned(),
+            "m0_moe_primary_weighted_avg_num, m0_moe_primary_weighted_avg_denom, \
+            m0_moe_secondary_weighted_avg_num_0, m0_moe_secondary_weighted_avg_denom_0, \
+            m0_moe_secondary_weighted_avg_num_1, m0_moe_secondary_weighted_avg_denom_1, \
+            m0_moe_secondary_weighted_avg_num_2, m0_moe_secondary_weighted_avg_denom_2".to_owned(),
         );
     }
 }
