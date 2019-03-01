@@ -28,6 +28,6 @@ pub fn metadata_all_handler(
 {
     info!("Metadata for all");
 
-    Ok(HttpResponse::Ok().json(req.state().schema.read().unwrap().clone()))
+    Ok(HttpResponse::Ok().json(req.state().schema.read().unwrap().metadata()))
 }
 

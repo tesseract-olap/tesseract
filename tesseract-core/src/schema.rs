@@ -2,6 +2,7 @@ use serde_derive::Serialize;
 use std::convert::From;
 
 pub mod aggregator;
+pub mod metadata;
 mod json;
 mod xml;
 
@@ -84,6 +85,8 @@ impl From<SchemaConfigJson> for Schema {
     }
 }
 
+/// No `From<CubeConfig>` because the transition needs to be made at Schema
+/// level in order to take into account shared dims.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Cube {
     pub name: String,

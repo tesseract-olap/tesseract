@@ -25,6 +25,7 @@ use self::names::{
     LevelName,
 };
 pub use self::schema::{Schema, Cube, Table, Aggregator};
+use self::schema::metadata::{SchemaMetadata, CubeMetadata};
 use self::query_ir::{
     CutSql,
     DrilldownSql,
@@ -57,11 +58,15 @@ impl Schema {
         Schema::from_json(&serialized)
     }
 
-    pub fn cube_metadata(&self, cube_name: &str) -> Option<Cube> {
+    pub fn cube_metadata(&self, cube_name: &str) -> Option<CubeMetadata> {
         // Takes the first cube with the name.
         // TODO we still have to check that the cube names are distinct
         // before this.
-        self.cubes.iter().find(|c| c.name == cube_name).cloned()
+        self.cubes.iter().find(|c| c.name == cube_name).map(|c| c.into())
+    }
+
+    pub fn metadata(&self) -> SchemaMetadata {
+        self.into()
     }
 
     pub fn sql_query(
