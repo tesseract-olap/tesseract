@@ -22,6 +22,7 @@ use std::sync::{Arc, RwLock};
 #[derive(Debug, Clone)]
 pub enum SchemaSource {
     LocalSchema { filepath: String },
+    #[allow(dead_code)]
     RemoteSchema { endpoint: String },
 }
 
