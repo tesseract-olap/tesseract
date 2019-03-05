@@ -69,6 +69,36 @@ impl Schema {
         self.into()
     }
 
+    pub fn members_sql(
+        &self,
+        cube: &str,
+        level_name: &LevelName,
+        ) -> Result<(String, Vec<String>), Error> // Sql and then Header
+    {
+        let members_query_ir = self.get_dim_col_table(cube, level_name)?;
+
+        let header = if members_query_ir.name_column.is_some() {
+            vec!["ID".into(), "Label".into()]
+        } else {
+            vec!["ID".into()]
+        };
+
+        let name_col = if let Some(ref col) = members_query_ir.name_column {
+           col.to_owned()
+        } else {
+            "".into()
+        };
+
+        let sql = format!("select distinct {}{}{} from {}",
+            members_query_ir.key_column,
+            if members_query_ir.name_column.is_some() { ", " } else { "" },
+            name_col,
+            members_query_ir.table.full_name(),
+        );
+
+        Ok((sql, header))
+    }
+
     pub fn sql_query(
         &self,
         cube: &str,
@@ -642,7 +672,7 @@ impl Schema {
         Ok(res)
     }
 
-    fn get_dim_col(&self, cube_name: &str, level_name: &LevelName) -> Result<String, Error> {
+    fn get_dim_col_table(&self, cube_name: &str, level_name: &LevelName) -> Result<MembersQueryIR, Error> {
         let cube = self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
             .ok_or(format_err!("Could not find cube"))?;
@@ -657,9 +687,15 @@ impl Schema {
             .find(|lvl| lvl.name == level_name.level)
             .ok_or(format_err!("could not find level for level name"))?;
 
-        let column = level.key_column.clone();
+        let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
+        let key_column = level.key_column.clone();
+        let name_column = level.name_column.clone();
 
-        Ok(column)
+        Ok(MembersQueryIR {
+            table,
+            key_column,
+            name_column,
+        })
     }
 
     fn get_dim_col_alias(&self, cube_name: &str, level_name: &LevelName) -> Result<String, Error> {
@@ -698,3 +734,8 @@ impl Schema {
     }
 }
 
+struct MembersQueryIR {
+    table: Table,
+    key_column: String,
+    name_column: Option<String>,
+}
