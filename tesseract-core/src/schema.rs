@@ -14,6 +14,7 @@ pub use crate::schema::{
     json::MeasureConfigJson,
     json::TableConfigJson,
     json::PropertyConfigJson,
+    json::AnnotationConfigJson,
     xml::SchemaConfigXML,
     xml::DimensionConfigXML,
     xml::HierarchyConfigXML,
@@ -29,6 +30,7 @@ pub use self::aggregator::Aggregator;
 pub struct Schema {
     pub name: String,
     pub cubes: Vec<Cube>,
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 impl From<SchemaConfigJson> for Schema {
@@ -47,21 +49,51 @@ impl From<SchemaConfigJson> for Schema {
             let measures = cube_config.measures.into_iter()
                 .map(|mea| mea.into())
                 .collect();
+            let cube_annotations = cube_config.annotations
+                .map(|anns| {
+                    anns.into_iter()
+                        .map(|ann| ann.into())
+                        .collect()
+                });
 
             // special case: check for dimension_usages
             if let Some(dim_usages) = cube_config.dimension_usages {
                 for dim_usage in dim_usages {
+                    // prep annotations to be merged with shared dim annotations
+                    let dim_usage_annotations: Option<Vec<Annotation>> = dim_usage.annotations
+                        .map(|anns| {
+                            anns.into_iter()
+                                .map(|ann| ann.into())
+                                .collect()
+                        });
+
                     if let Some(ref shared_dims) = schema_config.shared_dimensions {
                         for shared_dim_config in shared_dims {
                             if dim_usage.name == shared_dim_config.name {
                                 let hierarchies = shared_dim_config.hierarchies.iter()
                                     .map(|h| h.clone().into())
                                     .collect();
+                                let shared_dim_annotations: Option<Vec<Annotation>> = shared_dim_config.annotations.as_ref()
+                                    .map(|anns| {
+                                        anns.into_iter()
+                                            .map(|ann| ann.clone().into())
+                                            .collect()
+                                    });
+                                let dim_annotations = shared_dim_annotations
+                                    .and_then(|shared_dim_anns| {
+                                        dim_usage_annotations.as_ref().map(|dim_usage_anns| {
+                                            let mut dim_anns = shared_dim_anns.clone();
+                                            dim_anns.extend_from_slice(&dim_usage_anns);
+                                            dim_anns
+                                        })
+                                    });
+
 
                                 dimensions.push(Dimension {
                                     name: shared_dim_config.name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
                                     hierarchies: hierarchies,
+                                    annotations: dim_annotations,
                                 });
                             }
                         }
@@ -75,12 +107,21 @@ impl From<SchemaConfigJson> for Schema {
                 can_aggregate: false,
                 dimensions: dimensions,
                 measures: measures,
+                annotations: cube_annotations,
             });
         }
+
+        let schema_annotations = schema_config.annotations
+            .map(|anns| {
+                anns.into_iter()
+                    .map(|ann| ann.into())
+                    .collect()
+            });
 
         Schema {
             name: schema_config.name,
             cubes: cubes,
+            annotations: schema_annotations,
         }
     }
 }
@@ -94,6 +135,7 @@ pub struct Cube {
     pub can_aggregate: bool,
     pub dimensions: Vec<Dimension>,
     pub measures: Vec<Measure>,
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -101,6 +143,7 @@ pub struct Dimension {
     pub name: String,
     pub foreign_key: Option<String>,
     pub hierarchies: Vec<Hierarchy>,
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 impl From<DimensionConfigJson> for Dimension {
@@ -108,11 +151,18 @@ impl From<DimensionConfigJson> for Dimension {
         let hierarchies = dimension_config.hierarchies.into_iter()
             .map(|h| h.into())
             .collect();
+        let annotations = dimension_config.annotations
+            .map(|anns| {
+                anns.into_iter()
+                    .map(|ann| ann.into())
+                    .collect()
+            });
 
         Dimension {
             name: dimension_config.name,
             foreign_key: dimension_config.foreign_key,
             hierarchies: hierarchies,
+            annotations: annotations,
         }
     }
 }
@@ -123,6 +173,7 @@ pub struct Hierarchy {
     pub table: Option<Table>,
     pub primary_key: String,
     pub levels: Vec<Level>,
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 impl From<HierarchyConfigJson> for Hierarchy {
@@ -130,6 +181,12 @@ impl From<HierarchyConfigJson> for Hierarchy {
         let levels: Vec<Level> = hierarchy_config.levels.into_iter()
             .map(|l| l.into())
             .collect();
+        let annotations = hierarchy_config.annotations
+            .map(|anns| {
+                anns.into_iter()
+                    .map(|ann| ann.into())
+                    .collect()
+            });
 
         let primary_key = hierarchy_config.primary_key
             .unwrap_or_else(|| {
@@ -145,6 +202,7 @@ impl From<HierarchyConfigJson> for Hierarchy {
             table: hierarchy_config.table.map(|t| t.into()),
             primary_key: primary_key,
             levels: levels,
+            annotations: annotations,
         }
     }
 }
@@ -156,6 +214,7 @@ pub struct Level {
     pub name_column: Option<String>,
     pub properties: Option<Vec<Property>>,
     pub key_type: Option<MemberType>,
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 impl From<LevelConfigJson> for Level {
@@ -166,6 +225,12 @@ impl From<LevelConfigJson> for Level {
                     .map(|p| p.into())
                     .collect()
             });
+        let annotations = level_config.annotations
+            .map(|anns| {
+                anns.into_iter()
+                    .map(|ann| ann.into())
+                    .collect()
+            });
 
         Level {
             name: level_config.name,
@@ -173,6 +238,7 @@ impl From<LevelConfigJson> for Level {
             name_column: level_config.name_column,
             properties,
             key_type: level_config.key_type,
+            annotations: annotations,
         }
     }
 }
@@ -182,14 +248,23 @@ pub struct Measure{
     pub name: String,
     pub column: String,
     pub aggregator: Aggregator,
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 impl From<MeasureConfigJson> for Measure {
     fn from(measure_config: MeasureConfigJson) -> Self {
+        let annotations = measure_config.annotations
+            .map(|anns| {
+                anns.into_iter()
+                    .map(|ann| ann.into())
+                    .collect()
+            });
+
         Measure {
             name: measure_config.name,
             column: measure_config.column,
             aggregator: measure_config.aggregator,
+            annotations: annotations,
         }
     }
 }
@@ -225,13 +300,37 @@ impl Table {
 pub struct Property{
     pub name: String,
     pub column: String,
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 impl From<PropertyConfigJson> for Property {
     fn from(property_config: PropertyConfigJson) -> Self {
+        let annotations = property_config.annotations
+            .map(|anns| {
+                anns.into_iter()
+                    .map(|ann| ann.into())
+                    .collect()
+            });
+
         Property {
             name: property_config.name,
             column: property_config.column,
+            annotations: annotations,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Annotation{
+    pub name: String,
+    pub text: String,
+}
+
+impl From<AnnotationConfigJson> for Annotation {
+    fn from(annotation_config: AnnotationConfigJson) -> Self {
+        Annotation {
+            name: annotation_config.name,
+            text: annotation_config.text,
         }
     }
 }
