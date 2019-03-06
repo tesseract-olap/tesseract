@@ -18,15 +18,12 @@ use super::{
 pub struct SchemaMetadata {
     pub name: String,
     pub cubes: Vec<CubeMetadata>,
-    pub annotations: Option<AnnotationMetadata>,
+    pub annotations: AnnotationMetadata,
 }
 
 impl From<&Schema> for SchemaMetadata {
     fn from(schema: &Schema) -> Self {
-        let annotations = schema.annotations.as_ref()
-            .map(|anns| {
-                anns.as_slice().into()
-            });
+        let annotations = (&schema.annotations).into();
 
         SchemaMetadata {
             name: schema.name.clone(),
@@ -41,15 +38,12 @@ pub struct CubeMetadata {
     pub name: String,
     pub dimensions: Vec<DimensionMetadata>,
     pub measures: Vec<MeasureMetadata>,
-    pub annotations: Option<AnnotationMetadata>,
+    pub annotations: AnnotationMetadata,
 }
 
 impl From<&Cube> for CubeMetadata {
     fn from(cube: &Cube) -> Self {
-        let annotations = cube.annotations.as_ref()
-            .map(|anns| {
-                anns.as_slice().into()
-            });
+        let annotations = (&cube.annotations).into();
 
         CubeMetadata {
             name: cube.name.clone(),
@@ -64,15 +58,12 @@ impl From<&Cube> for CubeMetadata {
 pub struct DimensionMetadata {
     pub name: String,
     pub hierarchies: Vec<HierarchyMetadata>,
-    pub annotations: Option<AnnotationMetadata>,
+    pub annotations: AnnotationMetadata,
 }
 
 impl From<&Dimension> for DimensionMetadata {
     fn from(dimension: &Dimension) -> Self {
-        let annotations = dimension.annotations.as_ref()
-            .map(|anns| {
-                anns.as_slice().into()
-            });
+        let annotations = (&dimension.annotations).into();
 
         DimensionMetadata {
             name: dimension.name.clone(),
@@ -86,15 +77,12 @@ impl From<&Dimension> for DimensionMetadata {
 pub struct HierarchyMetadata {
     pub name: String,
     pub levels: Vec<LevelMetadata>,
-    pub annotations: Option<AnnotationMetadata>,
+    pub annotations: AnnotationMetadata,
 }
 
 impl From<&Hierarchy> for HierarchyMetadata {
     fn from(hierarchy: &Hierarchy) -> Self {
-        let annotations = hierarchy.annotations.as_ref()
-            .map(|anns| {
-                anns.as_slice().into()
-            });
+        let annotations = (&hierarchy.annotations).into();
 
         HierarchyMetadata {
             name: hierarchy.name.clone(),
@@ -108,7 +96,7 @@ impl From<&Hierarchy> for HierarchyMetadata {
 pub struct LevelMetadata {
     pub name: String,
     pub properties: Option<Vec<PropertyMetadata>>,
-    pub annotations: Option<AnnotationMetadata>,
+    pub annotations: AnnotationMetadata,
 }
 
 impl From<&Level> for LevelMetadata {
@@ -116,10 +104,7 @@ impl From<&Level> for LevelMetadata {
         let properties = level.properties.clone().map(|props| {
                 props.iter().map(|p| p.into()).collect()
             });
-        let annotations = level.annotations.as_ref()
-            .map(|anns| {
-                anns.as_slice().into()
-            });
+        let annotations = (&level.annotations).into();
 
         LevelMetadata {
             name: level.name.clone(),
@@ -133,15 +118,12 @@ impl From<&Level> for LevelMetadata {
 pub struct MeasureMetadata {
     pub name: String,
     pub aggregator: AggregatorMetadata,
-    pub annotations: Option<AnnotationMetadata>,
+    pub annotations: AnnotationMetadata,
 }
 
 impl From<&Measure> for MeasureMetadata {
     fn from(measure: &Measure) -> Self {
-        let annotations = measure.annotations.as_ref()
-            .map(|anns| {
-                anns.as_slice().into()
-            });
+        let annotations = (&measure.annotations).into();
 
         MeasureMetadata {
             name: measure.name.clone(),
@@ -154,15 +136,12 @@ impl From<&Measure> for MeasureMetadata {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PropertyMetadata {
     pub name: String,
-    pub annotations: Option<AnnotationMetadata>,
+    pub annotations: AnnotationMetadata,
 }
 
 impl From<&Property> for PropertyMetadata {
     fn from(property: &Property) -> Self {
-        let annotations = property.annotations.as_ref()
-            .map(|anns| {
-                anns.as_slice().into()
-            });
+        let annotations = (&property.annotations).into();
 
         PropertyMetadata {
             name: property.name.clone(),
@@ -174,11 +153,15 @@ impl From<&Property> for PropertyMetadata {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AnnotationMetadata(HashMap<String, String>);
 
-impl From<&[Annotation]> for AnnotationMetadata {
-    fn from(annotations: &[Annotation]) -> Self {
-        let res = annotations.iter()
-            .map(|ann| (ann.name.to_owned(), ann.text.to_owned()) )
-            .collect();
+impl From<&Option<Vec<Annotation>>> for AnnotationMetadata {
+    fn from(annotations: &Option<Vec<Annotation>>) -> Self {
+        let res = if let Some(anns) = annotations {
+            anns.iter()
+                .map(|ann| (ann.name.to_owned(), ann.text.to_owned()) )
+                .collect()
+        } else {
+            HashMap::new()
+        };
 
         AnnotationMetadata(res)
     }
