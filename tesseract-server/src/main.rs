@@ -1,5 +1,4 @@
 #![feature(try_from)]
-#![feature(transpose_result)]
 
 //! tesseract-core contains Schema;
 //! Schema is stateless; it is constructed from the schema file.

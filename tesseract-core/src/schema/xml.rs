@@ -15,6 +15,7 @@ use serde_derive::Serialize;
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
 
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SchemaConfigXML {
     pub name: String,
@@ -22,6 +23,8 @@ pub struct SchemaConfigXML {
     pub shared_dimensions: Option<Vec<SharedDimensionConfigXML>>,
     #[serde(rename(deserialize="Cube"))]
     pub cubes: Vec<CubeConfigXML>,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -35,6 +38,8 @@ pub struct CubeConfigXML {
     pub dimension_usages: Option<Vec<DimensionUsageXML>>,
     #[serde(rename(deserialize="Measure"))]
     pub measures: Vec<MeasureConfigXML>,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -43,6 +48,8 @@ pub struct DimensionConfigXML {
     pub foreign_key: Option<String>, // does not exist for shared dims
     #[serde(rename(deserialize="Hierarchy"))]
     pub hierarchies: Vec<HierarchyConfigXML>,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -50,12 +57,16 @@ pub struct SharedDimensionConfigXML {
     pub name: String,
     #[serde(rename(deserialize="Hierarchy"))]
     pub hierarchies: Vec<HierarchyConfigXML>,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DimensionUsageXML {
     pub name: String,
     pub foreign_key: String,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -66,6 +77,8 @@ pub struct HierarchyConfigXML {
     pub primary_key: Option<String>,
     #[serde(rename(deserialize="Level"))]
     pub levels: Vec<LevelConfigXML>,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -76,6 +89,8 @@ pub struct LevelConfigXML {
     #[serde(rename(deserialize="Property"))]
     pub properties: Option<Vec<PropertyConfigXML>>,
     pub key_type: Option<MemberType>,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -83,6 +98,8 @@ pub struct MeasureConfigXML {
     pub name: String,
     pub column: String,
     pub aggregator: Aggregator,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -96,13 +113,21 @@ pub struct TableConfigXML {
 pub struct PropertyConfigXML {
     pub name: String,
     pub column: String,
+    #[serde(rename(deserialize="Annotation"))]
+    pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct AnnotationConfigXML {
+    pub name: String,
+    #[serde(rename(deserialize="$value"))]
+    pub text: String,
+}
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use serde_xml_rs as serde_xml;
+    use serde_xml_rs::from_reader;
 
     #[test]
     fn xml_schema_config() {
@@ -113,6 +138,6 @@ mod test {
                 </Cube>
             </Schema>
         "##;
-        let schema_config: SchemaConfigXML = serde_xml::deserialize(s.as_bytes()).unwrap();
+        let schema_config: SchemaConfigXML = from_reader(s.as_bytes()).unwrap();
     }
 }

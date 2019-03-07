@@ -17,6 +17,8 @@ use crate::handlers::{
     index_handler,
     metadata_handler,
     metadata_all_handler,
+    members_handler,
+    members_default_handler,
 };
 use crate::logic_layer::{Cache};
 
@@ -27,6 +29,7 @@ use std::sync::{Arc, RwLock};
 #[derive(Debug, Clone)]
 pub enum SchemaSource {
     LocalSchema { filepath: String },
+    #[allow(dead_code)]
     RemoteSchema { endpoint: String },
 }
 
@@ -88,6 +91,13 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
         })
 
         // Helpers
+        .resource("/cubes/{cube}/members", |r| {
+            r.method(Method::GET).with(members_default_handler)
+        })
+        .resource("/cubes/{cube}/members.{format}", |r| {
+            r.method(Method::GET).with(members_handler)
+        })
+
         .resource("/flush", |r| {
             r.method(Method::POST).with(flush_handler)
         })
