@@ -9,6 +9,7 @@ pub mod query_ir;
 
 use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
+use serde_xml::from_reader;
 
 use crate::schema::{
     SchemaConfigJson,
@@ -51,7 +52,11 @@ impl Schema {
 
     /// Deserializes XML schema into a `Schema`.
     pub fn from_xml(raw_schema: &str) -> Result<Self, Error> {
-        let schema_config: SchemaConfigXML = serde_xml::deserialize(raw_schema.as_bytes())?;
+        let schema_config: SchemaConfigXML = match from_reader(raw_schema.as_bytes()) {
+            Ok(schema_config_xml) => schema_config_xml,
+            Err(err) => return Err(format_err!("Error reading XML schema: {}", err))
+        };
+
         // Serialize XML to JSON as intermediary step
         let serialized = serde_json::to_string(&schema_config)?;
         Schema::from_json(&serialized)
