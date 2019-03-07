@@ -239,12 +239,14 @@ pub struct FilterSql {
 
 #[derive(Debug, Clone)]
 pub struct LimitSql {
+    pub offset: Option<u64>,
     pub n: u64,
 }
 
 impl From<LimitQuery> for LimitSql {
     fn from(l: LimitQuery) -> Self {
         LimitSql {
+            offset: l.offset,
             n: l.n,
         }
     }

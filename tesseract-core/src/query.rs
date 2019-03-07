@@ -236,6 +236,7 @@ impl FromStr for Comparison {
 
 #[derive(Debug, Clone)]
 pub struct LimitQuery {
+    pub offset: Option<u64>,
     pub n: u64,
 }
 
@@ -243,7 +244,21 @@ impl FromStr for LimitQuery {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(LimitQuery { n: s.parse::<u64>()? })
+        match &s.split(",").collect::<Vec<_>>()[..] {
+            [offset, n] => {
+                Ok(LimitQuery {
+                    offset: Some(offset.parse::<u64>()?),
+                    n: n.parse::<u64>()?,
+                })
+            },
+            [n] => {
+                Ok(LimitQuery {
+                    offset: None,
+                    n: n.parse::<u64>()?,
+                })
+            },
+            _ => bail!("Could not parse a limit query"),
+        }
     }
 }
 

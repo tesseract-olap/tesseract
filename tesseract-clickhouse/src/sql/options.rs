@@ -40,7 +40,11 @@ pub fn wrap_options(
     // - limits
     let limit_sql = {
         if let Some(limit) = limit {
-            format!("limit {}", limit.n)
+            if let Some(offset) = limit.offset {
+                format!("limit {}, {}", offset, limit.n)
+            } else {
+                format!("limit {}", limit.n)
+            }
         } else {
             "".to_string()
         }
