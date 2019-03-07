@@ -1,6 +1,7 @@
 use serde_derive::Deserialize;
 
 use crate::query_ir::MemberType;
+use super::aggregator::Aggregator;
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct SchemaConfigJson {
@@ -58,7 +59,7 @@ pub struct LevelConfigJson {
 pub struct MeasureConfigJson {
     pub name: String,
     pub column: String,
-    pub aggregator: String,
+    pub aggregator: Aggregator,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

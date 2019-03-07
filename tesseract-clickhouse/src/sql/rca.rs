@@ -283,8 +283,10 @@ pub fn calculate(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use super::super::*;
+
+    use tesseract_core::Table;
+    use tesseract_core::query_ir::LevelColumn;
 
     #[test]
     fn test_rca_sql() {
@@ -349,6 +351,7 @@ mod test {
         //];
 
         let drill_1 = vec![DrilldownSql {
+            alias_postfix: "".into(),
             foreign_key: "date_id".into(),
             primary_key: "date_id".into(),
             table: Table { name: "sales".into(), schema: None, primary_key: None },
@@ -370,6 +373,7 @@ mod test {
         }];
 
         let drill_2 = vec![DrilldownSql {
+            alias_postfix: "".into(),
             foreign_key: "product_id".into(),
             primary_key: "product_id".into(),
             table: Table { name: "dim_products".into(), schema: None, primary_key: None },
@@ -386,16 +390,20 @@ mod test {
             property_columns: vec![],
         }];
 
-        let mea = MeasureSql { aggregator: "sum".into(), column: "quantity".into() };
+        use tesseract_core::schema::aggregator::Aggregator;
+        let mea = MeasureSql { aggregator: Aggregator::Sum, column: "quantity".into() };
+
+        let debug = false;
 
         let rca = RcaSql {
+            debug,
             drill_1,
             drill_2,
             mea,
         };
 
         assert_eq!(
-            clickhouse_sql(&table, &[], &[], &[], &None, &None, &None, &Some(rca), &None),
+            clickhouse_sql(&table, &[], &[], &[], &None, &None, &None, &None, &Some(rca), &None),
             "".to_owned()
         );
     }

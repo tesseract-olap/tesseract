@@ -1,5 +1,6 @@
 use itertools::join;
 
+use crate::Aggregator;
 use crate::query_ir::{
     TableSql,
     CutSql,
@@ -29,6 +30,20 @@ pub(crate) fn standard_sql(
     _growth: &Option<GrowthSql>,
     ) -> String
 {
+    // hack for now... remove later
+    fn agg_sql_string(m: &MeasureSql) -> String {
+        match &m.aggregator {
+            Aggregator::Sum => format!("sum"),
+            Aggregator::Count => format!("count"),
+            Aggregator::Average => format!("avg"),
+            // median doesn't work like this
+            Aggregator::Median => format!("median"),
+            Aggregator::WeightedAverage {..} => format!("avg"),
+            Aggregator::Moe {..} => format!(""),
+            Aggregator::WeightedAverageMoe {..} => format!(""),
+            Aggregator::Custom(s) => format!("{}", s),
+        }
+    }
     // --------------------------------------------------
     // copied from primary_agg for clickhouse
     let ext_drills: Vec<_> = drills.iter()
@@ -50,7 +65,7 @@ pub(crate) fn standard_sql(
     // --------------------------------------------------
 
     let drill_cols = join(drills.iter().map(|d| d.col_qual_string()), ", ");
-    let mea_cols = join(meas.iter().map(|m| m.agg_col_string()), ", ");
+    let mea_cols = join(meas.iter().map(|m| agg_sql_string(m)), ", ");
 
     let mut final_sql = format!("select {}, {} from {}",
         drill_cols,
@@ -82,3 +97,57 @@ pub(crate) fn standard_sql(
     final_sql = format!("{} group by {};", final_sql, drill_cols);
     final_sql
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    /// Tests:
+    /// - basic standard sql generation
+    /// - join dim table or inline
+    /// - cuts on multi-level dim
+    /// - parents
+    ///
+    fn test_standard_sql() {
+        //"select valid_projects.id, name, sum(commits) from project_facts inner join valid_projects on project_facts.project_id = valid_projects.id where valid_projects.id=442841 group by name;"
+        let table = TableSql {
+            name: "project_facts".into(),
+            primary_key: Some("id".into()),
+        };
+        let cuts = vec![
+            CutSql {
+                foreign_key: "project_id".into(),
+                primary_key: "id".into(),
+                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
+                column: "id".into(),
+                members: vec!["3".into()],
+                member_type: MemberType::NonText,
+            },
+        ];
+        let drills = vec![
+            // this dim is inline, so should use the fact table
+            // also has parents, so has 
+            DrilldownSql {
+                alias_postfix: "".into(),
+                foreign_key: "project_id".into(),
+                primary_key: "id".into(),
+                table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
+                level_columns: vec![
+                    LevelColumn {
+                        key_column: "id".into(),
+                        name_column: Some("name".to_owned()),
+                    },
+                ],
+                property_columns: vec![],
+            },
+        ];
+        let meas = vec![
+            MeasureSql { aggregator: Aggregator::Sum, column: "commits".into() }
+        ];
+
+        assert_eq!(
+            standard_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
+            "select valid_projects.id, valid_projects.name, sum(commits) from project_facts inner join valid_projects on valid_projects.id = project_facts.project_id where valid_projects.id in (3) group by valid_projects.id, valid_projects.name;".to_owned()
+        );
+    }
+}
+

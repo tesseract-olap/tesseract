@@ -1,6 +1,7 @@
 use serde_derive::Serialize;
 use std::convert::From;
 
+pub mod aggregator;
 mod json;
 mod xml;
 
@@ -22,6 +23,7 @@ pub use crate::schema::{
 };
 use crate::names::{LevelName, Measure as MeasureName};
 use crate::query_ir::MemberType;
+pub use self::aggregator::Aggregator;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Schema {
@@ -217,7 +219,7 @@ impl From<LevelConfigJson> for Level {
 pub struct Measure{
     pub name: String,
     pub column: String,
-    pub aggregator: String,
+    pub aggregator: Aggregator,
 }
 
 impl From<MeasureConfigJson> for Measure {

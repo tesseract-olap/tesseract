@@ -2,7 +2,7 @@ use clickhouse_rs::Pool;
 use clickhouse_rs::types::Options;
 use failure::Error;
 use futures::future::Future;
-use log::{debug, info};
+use log::*;
 use std::time::{Duration, Instant};
 use tesseract_core::{Backend, DataFrame, QueryIr};
 

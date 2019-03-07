@@ -2,7 +2,7 @@ mod backend;
 mod dataframe;
 pub mod format;
 pub mod names;
-mod schema;
+pub mod schema;
 mod sql;
 pub mod query;
 pub mod query_ir;
@@ -24,7 +24,7 @@ use self::names::{
     Property,
     LevelName,
 };
-pub use self::schema::{Schema, Cube, Dimension, Table};
+pub use self::schema::{Schema, Cube, Dimension, Table, Aggregator};
 use self::query_ir::{
     CutSql,
     DrilldownSql,

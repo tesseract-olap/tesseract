@@ -1,5 +1,10 @@
 use itertools::join;
 
+use super::aggregator::{
+    agg_sql_string_pass_1,
+    agg_sql_string_pass_2,
+    agg_sql_string_select_mea,
+};
 use super::{
     TableSql,
     CutSql,
@@ -91,7 +96,11 @@ pub fn primary_agg(
     let mea_cols = meas
         .iter()
         .enumerate()
-        .map(|(i, m)| format!("{} as m{}", m.agg_col_string(), i));
+        .map(|(i, m)| {
+            // should return "m.aggregator({m.col}) as m{i}" for simple cases
+            agg_sql_string_pass_1(&m.column, &m.aggregator, i)
+        }
+        );
     let mea_cols = join(mea_cols, ", ");
 
     let inline_dim_cols = inline_drills.iter().map(|d| d.col_alias_string());
@@ -145,6 +154,17 @@ pub fn primary_agg(
     // initialize current dim cols with inline drills and idx cols (all dim cols)
     let mut current_dim_cols = vec![all_fact_dim_aliass];
 
+    // Create sql string for the measures that are carried up from the
+    // fact table query
+    let select_mea_cols = meas
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            // should return "m{i}" for simple cases
+            agg_sql_string_select_mea(&m.aggregator, i)
+        });
+    let select_mea_cols = join(select_mea_cols, ", ");
+
     for dim_subquery in dim_subqueries {
         // This section needed to accumulate the dim cols that are being selected over
         // the recursive joins.
@@ -161,7 +181,7 @@ pub fn primary_agg(
         // Now construct subquery
         sub_queries = format!("select {}{} from ({}) all right join ({}) using {}",
             sub_queries_dim_cols,
-            join((0..meas.len()).map(|i| format!("m{}", i)), ", "),
+            select_mea_cols,
             dim_subquery.sql,
             sub_queries,
             dim_subquery.foreign_key
@@ -172,7 +192,10 @@ pub fn primary_agg(
     let final_drill_cols = drills.iter().map(|drill| drill.col_alias_only_string());
     let final_drill_cols = join(final_drill_cols, ", ");
 
-    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| format!("{}(m{}) as final_m{}", mea.aggregator, i, i));
+    let final_mea_cols = meas.iter().enumerate().map(|(i, mea)| {
+            // should return "m.aggregator(m{i}) as final_m{i}" for simple cases
+            agg_sql_string_pass_2(&mea.aggregator, i)
+        });
     let final_mea_cols = join(final_mea_cols, ", ");
 
     // This is the final result of the groupings.
