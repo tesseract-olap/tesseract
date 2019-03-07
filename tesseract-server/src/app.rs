@@ -9,10 +9,8 @@ use crate::db_config::Database;
 use crate::handlers::{
     aggregate_handler,
     aggregate_default_handler,
-    ll_aggregate_handler,
-    ll_aggregate_default_handler,
-    cube_detection_aggregation_default_handler,
-    cube_detection_aggregation_handler,
+    logic_layer_default_handler,
+    logic_layer_handler,
     flush_handler,
     index_handler,
     metadata_handler,
@@ -75,19 +73,12 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
             r.method(Method::GET).with(aggregate_handler)
         })
 
-        // Aggregation + Logic Layer
-        // TODO: Consolidate these routes into the aggregate routes above
-        .resource("/cubes/{cube}/logic-layer", |r| {
-            r.method(Method::GET).with(ll_aggregate_default_handler)
-        })
-        .resource("/cubes/{cube}/logic-layer.{format}", |r| {
-            r.method(Method::GET).with(ll_aggregate_handler)
-        })
+        // Logic Layer
         .resource("/logic-layer", |r| {
-            r.method(Method::GET).with(cube_detection_aggregation_default_handler)
+            r.method(Method::GET).with(logic_layer_default_handler)
         })
         .resource("/logic-layer.{format}", |r| {
-            r.method(Method::GET).with(cube_detection_aggregation_handler)
+            r.method(Method::GET).with(logic_layer_handler)
         })
 
         // Helpers

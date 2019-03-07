@@ -19,23 +19,23 @@ use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, finish_aggregatio
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub fn cube_detection_aggregation_default_handler(
+pub fn logic_layer_default_handler(
     (req, _cube): (HttpRequest<AppState>, Path<()>)
 ) -> FutureResponse<HttpResponse>
 {
-    do_cube_detection_aggregation(req, "csv".to_owned())
+    logic_layer_aggregation(req, "csv".to_owned())
 }
 
 /// Handles aggregation when a format is specified.
-pub fn cube_detection_aggregation_handler(
+pub fn logic_layer_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String)>)
 ) -> FutureResponse<HttpResponse>
 {
-    do_cube_detection_aggregation(req, cube_format.to_owned())
+    logic_layer_aggregation(req, cube_format.to_owned())
 }
 
 /// Performs first step of data aggregation, including cube detection.
-pub fn do_cube_detection_aggregation(
+pub fn logic_layer_aggregation(
     req: HttpRequest<AppState>,
     format: String,
 ) -> FutureResponse<HttpResponse>
