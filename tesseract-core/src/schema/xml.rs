@@ -99,6 +99,11 @@ pub struct PropertyConfigXML {
     pub column: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct AnnotationConfigXML {
+    pub name: String,
+    pub label: String,
+}
 
 #[cfg(test)]
 mod test {

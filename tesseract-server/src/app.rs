@@ -13,6 +13,8 @@ use crate::handlers::{
     index_handler,
     metadata_handler,
     metadata_all_handler,
+    members_handler,
+    members_default_handler,
 };
 
 use std::sync::{Arc, RwLock};
@@ -22,6 +24,7 @@ use std::sync::{Arc, RwLock};
 #[derive(Debug, Clone)]
 pub enum SchemaSource {
     LocalSchema { filepath: String },
+    #[allow(dead_code)]
     RemoteSchema { endpoint: String },
 }
 
@@ -61,6 +64,12 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, sc
         })
         .resource("/cubes/{cube}/aggregate.{format}", |r| {
             r.method(Method::GET).with(aggregate_handler)
+        })
+        .resource("/cubes/{cube}/members", |r| {
+            r.method(Method::GET).with(members_default_handler)
+        })
+        .resource("/cubes/{cube}/members.{format}", |r| {
+            r.method(Method::GET).with(members_handler)
         })
         .resource("/flush", |r| {
             // TODO: Change this to POST?
