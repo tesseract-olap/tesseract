@@ -110,25 +110,6 @@ pub fn detect_cube(schema: Schema, agg_query: LogicLayerQueryOpt) -> Result<Stri
         None => vec![],
     };
 
-    let cuts = match agg_query.cuts {
-        Some(cuts) => {
-            let mut c: Vec<LevelName> = vec![];
-            for cut in cuts {
-                let e: Vec<&str> = cut.split(".").collect();
-                // TODO: Fix
-                let ln = match LevelName::from_vec(
-                    e[..e.len()-1].to_vec()
-                ) {
-                    Ok(ln) => ln,
-                    Err(_) => break,
-                };
-                c.push(ln);
-            }
-            c
-        },
-        None => vec![],
-    };
-
     let measures = match agg_query.measures {
         Some(measures) => {
             let mut m: Vec<MeasureName> = vec![];
@@ -150,12 +131,6 @@ pub fn detect_cube(schema: Schema, agg_query: LogicLayerQueryOpt) -> Result<Stri
             }
         }
 
-        for cut in &cuts {
-            if !level_names.contains(cut) {
-                break;
-            }
-        }
-
         for measure in &measures {
             if !measure_names.contains(measure) {
                 break;
@@ -167,6 +142,6 @@ pub fn detect_cube(schema: Schema, agg_query: LogicLayerQueryOpt) -> Result<Stri
 
     match result {
         Some(cube) => Ok(String::from(cube.clone().name)),
-        None => Err(format_err!("No cubes found with the requested drilldowns/cuts/measures.")),
+        None => Err(format_err!("No cubes found with the requested drilldowns/measures.")),
     }
 }

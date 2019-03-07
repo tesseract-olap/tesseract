@@ -14,4 +14,3 @@ pub use self::metadata::members_handler;
 pub use self::metadata::members_default_handler;
 pub use self::metadata::metadata_handler;
 pub use self::metadata::metadata_all_handler;
-
