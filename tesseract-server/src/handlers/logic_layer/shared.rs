@@ -87,14 +87,16 @@ impl Time {
     }
 }
 
+
 /// The last few aggregation operations are common across all different routes.
 /// This method implements that step to avoid duplication.
 pub fn finish_aggregation(
     req: HttpRequest<AppState>,
     mut agg_query: LogicLayerQueryOpt,
-    cube: String,
     format: FormatType
 ) -> FutureResponse<HttpResponse> {
+    let cube = agg_query.cube.clone();
+
     // Process `time` param (latest/oldest)
     match &agg_query.time {
         Some(s) => {
@@ -190,10 +192,11 @@ pub fn finish_aggregation(
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LogicLayerQueryOpt {
-    pub drilldowns: Option<Vec<String>>,
-    pub cuts: Option<Vec<String>>,
-    pub measures: Option<Vec<String>>,
-    pub time: Option<String>,
+    cube: String,
+    drilldowns: Option<Vec<String>>,
+    cuts: Option<Vec<String>>,
+    measures: Option<Vec<String>>,
+    time: Option<String>,
     properties: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,
