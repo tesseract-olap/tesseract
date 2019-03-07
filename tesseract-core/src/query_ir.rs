@@ -10,6 +10,7 @@ pub struct QueryIr {
     pub cuts: Vec<CutSql>,
     pub drills: Vec<DrilldownSql>,
     pub meas: Vec<MeasureSql>,
+    pub filters: Vec<FilterSql>,
     // TODO put Filters and Calculations into own structs
     pub top: Option<TopSql>,
     pub top_where: Option<TopWhereSql>,
@@ -228,6 +229,13 @@ pub struct TopWhereSql {
     pub by_column: String,
     pub constraint: Constraint,
 }
+
+#[derive(Debug, Clone)]
+pub struct FilterSql {
+    pub by_column: String,
+    pub constraint: Constraint,
+}
+
 
 #[derive(Debug, Clone)]
 pub struct LimitSql {

@@ -65,6 +65,7 @@ impl Backend for Clickhouse {
             &query_ir.cuts,
             &query_ir.drills,
             &query_ir.meas,
+            &query_ir.filters,
             &query_ir.top,
             &query_ir.top_where,
             &query_ir.sort,

@@ -15,6 +15,7 @@ use tesseract_core::query_ir::{
     LimitSql,
     RcaSql,
     GrowthSql,
+    FilterSql,
     dim_subquery,
 };
 use self::options::wrap_options;
@@ -27,6 +28,7 @@ pub fn clickhouse_sql(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    filters: &[FilterSql],
     // TODO put Filters and Calculations into own structs
     top: &Option<TopSql>,
     top_where: &Option<TopWhereSql>,
@@ -50,7 +52,7 @@ pub fn clickhouse_sql(
         final_drill_cols = drill_cols;
     }
 
-    final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, limit);
+    final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, limit, filters);
 
     final_sql
 }

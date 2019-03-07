@@ -5,6 +5,7 @@ use super::{
     SortSql,
     TopSql,
     TopWhereSql,
+    FilterSql,
 };
 
 pub fn wrap_options(
@@ -14,6 +15,7 @@ pub fn wrap_options(
     top_where: &Option<TopWhereSql>,
     sort: &Option<SortSql>,
     limit: &Option<LimitSql>,
+    filters: &[FilterSql],
     ) -> String
 {
     let mut final_sql = final_sql;
@@ -64,8 +66,14 @@ pub fn wrap_options(
         }
     };
 
-    final_sql = format!("select * from ({}) {} {}",
+    let filters_sql = filters.iter()
+        .map(|f| format!("{} {}", f.by_column, f.constraint.sql_string()));
+    let filters_sql = format!("where {}", join(filters_sql, " and "));
+
+
+    final_sql = format!("select * from ({}) {} {} {}",
         final_sql,
+        filters_sql,
         sort_sql,
         limit_sql,
     );

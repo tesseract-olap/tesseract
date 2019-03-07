@@ -15,6 +15,7 @@ pub struct Query {
     pub drilldowns: Vec<Drilldown>,
     pub measures: Vec<Measure>,
     pub properties: Vec<Property>,
+    pub filters: Vec<FilterQuery>,
     pub parents: bool,
     pub top: Option<TopQuery>,
     pub top_where: Option<TopWhereQuery>,
@@ -32,6 +33,7 @@ impl Query {
             cuts: vec![],
             measures: vec![],
             properties: vec![],
+            filters: vec![],
             parents: false,
             top: None,
             top_where: None,
@@ -349,5 +351,33 @@ impl FromStr for GrowthQuery {
             _ => bail!("Could not parse a growth query, wrong number of args"),
         }
 
+    }
+}
+
+/// For filtering on a measure after Top is calculated (wrapper around end aggregation)
+#[derive(Debug, Clone)]
+pub struct FilterQuery {
+    pub by_mea_or_calc: MeaOrCalc,
+    pub constraint: Constraint,
+}
+
+// Currently only allows one sort_measure
+impl FromStr for FilterQuery {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.split(",").collect::<Vec<_>>()[..] {
+            [by_mea, constraint] => {
+
+                let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
+                let constraint = constraint.parse::<Constraint>()?;
+
+                Ok(FilterQuery {
+                    by_mea_or_calc,
+                    constraint,
+                })
+            },
+            _ => bail!("Could not parse a filter query"),
+        }
     }
 }
