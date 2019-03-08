@@ -118,6 +118,59 @@ impl Schema {
         if query.drilldowns.is_empty() && query.cuts.is_empty(){
             return Err(format_err!("Either a drilldown or cut is required"));
         }
+
+        // The logic layer only requires the level name to be provided for a query.
+        // Here, we find the dimension and hierarchy names for the given level names.
+        // NOTE: Failing silently for queries with multiple drilldowns if not all of
+        //       the level names are found.
+        let cube_obj = self.cubes.iter()
+            .find(|c| &c.name == &cube)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let mut drilldowns: Vec<Drilldown> = vec![];
+        let mut cuts: Vec<Cut> = vec![];
+
+        let drilldown_levels = query.drilldown_levels();
+        let cut_levels = query.cut_levels();
+
+        // TODO: Do this in one pass for both drilldowns, cuts and properties
+        for dimension in cube_obj.dimensions.clone() {
+            for hierarchy in dimension.hierarchies.clone() {
+                for level in hierarchy.levels.clone() {
+                    let level_name = LevelName {
+                        dimension: dimension.name.clone(),
+                        hierarchy: hierarchy.name.clone(),
+                        level: level.name.clone()
+                    };
+
+                    if drilldown_levels.contains(&level.name) {
+                        drilldowns.push(Drilldown(level_name.clone()));
+                    }
+
+                    match cut_levels.get(&level.name) {
+                        Some(members) => {
+                            cuts.push(
+                                Cut {
+                                    level_name: level_name.clone(),
+                                    members: members.clone()
+                                }
+                            );
+                        },
+                        None => continue,
+                    }
+                }
+            }
+        }
+
+        let mut query_copy = query.clone();
+        query_copy.drilldowns = drilldowns;
+        query_copy.cuts = cuts;
+        let query = query_copy;
+
+        if query.drilldowns.is_empty() && query.cuts.is_empty(){
+            return Err(format_err!("Please provide a valid drilldown or cut"));
+        }
+
         // also check that properties have a matching drilldown
         if let Some(ref rca) = query.rca {
             let rca_drills = [&rca.drill_1, &rca.drill_2];

@@ -139,7 +139,8 @@ pub fn finish_aggregation(
         },
         None => (),
     }
-    info!("query opts:{:?}", agg_query);
+
+    info!("aggregate query: {:?}", agg_query);
 
     // Turn AggregateQueryOpt into TsQuery
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
@@ -153,6 +154,8 @@ pub fn finish_aggregation(
             );
         },
     };
+
+    info!("tesseract query: {:?}", ts_query);
 
     let query_ir_headers = req
         .state()
@@ -174,7 +177,7 @@ pub fn finish_aggregation(
         .backend
         .generate_sql(query_ir);
 
-    info!("Sql query: {}", sql);
+    info!("SQL query: {}", sql);
     info!("Headers: {:?}", headers);
 
     req.state()
@@ -215,34 +218,31 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
 
     fn try_from(agg_query_opt: LogicLayerQueryOpt) -> Result<Self, Self::Error> {
-        let drilldowns: Result<Vec<_>, _> = agg_query_opt.drilldowns
+        let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 ds.iter().map(|d| d.parse()).collect()
             })
-            .unwrap_or(Ok(vec![]));
+            .unwrap_or(Ok(vec![]))?;
 
-        let cuts: Result<Vec<_>, _> = agg_query_opt.cuts
+        let cuts: Vec<_> = agg_query_opt.cuts
             .map(|cs| {
                 cs.iter().map(|c| c.parse()).collect()
             })
-            .unwrap_or(Ok(vec![]));
+            .unwrap_or(Ok(vec![]))?;
 
-        let measures: Result<Vec<_>, _> = agg_query_opt.measures
+        let measures: Vec<_> = agg_query_opt.measures
             .map(|ms| {
                 ms.iter().map(|m| m.parse()).collect()
             })
-            .unwrap_or(Ok(vec![]));
+            .unwrap_or(Ok(vec![]))?;
 
-        let properties: Result<Vec<_>, _> = agg_query_opt.properties
+        let properties: Vec<_> = agg_query_opt.properties
             .map(|ms| {
                 ms.iter().map(|m| m.parse()).collect()
             })
-            .unwrap_or(Ok(vec![]));
+            .unwrap_or(Ok(vec![]))?;
 
-        let drilldowns = drilldowns?;
-        let cuts = cuts?;
-        let measures = measures?;
-        let properties = properties?;
+        println!("{:?}", drilldowns);
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 

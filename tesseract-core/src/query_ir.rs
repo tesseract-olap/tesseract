@@ -177,14 +177,10 @@ pub struct CutSql {
 
 impl CutSql {
     pub fn members_string(&self) -> String {
-        let members = match self.member_type {
-            MemberType::NonText => join(&self.members, ", "),
-            MemberType::Text => {
-                let quoted = self.members.iter()
-                    .map(|m| format!("'{}'", m));
-                join(quoted, ", ")
-            }
-        };
+        // TODO: Does this somehow break ClickHouse?
+        let quoted = self.members.iter()
+            .map(|m| format!("'{}'", m));
+        let members = join(quoted, ", ");
         format!("{}", members)
     }
 

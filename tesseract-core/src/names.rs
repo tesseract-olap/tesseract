@@ -25,6 +25,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
+
 /// Fully qualified name of Dimension, Hierarchy, and Level
 /// Basis for other names.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -57,6 +58,12 @@ impl LevelName {
                 dimension: level_name[0].clone().into(),
                 hierarchy: level_name[0].clone().into(),
                 level: level_name[1].clone().into(),
+            })
+        } else if level_name.len() == 1 {
+            Ok(LevelName {
+                dimension: level_name[0].clone().into(),
+                hierarchy: level_name[0].clone().into(),
+                level: level_name[0].clone().into(),
             })
         } else {
             bail!(
@@ -110,6 +117,7 @@ impl FromStr for LevelName {
     }
 }
 
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Drilldown(pub LevelName);
 
@@ -140,6 +148,7 @@ impl FromStr for Drilldown {
         s.parse::<LevelName>().map(|level_name| Drilldown(level_name))
     }
 }
+
 
 /// Naive impl, does not check that [Measure]. is NOT
 /// prepended. But does remove brackets on FromStr
