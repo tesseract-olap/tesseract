@@ -1,9 +1,9 @@
 mod backend;
 mod dataframe;
+mod sql;
 pub mod format;
 pub mod names;
 pub mod schema;
-mod sql;
 pub mod query;
 pub mod query_ir;
 
@@ -129,11 +129,12 @@ impl Schema {
 
         let mut drilldowns: Vec<Drilldown> = vec![];
         let mut cuts: Vec<Cut> = vec![];
+        let mut properties: Vec<Property> = vec![];
 
         let drilldown_levels = query.drilldown_levels();
         let cut_levels = query.cut_levels();
+        let property_names = query.property_names();
 
-        // TODO: Do this in one pass for both drilldowns, cuts and properties
         for dimension in cube_obj.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
                 for level in hierarchy.levels.clone() {
@@ -143,10 +144,12 @@ impl Schema {
                         level: level.name.clone()
                     };
 
+                    // drilldowns
                     if drilldown_levels.contains(&level.name) {
                         drilldowns.push(Drilldown(level_name.clone()));
                     }
 
+                    // cuts
                     match cut_levels.get(&level.name) {
                         Some(members) => {
                             cuts.push(
@@ -158,6 +161,23 @@ impl Schema {
                         },
                         None => continue,
                     }
+
+                    // properties
+                    match level.properties {
+                        Some(props) => {
+                            for property in props.clone() {
+                                if property_names.contains(&property.name) {
+                                    properties.push(
+                                        Property {
+                                            level_name: level_name.clone(),
+                                            property: property.name.clone()
+                                        }
+                                    )
+                                }
+                            }
+                        },
+                        None => continue
+                    }
                 }
             }
         }
@@ -165,6 +185,7 @@ impl Schema {
         let mut query_copy = query.clone();
         query_copy.drilldowns = drilldowns;
         query_copy.cuts = cuts;
+        query_copy.properties = properties;
         let query = query_copy;
 
         if query.drilldowns.is_empty() && query.cuts.is_empty(){

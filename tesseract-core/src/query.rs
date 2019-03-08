@@ -63,6 +63,16 @@ impl Query {
 
         levels
     }
+
+    pub fn property_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = vec![];
+
+        for property in self.properties.clone() {
+            names.push(property.property);
+        }
+
+        names
+    }
 }
 
 // TODO: Move ClickHouse specific queries away from ts-core

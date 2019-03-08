@@ -209,7 +209,7 @@ impl Cut {
         Ok(LevelName::from_vec(cut_level.clone())
             .map(|level_name| {
                 Cut {
-                    level_name: level_name,
+                    level_name,
                     members: members.clone().into_iter().map(|s| s.into()).collect(),
                 }
             })
@@ -320,7 +320,7 @@ impl Property {
         Ok(LevelName::from_vec(property[0..property.len()-1].to_vec())
             .map(|level_name| {
                 Property {
-                    level_name: level_name,
+                    level_name,
                     property: property[property.len()-1].clone().into(),
                 }
             })
@@ -367,10 +367,20 @@ impl FromStr for Property {
             s.split(".")
         }).collect();
 
-        Ok(Property {
-            level_name: LevelName::from_vec(name_vec[0..name_vec.len()-1].to_vec())?,
-            property: name_vec[name_vec.len()-1].to_owned(),
-        })
+        if name_vec.len() == 1 {
+            // Logic layer does not require any dimension, hierarchy or level
+            // names for properties. We find which Level this property belongs
+            // to in `sql_query()`
+            Ok(Property {
+                level_name: LevelName::from_vec(name_vec.to_vec())?,
+                property: name_vec[0].to_string(),
+            })
+        } else {
+            Ok(Property {
+                level_name: LevelName::from_vec(name_vec[0..name_vec.len() - 1].to_vec())?,
+                property: name_vec[name_vec.len() - 1].to_owned(),
+            })
+        }
     }
 }
 

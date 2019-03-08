@@ -242,8 +242,6 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             })
             .unwrap_or(Ok(vec![]))?;
 
-        println!("{:?}", drilldowns);
-
         let parents = agg_query_opt.parents.unwrap_or(false);
 
         let top = agg_query_opt.top
