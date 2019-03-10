@@ -24,7 +24,7 @@ impl Postgres {
         Ok(Postgres::new(address))
     }
 
-    pub fn hangup() -> () {
+    pub fn hangup() {
         println!("Done with connection! TODO!");
     }
 }
@@ -60,15 +60,21 @@ mod tests {
     use super::*;
     use std::env;
     use tokio::runtime::current_thread::Runtime;
-
+    use tesseract_core::{ColumnData};
     #[test]
     fn test_pg_query() {
         let postgres_db= env::var("TESSERACT_DATABASE_URL").expect("Please provide TESSERACT_DATABASE_URL");
         let pg = Postgres::new(&postgres_db);
-        let future = pg.exec_sql("SELECT id, moi from test;".to_string()).map(|df| {
+        let future = pg.exec_sql("SELECT 1337 as hello;".to_string()).map(|df| {
             println!("Result was: {:?}", df);
-            ()
-        })
+            let expected_len: usize = 1;
+            let val = match df.columns[0].column_data {
+                ColumnData::Int32(ref internal_data) => internal_data[0],
+                _ => -1
+            };
+            assert_eq!(df.len(), expected_len);
+            assert_eq!(val, 1337);
+            })
             .map_err(|err| {
                println!("Got error {:?}", err);
                 ()
