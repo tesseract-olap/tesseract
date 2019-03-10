@@ -65,7 +65,7 @@ pub fn rows_to_df(qry_result: Collect<Query>, columns: &[Column]) -> Box<Future<
 
     let future = qry_result.map(|rows| {
         let mut df = DataFrame::from_vec(tcolumn_list);
-        for row_idx in 0..rows.len() {
+        for row in &rows {
             for col_idx in 0..df.columns.len() {
                 let column_data = df.columns
                     .get_mut(col_idx)
@@ -73,27 +73,22 @@ pub fn rows_to_df(qry_result: Collect<Query>, columns: &[Column]) -> Box<Future<
                     .column_data();
                 match column_data {
                     ColumnData::Int32(col_data) => {
-                        let row = &rows[row_idx];
                         let value = row.get::<_, i32>(col_idx);
                         col_data.push(value);
                     },
                     ColumnData::Int64(col_data) => {
-                        let row = &rows[row_idx];
                         let value = row.get::<_, i64>(col_idx);
                         col_data.push(value);
                     },
                     ColumnData::Float32(col_data) => {
-                        let row = &rows[row_idx];
                         let value = row.get::<_, f32>(col_idx);
                         col_data.push(value);
                     },
                     ColumnData::Float64(col_data) => {
-                        let row = &rows[row_idx];
                         let value = row.get::<_, f64>(col_idx);
                         col_data.push(value);
                     },
                     ColumnData::Text(col_data) => {
-                        let row = &rows[row_idx];
                         let value = row.get::<_, String>(col_idx);
                         col_data.push(value);
                     },
