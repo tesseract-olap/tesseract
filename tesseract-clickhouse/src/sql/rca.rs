@@ -403,7 +403,7 @@ mod test {
         };
 
         assert_eq!(
-            clickhouse_sql(&table, &[], &[], &[], &None, &None, &None, &None, &Some(rca), &None),
+            clickhouse_sql(&table, &[], &[], &[], &[], &None, &None, &None, &None, &Some(rca), &None),
             "".to_owned()
         );
     }

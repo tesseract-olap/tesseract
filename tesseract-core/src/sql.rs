@@ -100,6 +100,10 @@ pub(crate) fn standard_sql(
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::query_ir::{MemberType, LevelColumn};
+    use crate::Table;
+
     #[test]
     /// Tests:
     /// - basic standard sql generation
