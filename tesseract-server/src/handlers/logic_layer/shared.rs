@@ -117,20 +117,32 @@ pub struct LogicLayerQueryOpt {
 
 impl LogicLayerQueryOpt {
     fn deserialize_args(arg: String) -> Vec<String> {
-        // TODO: Not working when only one of the arguments is wrapped in []
+        let mut open = false;
+        let mut curr_str = "".to_string();
+        let mut arg_vec: Vec<String> = vec![];
 
-        let arg_vec: Vec<String> = (if arg.chars().nth(0).unwrap() == '[' {
-            // check if starts with '[', then assume
-            // that this means that it's a qualified name
-            // with [] wrappers. This means that can't just
-            // split on any periods, only periods that fall
-            // outside the []
-            let pattern: &[_] = &['[', ']'];
-            let arg = arg.trim_matches(pattern);
-            arg.split("],[")
-        } else {
-            arg.split(",")
-        }).map(|s| s.to_string()).collect();
+        for c in arg.chars() {
+            let c_str = c.to_string();
+            if c_str == "[" {
+                open = true;
+            } else if c_str == "]" {
+                arg_vec.push(curr_str);
+                curr_str = "".to_string();
+                open = false;
+            } else if c_str == "," {
+                if open {
+                    curr_str += &c_str;
+                } else {
+                    continue;
+                }
+            } else {
+                curr_str += &c_str;
+            }
+        }
+
+        if curr_str.len() >= 1 {
+            arg_vec.push(curr_str);
+        }
 
         arg_vec
     }
