@@ -1,6 +1,7 @@
 use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 
+use crate::names::Mask;
 use crate::query::{LimitQuery, SortDirection, Constraint};
 use crate::schema::Table;
 use crate::schema::aggregator::Aggregator;
@@ -174,6 +175,8 @@ pub struct CutSql {
     pub column: String,
     pub members: Vec<String>,
     pub member_type: MemberType,
+    // Mask is Includes or Excludes on set of cut members
+    pub mask: Mask,
 }
 
 impl CutSql {
@@ -191,6 +194,13 @@ impl CutSql {
 
     pub fn col_qual_string(&self) -> String {
         format!("{}.{}", self.table.name, self.column)
+    }
+
+    pub fn mask_sql_string(&self) -> String {
+        match self.mask {
+            Mask::Include => "in".into(),
+            Mask::Exclude => "not in".into(),
+        }
     }
 }
 

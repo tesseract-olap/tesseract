@@ -474,6 +474,7 @@ mod test {
         println!("{}", drilldown);
         println!("{}", cut1);
         println!("{}", cut2);
+        println!("{}", cut2_not);
         println!("{}", property);
 
         panic!();
