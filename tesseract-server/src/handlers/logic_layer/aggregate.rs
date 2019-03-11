@@ -124,7 +124,7 @@ pub fn logic_layer_aggregation(
     // Process `time` param (latest/oldest)
     match &agg_query.time {
         Some(s) => {
-            let cube_info = req.state().cache.read().unwrap().find_cube_info(&cube_name);
+            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name);
 
             for (k, v) in s.iter() {
                 let time = match Time::from_key_value(k.clone(), v.clone()) {
@@ -138,9 +138,9 @@ pub fn logic_layer_aggregation(
                     },
                 };
 
-                match cube_info.clone() {
-                    Some(info) => {
-                        let (level, val) = match info.get_time_cut(time) {
+                match cube_cache.clone() {
+                    Some(cache) => {
+                        let (level, val) = match cache.get_time_cut(time) {
                             Ok(cut) => cut,
                             Err(err) => {
                                 return Box::new(
@@ -153,13 +153,11 @@ pub fn logic_layer_aggregation(
 
                         agg_query.cuts = match agg_query.cuts {
                             Some(mut cuts) => {
-                                cuts.insert(level, val);
+                                cuts.push(format!("{}.{}", level, val));
                                 Some(cuts)
                             },
                             None => {
-                                let mut m: HashMap<String, String> = HashMap::new();
-                                m.insert(level, val);
-                                Some(m)
+                                Some(vec![format!("{}.{}", level, val)])
                             },
                         }
                     },

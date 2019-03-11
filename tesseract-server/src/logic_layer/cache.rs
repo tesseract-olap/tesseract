@@ -187,12 +187,6 @@ fn find_years(cube: Cube) -> Result<Option<Dimension>, Error> {
         }
 
         for dim in &time_dimensions {
-            if dim.name.contains("End") {
-                return Ok(Some(dim.clone()));
-            }
-        }
-
-        for dim in &time_dimensions {
             if dim.name.contains("Year") {
                 return Ok(Some(dim.clone()));
             }

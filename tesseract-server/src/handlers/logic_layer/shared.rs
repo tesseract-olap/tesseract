@@ -98,7 +98,7 @@ impl Time {
 pub struct LogicLayerQueryOpt {
     pub cube: String,
     pub drilldowns: Option<Vec<String>>,
-    pub cuts: Option<HashMap<String, String>>,
+    pub cuts: Option<Vec<String>>,
     pub time: Option<HashMap<String, String>>,
     measures: Option<Vec<String>>,
     properties: Option<Vec<String>>,
@@ -110,6 +110,7 @@ pub struct LogicLayerQueryOpt {
     growth: Option<String>,
     rca: Option<String>,
     debug: Option<bool>,
+    filters: Option<Vec<String>>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
@@ -150,7 +151,7 @@ impl LogicLayerQueryOpt {
     pub fn from_params_map(params_map: HashMap<String, String>, cube_obj: Cube) -> Result<Self, Error> {
         let mut cube: String = "".to_string();
         let mut drilldowns: Option<Vec<String>> = None;
-        let mut cuts: Option<HashMap<String, String>> = None;
+        let mut cuts: Option<Vec<String>> = None;
         let mut measures: Option<Vec<String>> = None;
         let mut time: Option<HashMap<String, String>> = None;
         let mut properties: Option<Vec<String>> = None;
@@ -162,9 +163,10 @@ impl LogicLayerQueryOpt {
         let mut growth: Option<String> = None;
         let mut rca: Option<String> = None;
         let mut debug: Option<bool> = None;
+        let mut filters: Option<Vec<String>> = None;
 
         let mut time_map: HashMap<String, String> = HashMap::new();
-        let mut cuts_map: HashMap<String, String> = HashMap::new();
+        let mut cuts_vec: Vec<String> = vec![];
 
         for (k, v) in params_map.iter() {
             let param = k.clone();
@@ -243,16 +245,18 @@ impl LogicLayerQueryOpt {
                     Ok(dh) => dh,
                     Err(_) => break
                 };
-                cuts_map.insert(format!("{}.{}.{}", dimension, hierarchy, param), value);
+                cuts_vec.push(format!("{}.{}.{}.{}", dimension, hierarchy, param, value));
             }
         }
+
+        // TODO: Add filter support
 
         if time_map.len() >= 1 {
             time = Some(time_map);
         }
 
-        if cuts_map.len() >= 1 {
-            cuts = Some(cuts_map);
+        if cuts_vec.len() >= 1 {
+            cuts = Some(cuts_vec);
         }
 
         Ok(
@@ -270,7 +274,8 @@ impl LogicLayerQueryOpt {
                 limit,
                 growth,
                 rca,
-                debug
+                debug,
+                filters
             }
         )
     }
@@ -287,29 +292,11 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             })
             .unwrap_or(Ok(vec![]))?;
 
-        let cuts: Vec<_> = match agg_query_opt.cuts {
-            Some(cuts_map) => {
-                let mut c: Vec<Cut> = vec![];
-
-                for (k, v) in cuts_map.iter() {
-                    let ln = LevelName::from_vec(k.split(".").map(|s| s.to_string()).collect());
-                    let level_name = match ln {
-                        Ok(level_name) => level_name,
-                        Err(_) => continue
-                    };
-
-                    c.push(
-                        Cut {
-                            level_name,
-                            members: v.split(",").map(|s| s.to_string()).collect()
-                        }
-                    )
-                }
-
-                c
-            },
-            None => vec![]
-        };
+        let cuts: Vec<_> = agg_query_opt.cuts
+            .map(|cs| {
+                cs.iter().map(|c| c.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]))?;
 
         let measures: Vec<_> = agg_query_opt.measures
             .map(|ms| {
@@ -320,6 +307,12 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
         let properties: Vec<_> = agg_query_opt.properties
             .map(|ms| {
                 ms.iter().map(|m| m.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]))?;
+
+        let filters: Vec<_> = agg_query_opt.filters
+            .map(|fs| {
+                fs.iter().map(|f| f.parse()).collect()
             })
             .unwrap_or(Ok(vec![]))?;
 
@@ -361,6 +354,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             rca,
             growth,
             debug,
+            filters,
         })
     }
 }
