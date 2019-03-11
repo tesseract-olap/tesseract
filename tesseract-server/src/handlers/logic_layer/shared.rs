@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use tesseract_core::names::{LevelName, Cut};
 use tesseract_core::Query as TsQuery;
-use tesseract_core::schema::Schema;
+use tesseract_core::schema::{Cube};
 
 
 #[derive(Debug, Clone)]
@@ -135,7 +135,7 @@ impl LogicLayerQueryOpt {
         arg_vec
     }
 
-    pub fn from_params_map(params_map: HashMap<String, String>, schema: Schema) -> Result<Self, Error> {
+    pub fn from_params_map(params_map: HashMap<String, String>, cube_obj: Cube) -> Result<Self, Error> {
         let mut cube: String = "".to_string();
         let mut drilldowns: Option<Vec<String>> = None;
         let mut cuts: Option<HashMap<String, String>> = None;
@@ -154,26 +154,28 @@ impl LogicLayerQueryOpt {
         let mut time_map: HashMap<String, String> = HashMap::new();
         let mut cuts_map: HashMap<String, String> = HashMap::new();
 
-        let cube_name = match params_map.get("cube") {
-            Some(c) => c.to_string(),
-            None => return Err(format_err!("`cube` param not provided"))
-        };
-        let cube_res = schema.cubes.iter()
-            .find(|c| &c.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"));
-        let cube_obj = match cube_res {
-            Ok(c) => c.clone(),
-            Err(err) => return Err(format_err!(err.to_string()))
-        };
-
         for (k, v) in params_map.iter() {
-            let param = *k;
-            let value = *v;
+            let param = k.clone();
+            let value = v.clone();
 
             if param == "cube" {
-                continue;
+                cube = value;
             } else if param == "drilldowns" {
-                drilldowns = Some(LogicLayerQueryOpt::deserialize_args(value));
+                let drilldown_levels = LogicLayerQueryOpt::deserialize_args(value);
+                let mut d: Vec<String> = vec![];
+
+                for level in drilldown_levels {
+                    let (dimension, hierarchy) = match cube_obj.identify_level(level.clone()) {
+                        Ok(dh) => dh,
+                        Err(err) => break
+                    };
+
+                    d.push(
+                        format!("{}.{}.{}", dimension, hierarchy, level)
+                    );
+                }
+
+                drilldowns = Some(d);
             } else if param == "measures" {
                 measures = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "time" {
@@ -183,6 +185,7 @@ impl LogicLayerQueryOpt {
                 }
                 time_map.insert(time_op[0].clone(), time_op[1].clone());
             } else if param == "properties" {
+                // TODO: Transform
                 properties = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "parents" {
                 if value == "true" {
@@ -209,6 +212,7 @@ impl LogicLayerQueryOpt {
                     debug = Some(false);
                 }
             } else {
+                // TODO: Transform
                 // Support for arbitrary cuts
                 cuts_map.insert(param, value);
             }

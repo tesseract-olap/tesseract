@@ -1,5 +1,6 @@
 use serde_derive::Serialize;
 use std::convert::From;
+use failure::{Error, format_err};
 
 pub mod aggregator;
 pub mod metadata;
@@ -26,6 +27,7 @@ pub use crate::schema::{
 use crate::names::{LevelName, Measure as MeasureName};
 use crate::query_ir::MemberType;
 pub use self::aggregator::Aggregator;
+
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Schema {
@@ -93,7 +95,7 @@ impl From<SchemaConfigJson> for Schema {
                                 dimensions.push(Dimension {
                                     name: shared_dim_config.name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
-                                    hierarchies: hierarchies,
+                                    hierarchies,
                                     annotations: dim_annotations,
                                 });
                             }
@@ -106,8 +108,8 @@ impl From<SchemaConfigJson> for Schema {
                 name: cube_config.name,
                 table: cube_config.table.into(),
                 can_aggregate: false,
-                dimensions: dimensions,
-                measures: measures,
+                dimensions,
+                measures,
                 annotations: cube_annotations,
             });
         }
@@ -121,7 +123,7 @@ impl From<SchemaConfigJson> for Schema {
 
         Schema {
             name: schema_config.name,
-            cubes: cubes,
+            cubes,
             annotations: schema_annotations,
         }
     }
@@ -175,6 +177,21 @@ impl Cube {
         }
 
         measure_names
+    }
+
+    /// Finds the dimension and hierarchy names for a given level.
+    pub fn identify_level(&self, level_name: String) -> Result<(String, String), Error> {
+        for dimension in self.dimensions.clone() {
+            for hierarchy in dimension.hierarchies.clone() {
+                for level in hierarchy.levels.clone() {
+                    if level.name == level_name {
+                        return Ok((dimension.name, hierarchy.name))
+                    }
+                }
+            }
+        }
+
+        Err(format_err!("'{}' not found", level_name))
     }
 }
 

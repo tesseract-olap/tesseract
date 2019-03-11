@@ -742,6 +742,12 @@ impl Schema {
 
         Ok(column)
     }
+
+    pub fn get_cube_by_name(&self, cube_name: &str) -> Result<&Cube, Error> {
+        self.cubes.iter()
+            .find(|c| &c.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))
+    }
 }
 
 struct MembersQueryIR {
