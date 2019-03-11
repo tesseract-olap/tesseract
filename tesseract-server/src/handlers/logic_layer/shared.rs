@@ -7,7 +7,6 @@ use actix_web::{
 use failure::{Error, format_err};
 use futures::future::{self, Future};
 use log::*;
-use serde_derive::{Serialize, Deserialize};
 use std::convert::{TryFrom, TryInto};
 use std::collections::HashMap;
 
@@ -299,7 +298,8 @@ pub fn finish_aggregation(
         .responder()
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+
+#[derive(Debug, Clone)]
 pub struct LogicLayerQueryOpt {
     cube: String,
     drilldowns: Option<Vec<String>>,
@@ -435,6 +435,7 @@ impl LogicLayerQueryOpt {
         )
     }
 }
+
 
 impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
