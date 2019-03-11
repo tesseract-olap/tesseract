@@ -231,6 +231,25 @@ pub struct LogicLayerQueryOpt {
 }
 
 impl LogicLayerQueryOpt {
+    fn deserialize_args(arg: String) -> Vec<String> {
+        // TODO: Not working when only one of the arguments is wrapped in []
+
+        let arg_vec: Vec<String> = (if arg.chars().nth(0).unwrap() == '[' {
+            // check if starts with '[', then assume
+            // that this means that it's a qualified name
+            // with [] wrappers. This means that can't just
+            // split on any periods, only periods that fall
+            // outside the []
+            let pattern: &[_] = &['[', ']'];
+            let arg = arg.trim_matches(pattern);
+            arg.split("],[")
+        } else {
+            arg.split(",")
+        }).map(|s| s.to_string()).collect();
+
+        arg_vec
+    }
+
     pub fn from_params_list(params_list: Vec<(String, String)>) -> Result<Self, Error> {
         let mut cube: String = "".to_string();
         let mut drilldowns: Option<Vec<String>> = None;
@@ -253,17 +272,14 @@ impl LogicLayerQueryOpt {
             let param = p.0;
             let value = p.1;
 
-            // TODO: Add brackets support here
-            // after the split, remove [ and ] from each string
-
             if param == "cube" {
                 cube = value;
             } else if param == "drilldowns" {
-                drilldowns = Some(value.split(",").map(|s| s.to_string()).collect());
+                drilldowns = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "cuts" {
-                cuts = Some(value.split(",").map(|s| s.to_string()).collect());
+                cuts = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "measures" {
-                measures = Some(value.split(",").map(|s| s.to_string()).collect());
+                measures = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "time" {
                 let time_op: Vec<String> = value.split(".").map(|s| s.to_string()).collect();
                 if time_op.len() != 2 {
@@ -271,7 +287,7 @@ impl LogicLayerQueryOpt {
                 }
                 time_map.insert(time_op[0].clone(), time_op[1].clone());
             } else if param == "properties" {
-                properties = Some(value.split(",").map(|s| s.to_string()).collect());
+                properties = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "parents" {
                 if value == "true" {
                     parents = Some(true);
