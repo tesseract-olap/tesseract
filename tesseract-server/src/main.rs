@@ -64,9 +64,7 @@ fn main() -> Result<(), Error> {
     // NOTE: Local schema is the only supported SchemaSource for now
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
-    let schema = schema_config::read_schema(&schema_path).map_err(|err| {
-        format_err!("Error reading schema: {}", err)
-    })?;
+    let schema = schema_config::read_schema(&schema_path)?;
     let schema_arc = Arc::new(RwLock::new(schema.clone()));
 
     // Env

@@ -16,7 +16,7 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
     } else if schema_path.ends_with("json") {
         schema = Schema::from_json(&schema_str)?;
     } else {
-        panic!("Schema format not supported");
+        return Err(format_err!("Schema format not supported"))
     }
 
     // Check each cube for unique level and property names
@@ -28,7 +28,7 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
             for hierarchy in dimension.hierarchies.clone() {
                 for level in hierarchy.levels.clone() {
                     if levels.contains(&level.name) {
-                        panic!(format!("Make sure the {} cube has unique level names", cube.name));
+                        return Err(format_err!("Make sure the {} cube has unique level names", cube.name))
                     } else {
                         levels.insert(level.name);
                     }
@@ -37,7 +37,7 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
                         Some(props) => {
                             for property in props {
                                 if properties.contains(&property.name) {
-                                    panic!(format!("Make sure the {} cube has unique property names", cube.name));
+                                    return Err(format_err!("Make sure the {} cube has unique property names", cube.name))
                                 } else {
                                     properties.insert(property.name);
                                 }
