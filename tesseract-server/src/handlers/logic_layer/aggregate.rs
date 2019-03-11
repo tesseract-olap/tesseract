@@ -9,6 +9,7 @@ use futures::future::{self};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
+use serde_urlencoded;
 use tesseract_core::{Schema};
 use tesseract_core::format::{FormatType};
 use tesseract_core::names::{LevelName, Measure as MeasureName};
@@ -56,11 +57,8 @@ pub fn logic_layer_aggregation(
     info!("format: {:?}", format);
 
     let query = req.query_string();
-    lazy_static!{
-        static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
-    }
 
-    let agg_query_res = QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(&query);
+    let agg_query_res = serde_urlencoded::from_str::<Vec<(String, String)>>(query);
     let agg_query = match agg_query_res {
         Ok(q) => q,
         Err(err) => {
@@ -72,7 +70,20 @@ pub fn logic_layer_aggregation(
         },
     };
 
-    finish_aggregation(req, agg_query, format)
+    println!("{:?}", agg_query);
+
+    let mut query_opt = match LogicLayerQueryOpt::from_params_list(agg_query) {
+        Ok(q) => q,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
+    finish_aggregation(req, query_opt, format)
 }
 
 

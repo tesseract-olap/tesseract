@@ -214,6 +214,92 @@ pub struct LogicLayerQueryOpt {
 //    sparse: Option<bool>,
 }
 
+impl LogicLayerQueryOpt {
+    pub fn from_params_list(params_list: Vec<(String, String)>) -> Result<Self, Error> {
+        let mut cube: String = "".to_string();
+        let mut drilldowns: Option<Vec<String>> = None;
+        let mut cuts: Option<Vec<String>> = None;
+        let mut measures: Option<Vec<String>> = None;
+        // TODO: Is time a cut or a drilldown?
+        let mut time: Option<String> = None;
+        let mut properties: Option<Vec<String>> = None;
+        let mut parents: Option<bool> = None;
+        let mut top: Option<String> = None;
+        let mut top_where: Option<String> = None;
+        let mut sort: Option<String> = None;
+        let mut limit: Option<String> = None;
+        let mut growth: Option<String> = None;
+        let mut rca: Option<String> = None;
+        let mut debug: Option<bool> = None;
+
+        for p in params_list {
+            let param = p.0;
+            let value = p.1;
+
+            // TODO: Add brackets support here
+            // after the split, remove [ and ] from each string
+
+            if param == "cube" {
+                cube = value;
+            } else if param == "drilldowns" {
+                drilldowns = Some(value.split(",").map(|s| s.to_string()).collect());
+            } else if param == "cuts" {
+                cuts = Some(value.split(",").map(|s| s.to_string()).collect());
+            } else if param == "measures" {
+                measures = Some(value.split(",").map(|s| s.to_string()).collect());
+            } else if param == "time" {
+                // TODO: Change this to HashMap<String, String>
+                time = Some(value);
+            } else if param == "properties" {
+                properties = Some(value.split(",").map(|s| s.to_string()).collect());
+            } else if param == "parents" {
+                if value == "true" {
+                    parents = Some(true);
+                } else {
+                    parents = Some(false);
+                }
+            } else if param == "top" {
+                top = Some(value);
+            } else if param == "top_where" {
+                top_where = Some(value);
+            } else if param == "sort" {
+                sort = Some(value);
+            } else if param == "limit" {
+                limit = Some(value);
+            } else if param == "growth" {
+                growth = Some(value);
+            } else if param == "rca" {
+                rca = Some(value);
+            } else if param == "debug" {
+                if value == "true" {
+                    debug = Some(true);
+                } else {
+                    debug = Some(false);
+                }
+            }
+        }
+
+        Ok(
+            LogicLayerQueryOpt {
+                cube,
+                drilldowns,
+                cuts,
+                measures,
+                time,
+                properties,
+                parents: None,
+                top: None,
+                top_where: None,
+                sort: None,
+                limit: None,
+                growth: None,
+                rca: None,
+                debug: None
+            }
+        )
+    }
+}
+
 impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
 
