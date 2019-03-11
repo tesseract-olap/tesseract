@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use tesseract_core::names::{LevelName, Cut};
 use tesseract_core::Query as TsQuery;
+use tesseract_core::schema::Schema;
 
 
 #[derive(Debug, Clone)]
@@ -134,7 +135,7 @@ impl LogicLayerQueryOpt {
         arg_vec
     }
 
-    pub fn from_params_list(params_list: Vec<(String, String)>) -> Result<Self, Error> {
+    pub fn from_params_map(params_map: HashMap<String, String>, schema: Schema) -> Result<Self, Error> {
         let mut cube: String = "".to_string();
         let mut drilldowns: Option<Vec<String>> = None;
         let mut cuts: Option<HashMap<String, String>> = None;
@@ -153,12 +154,24 @@ impl LogicLayerQueryOpt {
         let mut time_map: HashMap<String, String> = HashMap::new();
         let mut cuts_map: HashMap<String, String> = HashMap::new();
 
-        for p in params_list {
-            let param = p.0;
-            let value = p.1;
+        let cube_name = match params_map.get("cube") {
+            Some(c) => c.to_string(),
+            None => return Err(format_err!("`cube` param not provided"))
+        };
+        let cube_res = schema.cubes.iter()
+            .find(|c| &c.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"));
+        let cube_obj = match cube_res {
+            Ok(c) => c.clone(),
+            Err(err) => return Err(format_err!(err.to_string()))
+        };
+
+        for (k, v) in params_map.iter() {
+            let param = *k;
+            let value = *v;
 
             if param == "cube" {
-                cube = value;
+                continue;
             } else if param == "drilldowns" {
                 drilldowns = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "measures" {
