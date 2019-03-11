@@ -1,19 +1,24 @@
+use std::collections::HashMap;
+use std::convert::{TryInto};
+
 use actix_web::{
+    AsyncResponder,
     FutureResponse,
     HttpRequest,
     HttpResponse,
     Path,
 };
 use failure::{Error, format_err};
-use futures::future::{self};
-use lazy_static::lazy_static;
 use log::*;
-use serde_qs as qs;
 use serde_urlencoded;
-use tesseract_core::format::{FormatType};
+use futures::future::{self, Future};
+
+use tesseract_core::format::{format_records, FormatType};
+use tesseract_core::names::{LevelName, Cut, Drilldown, Property};
+use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, finish_aggregation};
+use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -34,7 +39,7 @@ pub fn logic_layer_handler(
 }
 
 
-/// Performs first step of data aggregation.
+/// Performs data aggregation.
 pub fn logic_layer_aggregation(
     req: HttpRequest<AppState>,
     format: String,
@@ -81,5 +86,192 @@ pub fn logic_layer_aggregation(
         },
     };
 
-    finish_aggregation(req, query_opt, format)
+    let mut agg_query = query_opt.clone();
+
+    let cube = agg_query.cube.clone();
+
+    // Process `time` param (latest/oldest)
+    match &agg_query.time {
+        Some(s) => {
+            let cube_info = req.state().cache.read().unwrap().find_cube_info(&cube);
+
+            for (k, v) in s.iter() {
+                let time = match Time::from_key_value(k.clone(), v.clone()) {
+                    Ok(time) => time,
+                    Err(err) => {
+                        return Box::new(
+                            future::result(
+                                Ok(HttpResponse::NotFound().json(err.to_string()))
+                            )
+                        );
+                    },
+                };
+
+                match cube_info.clone() {
+                    Some(info) => {
+                        let (level, val) = match info.get_time_cut(time) {
+                            Ok(cut) => cut,
+                            Err(err) => {
+                                return Box::new(
+                                    future::result(
+                                        Ok(HttpResponse::NotFound().json(err.to_string()))
+                                    )
+                                );
+                            }
+                        };
+
+                        agg_query.cuts = match agg_query.cuts {
+                            Some(mut cuts) => {
+                                cuts.insert(level, val);
+                                Some(cuts)
+                            },
+                            None => {
+                                let mut m: HashMap<String, String> = HashMap::new();
+                                m.insert(level, val);
+                                Some(m)
+                            },
+                        }
+                    },
+                    None => (),
+                };
+            }
+        },
+        None => (),
+    }
+
+    info!("aggregate query: {:?}", agg_query);
+
+    // Turn AggregateQueryOpt into TsQuery
+    let ts_query: Result<TsQuery, _> = agg_query.try_into();
+    let ts_query = match ts_query {
+        Ok(q) => q,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
+    info!("tesseract query: {:?}", ts_query);
+
+    // The logic layer only requires the level name to be provided for a query.
+    // Here, we find the dimension and hierarchy names for the given level names.
+    // NOTE: Failing silently for queries with multiple drilldowns if not all of
+    //       the level names are found.
+    let schema = req
+        .state()
+        .schema.read().unwrap();
+
+    let cube_obj_res = schema.cubes.iter()
+        .find(|c| &c.name == &cube)
+        .ok_or(format_err!("Could not find cube"));
+
+    let cube_obj = match cube_obj_res {
+        Ok(c) => c,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        }
+    };
+
+    let mut drilldowns: Vec<Drilldown> = vec![];
+    let mut cuts: Vec<Cut> = vec![];
+    let mut properties: Vec<Property> = vec![];
+
+    let drilldown_levels = ts_query.drilldown_levels();
+    let cut_levels = ts_query.cut_levels();
+    let property_names = ts_query.property_names();
+
+    for dimension in cube_obj.dimensions.clone() {
+        for hierarchy in dimension.hierarchies.clone() {
+            for level in hierarchy.levels.clone() {
+                let level_name = LevelName {
+                    dimension: dimension.name.clone(),
+                    hierarchy: hierarchy.name.clone(),
+                    level: level.name.clone()
+                };
+
+                // drilldowns
+                if drilldown_levels.contains(&level.name) {
+                    drilldowns.push(Drilldown(level_name.clone()));
+                }
+
+                // cuts
+                match cut_levels.get(&level.name) {
+                    Some(members) => {
+                        cuts.push(
+                            Cut {
+                                level_name: level_name.clone(),
+                                members: members.clone()
+                            }
+                        );
+                    },
+                    None => continue,
+                }
+
+                // properties
+                match level.properties {
+                    Some(props) => {
+                        for property in props.clone() {
+                            if property_names.contains(&property.name) {
+                                properties.push(
+                                    Property {
+                                        level_name: level_name.clone(),
+                                        property: property.name.clone()
+                                    }
+                                )
+                            }
+                        }
+                    },
+                    None => continue
+                }
+            }
+        }
+    }
+
+    let mut query_copy = ts_query.clone();
+    query_copy.drilldowns = drilldowns;
+    query_copy.cuts = cuts;
+    query_copy.properties = properties;
+    let ts_query = query_copy;
+
+    let query_ir_headers = req
+        .state()
+        .schema.read().unwrap()
+        .sql_query(&cube, &ts_query);
+
+    let (query_ir, headers) = match query_ir_headers {
+        Ok(x) => x,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
+
+    let sql = req.state()
+        .backend
+        .generate_sql(query_ir);
+
+    info!("SQL query: {}", sql);
+    info!("Headers: {:?}", headers);
+
+    req.state()
+        .backend
+        .exec_sql(sql)
+        .from_err()
+        .and_then(move |df| {
+            match format_records(&headers, df, format) {
+                Ok(res) => Ok(HttpResponse::Ok().body(res)),
+                Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+            }
+        })
+        .responder()
 }
