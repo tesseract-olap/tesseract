@@ -8,13 +8,11 @@ use actix_web::{
     HttpResponse,
     Path,
 };
-use failure::{Error, format_err};
 use log::*;
 use serde_urlencoded;
 use futures::future::{self, Future};
 
 use tesseract_core::format::{format_records, FormatType};
-use tesseract_core::schema::{Cube};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;

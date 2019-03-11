@@ -43,36 +43,6 @@ impl Query {
             debug: false,
         }
     }
-
-    pub fn drilldown_levels(&self) -> Vec<String> {
-        let mut levels: Vec<String> = vec![];
-
-        for drilldown in self.drilldowns.clone() {
-            levels.push(drilldown.0.level);
-        }
-
-        levels
-    }
-
-    pub fn cut_levels(&self) -> HashMap<String, Vec<String>> {
-        let mut levels: HashMap<String, Vec<String>> = HashMap::new();
-
-        for cut in self.cuts.clone() {
-            levels.insert(cut.level_name.level, cut.members);
-        }
-
-        levels
-    }
-
-    pub fn property_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = vec![];
-
-        for property in self.properties.clone() {
-            names.push(property.property);
-        }
-
-        names
-    }
 }
 
 // TODO: Move ClickHouse specific queries away from ts-core

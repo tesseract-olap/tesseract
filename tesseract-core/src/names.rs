@@ -60,12 +60,6 @@ impl LevelName {
                 hierarchy: level_name[0].clone().into(),
                 level: level_name[1].clone().into(),
             })
-        } else if level_name.len() == 1 {
-            Ok(LevelName {
-                dimension: level_name[0].clone().into(),
-                hierarchy: level_name[0].clone().into(),
-                level: level_name[0].clone().into(),
-            })
         } else {
             bail!(
                 "Dimension {:?} does not follow naming convention",
@@ -223,10 +217,6 @@ impl Cut {
                 ))
             })?)
     }
-
-//    pub fn from_hashmap(map: HashMap<String, String>) -> Result<Self, Error> {
-//
-//    }
 }
 
 impl fmt::Display for Cut {
@@ -295,7 +285,7 @@ impl FromStr for Cut {
 
         Ok(Cut {
             level_name: LevelName::from_vec(name_vec[0..name_vec.len()-1].to_vec())?,
-            members: members,
+            members,
         })
     }
 }
@@ -374,20 +364,10 @@ impl FromStr for Property {
             s.split(".")
         }).collect();
 
-        if name_vec.len() == 1 {
-            // Logic layer does not require any dimension, hierarchy or level
-            // names for properties. We find which Level this property belongs
-            // to in `sql_query()`
-            Ok(Property {
-                level_name: LevelName::from_vec(name_vec.to_vec())?,
-                property: name_vec[0].to_string(),
-            })
-        } else {
-            Ok(Property {
-                level_name: LevelName::from_vec(name_vec[0..name_vec.len() - 1].to_vec())?,
-                property: name_vec[name_vec.len() - 1].to_owned(),
-            })
-        }
+        Ok(Property {
+            level_name: LevelName::from_vec(name_vec[0..name_vec.len() - 1].to_vec())?,
+            property: name_vec[name_vec.len() - 1].to_owned(),
+        })
     }
 }
 

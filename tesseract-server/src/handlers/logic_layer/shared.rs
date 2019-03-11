@@ -99,8 +99,8 @@ pub struct LogicLayerQueryOpt {
     pub cube: String,
     pub drilldowns: Option<Vec<String>>,
     pub cuts: Option<HashMap<String, String>>,
-    measures: Option<Vec<String>>,
     pub time: Option<HashMap<String, String>>,
+    measures: Option<Vec<String>>,
     properties: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,
@@ -167,7 +167,7 @@ impl LogicLayerQueryOpt {
                 for level in drilldown_levels {
                     let (dimension, hierarchy) = match cube_obj.identify_level(level.clone()) {
                         Ok(dh) => dh,
-                        Err(err) => break
+                        Err(_) => break
                     };
 
                     d.push(
@@ -192,7 +192,7 @@ impl LogicLayerQueryOpt {
                 for property in property_levels {
                     let (dimension, hierarchy, level) = match cube_obj.identify_property(property.clone()) {
                         Ok(dh) => dh,
-                        Err(err) => break
+                        Err(_) => break
                     };
 
                     p.push(
@@ -229,7 +229,7 @@ impl LogicLayerQueryOpt {
                 // Support for arbitrary cuts
                 let (dimension, hierarchy) = match cube_obj.identify_level(param.clone()) {
                     Ok(dh) => dh,
-                    Err(err) => break
+                    Err(_) => break
                 };
                 cuts_map.insert(format!("{}.{}.{}", dimension, hierarchy, param), value);
             }
