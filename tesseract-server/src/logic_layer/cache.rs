@@ -43,7 +43,7 @@ impl CubeCache {
         }
     }
 
-    pub fn get_time_cut(&self, t: Time) -> Result<String, Error> {
+    pub fn get_time_cut(&self, t: Time) -> Result<(String, String), Error> {
         let year_opt;
 
         // TODO: Add check for precision type
@@ -60,7 +60,10 @@ impl CubeCache {
 
         let ln = self.get_time_level_name();
 
-        Ok(format!("{}.{}.{}.{}", ln.dimension(), ln.hierarchy(), ln.level(), year).to_string())
+        Ok((
+            format!("{}.{}.{}", ln.dimension(), ln.hierarchy(), ln.level()).to_string(),
+            year.to_string()
+        ))
     }
 
     pub fn min_year(&self) -> Option<u32> {

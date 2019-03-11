@@ -24,6 +24,7 @@ use failure::{Error, bail, format_err, ensure};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
+use std::collections::HashMap;
 
 
 /// Fully qualified name of Dimension, Hierarchy, and Level
@@ -177,6 +178,7 @@ impl FromStr for Measure {
     }
 }
 
+
 /// Note: FromStr impl aggressively left trims ampersands
 /// from the beginning of member list and from the
 /// beginning of each member
@@ -221,6 +223,10 @@ impl Cut {
                 ))
             })?)
     }
+
+//    pub fn from_hashmap(map: HashMap<String, String>) -> Result<Self, Error> {
+//
+//    }
 }
 
 impl fmt::Display for Cut {
@@ -293,6 +299,7 @@ impl FromStr for Cut {
         })
     }
 }
+
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Property {
@@ -383,6 +390,7 @@ impl FromStr for Property {
         }
     }
 }
+
 
 #[cfg(test)]
 mod test {

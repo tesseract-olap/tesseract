@@ -91,7 +91,7 @@ pub(crate) fn standard_sql(
     }
 
     if !cuts.is_empty() {
-        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.col_qual_string(), c.members_string())), ", ");
+        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.col_qual_string(), c.members_string())), " and ");
         final_sql = format!("{} where {}", final_sql, cut_clauses);
     }
 

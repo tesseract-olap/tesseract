@@ -12,6 +12,7 @@ use std::convert::{TryFrom, TryInto};
 use std::collections::HashMap;
 
 use tesseract_core::format::{format_records, FormatType};
+use tesseract_core::names::{LevelName, Cut};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
@@ -130,7 +131,8 @@ pub fn finish_aggregation(
 
                 match cube_info.clone() {
                     Some(info) => {
-                        let cut = match info.get_time_cut(time) {
+                        // TODO: Refactor this to return k, v
+                        let (level, val) = match info.get_time_cut(time) {
                             Ok(cut) => cut,
                             Err(err) => {
                                 return Box::new(
@@ -143,10 +145,14 @@ pub fn finish_aggregation(
 
                         agg_query.cuts = match agg_query.cuts {
                             Some(mut cuts) => {
-                                cuts.push(cut);
+                                cuts.insert(level, val);
                                 Some(cuts)
                             },
-                            None => Some(vec![cut]),
+                            None => {
+                                let mut m: HashMap<String, String> = HashMap::new();
+                                m.insert(level, val);
+                                Some(m)
+                            },
                         }
                     },
                     None => (),
@@ -213,7 +219,7 @@ pub fn finish_aggregation(
 pub struct LogicLayerQueryOpt {
     cube: String,
     drilldowns: Option<Vec<String>>,
-    cuts: Option<Vec<String>>,
+    cuts: Option<HashMap<String, String>>,
     measures: Option<Vec<String>>,
     time: Option<HashMap<String, String>>,
     properties: Option<Vec<String>>,
@@ -253,7 +259,7 @@ impl LogicLayerQueryOpt {
     pub fn from_params_list(params_list: Vec<(String, String)>) -> Result<Self, Error> {
         let mut cube: String = "".to_string();
         let mut drilldowns: Option<Vec<String>> = None;
-        let mut cuts: Option<Vec<String>> = None;
+        let mut cuts: Option<HashMap<String, String>> = None;
         let mut measures: Option<Vec<String>> = None;
         let mut time: Option<HashMap<String, String>> = None;
         let mut properties: Option<Vec<String>> = None;
@@ -267,6 +273,7 @@ impl LogicLayerQueryOpt {
         let mut debug: Option<bool> = None;
 
         let mut time_map: HashMap<String, String> = HashMap::new();
+        let mut cuts_map: HashMap<String, String> = HashMap::new();
 
         for p in params_list {
             let param = p.0;
@@ -276,8 +283,6 @@ impl LogicLayerQueryOpt {
                 cube = value;
             } else if param == "drilldowns" {
                 drilldowns = Some(LogicLayerQueryOpt::deserialize_args(value));
-            } else if param == "cuts" {
-                cuts = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "measures" {
                 measures = Some(LogicLayerQueryOpt::deserialize_args(value));
             } else if param == "time" {
@@ -312,11 +317,18 @@ impl LogicLayerQueryOpt {
                 } else {
                     debug = Some(false);
                 }
+            } else {
+                // Support for arbitrary cuts
+                cuts_map.insert(param, value);
             }
         }
 
         if time_map.len() >= 1 {
             time = Some(time_map);
+        }
+
+        if cuts_map.len() >= 1 {
+            cuts = Some(cuts_map);
         }
 
         Ok(
@@ -350,11 +362,29 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             })
             .unwrap_or(Ok(vec![]))?;
 
-        let cuts: Vec<_> = agg_query_opt.cuts
-            .map(|cs| {
-                cs.iter().map(|c| c.parse()).collect()
-            })
-            .unwrap_or(Ok(vec![]))?;
+        let cuts: Vec<_> = match agg_query_opt.cuts {
+            Some(cuts_map) => {
+                let mut c: Vec<Cut> = vec![];
+
+                for (k, v) in cuts_map.iter() {
+                    let ln = LevelName::from_vec(k.split(".").map(|s| s.to_string()).collect());
+                    let level_name = match ln {
+                        Ok(level_name) => level_name,
+                        Err(_) => continue
+                    };
+
+                    c.push(
+                        Cut {
+                            level_name,
+                            members: v.split(",").map(|s| s.to_string()).collect()
+                        }
+                    )
+                }
+
+                c
+            },
+            None => vec![]
+        };
 
         let measures: Vec<_> = agg_query_opt.measures
             .map(|ms| {
