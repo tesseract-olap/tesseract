@@ -12,7 +12,7 @@ use std::convert::{TryFrom, TryInto};
 use std::collections::HashMap;
 
 use tesseract_core::format::{format_records, FormatType};
-use tesseract_core::names::{LevelName, Cut};
+use tesseract_core::names::{LevelName, Cut, Drilldown, Property};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
@@ -178,6 +178,90 @@ pub fn finish_aggregation(
     };
 
     info!("tesseract query: {:?}", ts_query);
+
+    // The logic layer only requires the level name to be provided for a query.
+    // Here, we find the dimension and hierarchy names for the given level names.
+    // NOTE: Failing silently for queries with multiple drilldowns if not all of
+    //       the level names are found.
+    let schema = req
+        .state()
+        .schema.read().unwrap();
+
+    let cube_obj_res = schema.cubes.iter()
+        .find(|c| &c.name == &cube)
+        .ok_or(format_err!("Could not find cube"));
+
+    let cube_obj = match cube_obj_res {
+        Ok(c) => c,
+        Err(err) => {
+            return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        }
+    };
+
+    let mut drilldowns: Vec<Drilldown> = vec![];
+    let mut cuts: Vec<Cut> = vec![];
+    let mut properties: Vec<Property> = vec![];
+
+    let drilldown_levels = ts_query.drilldown_levels();
+    let cut_levels = ts_query.cut_levels();
+    let property_names = ts_query.property_names();
+
+    for dimension in cube_obj.dimensions.clone() {
+        for hierarchy in dimension.hierarchies.clone() {
+            for level in hierarchy.levels.clone() {
+                let level_name = LevelName {
+                    dimension: dimension.name.clone(),
+                    hierarchy: hierarchy.name.clone(),
+                    level: level.name.clone()
+                };
+
+                // drilldowns
+                if drilldown_levels.contains(&level.name) {
+                    drilldowns.push(Drilldown(level_name.clone()));
+                }
+
+                // cuts
+                match cut_levels.get(&level.name) {
+                    Some(members) => {
+                        cuts.push(
+                            Cut {
+                                level_name: level_name.clone(),
+                                members: members.clone()
+                            }
+                        );
+                    },
+                    None => continue,
+                }
+
+                // properties
+                match level.properties {
+                    Some(props) => {
+                        for property in props.clone() {
+                            if property_names.contains(&property.name) {
+                                properties.push(
+                                    Property {
+                                        level_name: level_name.clone(),
+                                        property: property.name.clone()
+                                    }
+                                )
+                            }
+                        }
+                    },
+                    None => continue
+                }
+            }
+        }
+    }
+
+    let mut query_copy = ts_query.clone();
+    query_copy.drilldowns = drilldowns;
+    query_copy.cuts = cuts;
+    query_copy.properties = properties;
+    let ts_query = query_copy;
 
     let query_ir_headers = req
         .state()
