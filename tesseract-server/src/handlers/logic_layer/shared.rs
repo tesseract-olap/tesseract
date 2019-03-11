@@ -9,6 +9,7 @@ use futures::future::{self, Future};
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use std::convert::{TryFrom, TryInto};
+use std::collections::HashMap;
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
@@ -85,6 +86,19 @@ impl Time {
 
         Ok(Time {precision, value})
     }
+
+    pub fn from_key_value(key: String, value: String) -> Result<Self, Error> {
+        let precision = match TimePrecision::from_str( key) {
+            Ok(precision) => precision,
+            Err(err) => return Err(err),
+        };
+        let value = match TimeValue::from_str(value) {
+            Ok(value) => value,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Time {precision, value})
+    }
 }
 
 
@@ -102,40 +116,42 @@ pub fn finish_aggregation(
         Some(s) => {
             let cube_info = req.state().cache.read().unwrap().find_cube_info(&cube);
 
-            let time = match Time::from_str(s.clone()) {
-                Ok(time) => time,
-                Err(err) => {
-                    return Box::new(
-                        future::result(
-                            Ok(HttpResponse::NotFound().json(err.to_string()))
-                        )
-                    );
-                },
-            };
+            for (k, v) in s.iter() {
+                let time = match Time::from_key_value(k.clone(), v.clone()) {
+                    Ok(time) => time,
+                    Err(err) => {
+                        return Box::new(
+                            future::result(
+                                Ok(HttpResponse::NotFound().json(err.to_string()))
+                            )
+                        );
+                    },
+                };
 
-            match cube_info {
-                Some(info) => {
-                    let cut = match info.get_time_cut(time) {
-                        Ok(cut) => cut,
-                        Err(err) => {
-                            return Box::new(
-                                future::result(
-                                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                                )
-                            );
+                match cube_info.clone() {
+                    Some(info) => {
+                        let cut = match info.get_time_cut(time) {
+                            Ok(cut) => cut,
+                            Err(err) => {
+                                return Box::new(
+                                    future::result(
+                                        Ok(HttpResponse::NotFound().json(err.to_string()))
+                                    )
+                                );
+                            }
+                        };
+
+                        agg_query.cuts = match agg_query.cuts {
+                            Some(mut cuts) => {
+                                cuts.push(cut);
+                                Some(cuts)
+                            },
+                            None => Some(vec![cut]),
                         }
-                    };
-
-                    agg_query.cuts = match agg_query.cuts {
-                        Some(mut cuts) => {
-                            cuts.push(cut);
-                            Some(cuts)
-                        },
-                        None => Some(vec![cut]),
-                    }
-                },
-                None => (),
-            };
+                    },
+                    None => (),
+                };
+            }
         },
         None => (),
     }
@@ -199,7 +215,7 @@ pub struct LogicLayerQueryOpt {
     drilldowns: Option<Vec<String>>,
     cuts: Option<Vec<String>>,
     measures: Option<Vec<String>>,
-    time: Option<String>,
+    time: Option<HashMap<String, String>>,
     properties: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,
@@ -220,8 +236,7 @@ impl LogicLayerQueryOpt {
         let mut drilldowns: Option<Vec<String>> = None;
         let mut cuts: Option<Vec<String>> = None;
         let mut measures: Option<Vec<String>> = None;
-        // TODO: Is time a cut or a drilldown?
-        let mut time: Option<String> = None;
+        let mut time: Option<HashMap<String, String>> = None;
         let mut properties: Option<Vec<String>> = None;
         let mut parents: Option<bool> = None;
         let mut top: Option<String> = None;
@@ -231,6 +246,8 @@ impl LogicLayerQueryOpt {
         let mut growth: Option<String> = None;
         let mut rca: Option<String> = None;
         let mut debug: Option<bool> = None;
+
+        let mut time_map: HashMap<String, String> = HashMap::new();
 
         for p in params_list {
             let param = p.0;
@@ -248,8 +265,11 @@ impl LogicLayerQueryOpt {
             } else if param == "measures" {
                 measures = Some(value.split(",").map(|s| s.to_string()).collect());
             } else if param == "time" {
-                // TODO: Change this to HashMap<String, String>
-                time = Some(value);
+                let time_op: Vec<String> = value.split(".").map(|s| s.to_string()).collect();
+                if time_op.len() != 2 {
+                    return Err(format_err!("Wrong format for time argument."));
+                }
+                time_map.insert(time_op[0].clone(), time_op[1].clone());
             } else if param == "properties" {
                 properties = Some(value.split(",").map(|s| s.to_string()).collect());
             } else if param == "parents" {
@@ -279,6 +299,10 @@ impl LogicLayerQueryOpt {
             }
         }
 
+        if time_map.len() >= 1 {
+            time = Some(time_map);
+        }
+
         Ok(
             LogicLayerQueryOpt {
                 cube,
@@ -287,14 +311,14 @@ impl LogicLayerQueryOpt {
                 measures,
                 time,
                 properties,
-                parents: None,
-                top: None,
-                top_where: None,
-                sort: None,
-                limit: None,
-                growth: None,
-                rca: None,
-                debug: None
+                parents,
+                top,
+                top_where,
+                sort,
+                limit,
+                growth,
+                rca,
+                debug
             }
         )
     }
