@@ -193,6 +193,28 @@ impl Cube {
 
         Err(format_err!("'{}' not found", level_name))
     }
+
+    /// Finds the dimension, hierarchy, and level names for a given property.
+    pub fn identify_property(&self, property_name: String) -> Result<(String, String, String), Error> {
+        for dimension in self.dimensions.clone() {
+            for hierarchy in dimension.hierarchies.clone() {
+                for level in hierarchy.levels.clone() {
+                    match level.properties {
+                        Some(props) => {
+                            for property in props {
+                                if property.name == property_name {
+                                    return Ok((dimension.name, hierarchy.name, level.name))
+                                }
+                            }
+                        },
+                        None => continue
+                    }
+                }
+            }
+        }
+
+        Err(format_err!("'{}' not found", property_name))
+    }
 }
 
 

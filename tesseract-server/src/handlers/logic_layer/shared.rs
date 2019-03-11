@@ -185,8 +185,22 @@ impl LogicLayerQueryOpt {
                 }
                 time_map.insert(time_op[0].clone(), time_op[1].clone());
             } else if param == "properties" {
-                // TODO: Transform
-                properties = Some(LogicLayerQueryOpt::deserialize_args(value));
+                let property_levels = LogicLayerQueryOpt::deserialize_args(value);
+
+                let mut p: Vec<String> = vec![];
+
+                for property in property_levels {
+                    let (dimension, hierarchy, level) = match cube_obj.identify_property(property.clone()) {
+                        Ok(dh) => dh,
+                        Err(err) => break
+                    };
+
+                    p.push(
+                        format!("{}.{}.{}.{}", dimension, hierarchy, level, property)
+                    );
+                }
+
+                properties = Some(p);
             } else if param == "parents" {
                 if value == "true" {
                     parents = Some(true);
@@ -212,9 +226,12 @@ impl LogicLayerQueryOpt {
                     debug = Some(false);
                 }
             } else {
-                // TODO: Transform
                 // Support for arbitrary cuts
-                cuts_map.insert(param, value);
+                let (dimension, hierarchy) = match cube_obj.identify_level(param.clone()) {
+                    Ok(dh) => dh,
+                    Err(err) => break
+                };
+                cuts_map.insert(format!("{}.{}.{}", dimension, hierarchy, param), value);
             }
         }
 
