@@ -140,7 +140,7 @@ pub fn logic_layer_aggregation(
 
                 match cube_cache.clone() {
                     Some(cache) => {
-                        let (level, val) = match cache.get_time_cut(time) {
+                        let cut = match cache.get_time_cut(time) {
                             Ok(cut) => cut,
                             Err(err) => {
                                 return Box::new(
@@ -153,11 +153,11 @@ pub fn logic_layer_aggregation(
 
                         agg_query.cuts = match agg_query.cuts {
                             Some(mut cuts) => {
-                                cuts.push(format!("{}.{}", level, val));
+                                cuts.push(cut);
                                 Some(cuts)
                             },
                             None => {
-                                Some(vec![format!("{}.{}", level, val)])
+                                Some(vec![cut])
                             },
                         }
                     },

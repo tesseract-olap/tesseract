@@ -185,7 +185,7 @@ impl LogicLayerQueryOpt {
                     };
 
                     d.push(
-                        format!("{}.{}.{}", dimension, hierarchy, level)
+                        format!("[{}].[{}].[{}]", dimension, hierarchy, level)
                     );
                 }
 
@@ -210,7 +210,7 @@ impl LogicLayerQueryOpt {
                     };
 
                     p.push(
-                        format!("{}.{}.{}.{}", dimension, hierarchy, level, property)
+                        format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level, property)
                     );
                 }
 
@@ -245,7 +245,7 @@ impl LogicLayerQueryOpt {
                     Ok(dh) => dh,
                     Err(_) => break
                 };
-                cuts_vec.push(format!("{}.{}.{}.{}", dimension, hierarchy, param, value));
+                cuts_vec.push(format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, param, value));
             }
         }
 
