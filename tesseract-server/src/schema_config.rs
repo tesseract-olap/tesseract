@@ -1,4 +1,5 @@
 use failure::{Error, format_err};
+use std::collections::HashSet;
 
 use tesseract_core::Schema;
 
@@ -16,6 +17,37 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
         schema = Schema::from_json(&schema_str)?;
     } else {
         panic!("Schema format not supported");
+    }
+
+    // Check each cube for unique level and property names
+    for cube in schema.cubes.clone() {
+        let mut levels = HashSet::new();
+        let mut properties = HashSet::new();
+
+        for dimension in cube.dimensions.clone() {
+            for hierarchy in dimension.hierarchies.clone() {
+                for level in hierarchy.levels.clone() {
+                    if levels.contains(&level.name) {
+                        panic!(format!("Make sure the {} cube has unique level names", cube.name));
+                    } else {
+                        levels.insert(level.name);
+                    }
+
+                    match level.properties {
+                        Some(props) => {
+                            for property in props {
+                                if properties.contains(&property.name) {
+                                    panic!(format!("Make sure the {} cube has unique property names", cube.name));
+                                } else {
+                                    properties.insert(property.name);
+                                }
+                            }
+                        },
+                        None => continue
+                    }
+                }
+            }
+        }
     }
 
     Ok(schema)
