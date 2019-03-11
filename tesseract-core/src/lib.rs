@@ -39,6 +39,7 @@ use self::query_ir::{
     SortSql,
     RcaSql,
     GrowthSql,
+    FilterSql,
 };
 pub use self::query::{Query, MeaOrCalc};
 pub use self::query_ir::QueryIr;
@@ -275,6 +276,43 @@ impl Schema {
             None
         };
 
+        // Filter, from Query to Query IR. SHould be exactly the same as TopWhere
+        let filters = query.filters.iter()
+            .map(|filter| {
+                let by_column = match &filter.by_mea_or_calc {
+                    MeaOrCalc::Mea(m) => {
+                        // NOTE: rca mea does not return the actual value, only rca. Since
+                        // mea value must be retrieved through explicit drilldown,
+                        // don't need to do an extra rca check here.
+
+                        query.measures.iter()
+                            .position(|col| col == m )
+                            .map(|idx| {
+                                let idx = if query.rca.is_some() {
+                                    idx + 1
+                                } else {
+                                    idx
+                                };
+                                format!("final_m{}", idx)
+                            })
+                            .ok_or(format_err!("measure {} for Top must be in measures", m))
+                    },
+                    MeaOrCalc::Calc(c) => {
+                        Ok(c.sql_string())
+                    }
+                };
+
+                by_column
+                    .map(|by_column| {
+                        FilterSql {
+                            by_column,
+                            constraint: filter.constraint.clone(),
+                        }
+                    })
+            })
+            .collect::<Result<Vec<_>,_>>();
+        let filters = filters?;
+
         let sort = if let Some(ref s) = query.sort {
             let sort_column = self.get_mea_col(&cube, &s.measure)?;
 
@@ -394,6 +432,7 @@ impl Schema {
                 cuts: cut_cols,
                 drills: drill_cols,
                 meas: mea_cols,
+                filters,
                 top,
                 top_where,
                 sort,

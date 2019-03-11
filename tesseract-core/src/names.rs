@@ -178,8 +178,11 @@ impl FromStr for Measure {
 /// beginning of each member
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Cut {
+    // if mask is include, includes indicated members in the cut.
+    // if mask is Exclude (exclude, negation), excludes members in the cut and includes all others.
     pub level_name: LevelName,
     pub members: Vec<String>,
+    pub mask: Mask,
 }
 
 impl Cut {
@@ -188,16 +191,18 @@ impl Cut {
         hierarchy: S,
         level: S,
         members: Vec<S>,
+        mask: Mask,
         ) -> Self
     {
         Cut {
             level_name: LevelName::new(dimension, hierarchy, level),
             members: members.into_iter().map(|s| s.into()).collect(),
+            mask,
         }
     }
 
     /// Names must have already been trimmed of [] delimiters.
-    pub fn from_vec<S: Into<String> + Clone>(cut_level: Vec<S>, members: Vec<S>) -> Result<Self, Error> 
+    pub fn from_vec<S: Into<String> + Clone>(cut_level: Vec<S>, members: Vec<S>, mask: Mask) -> Result<Self, Error>
     {
         ensure!(members.len() > 0, "No members found");
 
@@ -207,6 +212,7 @@ impl Cut {
                 Cut {
                     level_name,
                     members: members.clone().into_iter().map(|s| s.into()).collect(),
+                    mask,
                 }
             })
             .map_err(|err| {
@@ -223,9 +229,10 @@ impl fmt::Display for Cut {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // members must be more than 0, checked by assert on serialization
         if self.members.len() == 1 {
-            write!(f, "{}.&[{}]", self.level_name, self.members[0])
+            write!(f, "{}{}.&[{}]", self.mask, self.level_name, self.members[0])
         } else {
             let mut out = String::new();
+            out.push_str(&format!("{}", self.mask));
             out.push('{');
 
             let mut members = self.members.iter();
@@ -253,6 +260,21 @@ impl FromStr for Cut {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // first check for mask value (~)
+        let is_exclude = s.chars().nth(0).unwrap() == '~';
+        let mask = if is_exclude {
+            Mask::Exclude
+        } else {
+            Mask::Include
+        };
+        let s = if is_exclude {
+            // ok to slice string, because '~' is definitely one char
+            &s[1..]
+        } else {
+            s
+        };
+
+        // then do rest of processing normally
         let name_vec: Vec<_> = if s.chars().nth(0).unwrap() == '[' {
             // check if starts with '[', then assume
             // that this means that it's a qualified name
@@ -286,10 +308,26 @@ impl FromStr for Cut {
         Ok(Cut {
             level_name: LevelName::from_vec(name_vec[0..name_vec.len()-1].to_vec())?,
             members,
+            mask,
         })
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum Mask {
+    Include,
+    Exclude,
+}
+
+impl fmt::Display for Mask {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Mask::Include => write!(f, ""),
+            Mask::Exclude => write!(f, "~"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Property {
@@ -409,10 +447,11 @@ mod test {
 
     #[test]
     fn test_cut() {
-        let cut = Cut::new("Geography", "Geography", "County", vec!["1", "2"]);
+        let cut = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include);
         let cut_from_vec = Cut::from_vec(
             vec!["Geography", "County"],
-            vec!["1", "2"]
+            vec!["1", "2"],
+            Mask::Include,
             ).unwrap();
 
         assert_eq!(cut, cut_from_vec);
@@ -433,8 +472,9 @@ mod test {
     fn test_display() {
         let level = LevelName::new("Geography", "Geography", "County");
         let drilldown = Drilldown::new("Geography", "Geography", "County");
-        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"]);
-        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"]);
+        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"], Mask::Include);
+        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include);
+        let cut2_not = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Exclude);
         let property = Property::new("Geography", "Geography", "County", "name_en");
 
         println!("{}", level);
@@ -452,8 +492,9 @@ mod test {
 
         let level = LevelName::new("Geography", "Geography", "County");
         let drilldown = Drilldown::new("Geography", "Geography", "County");
-        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"]);
-        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"]);
+        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"], Mask::Include);
+        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include);
+        let cut2_not = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Exclude);
         let property = Property::new("Geography", "Geography", "County", "name_en");
 
         // test level_name
@@ -495,6 +536,9 @@ mod test {
         assert_eq!(cut2, cut2_test_3);
         assert_eq!(cut2, cut2_test_4);
         assert_eq!(cut2, cut2_test_5);
+
+        let cut2_test_1_not = "~Geography.Geography.County.1,2".parse::<Cut>().unwrap();
+        assert_eq!(cut2_not, cut2_test_1_not);
 
         // test property
         let property_test_1 = "Geography.Geography.County.name_en".parse::<Property>().unwrap();

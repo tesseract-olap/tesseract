@@ -15,6 +15,7 @@ use tesseract_core::query_ir::{
     LimitSql,
     RcaSql,
     GrowthSql,
+    FilterSql,
     dim_subquery,
 };
 use self::options::wrap_options;
@@ -27,6 +28,7 @@ pub fn clickhouse_sql(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    filters: &[FilterSql],
     // TODO put Filters and Calculations into own structs
     top: &Option<TopSql>,
     top_where: &Option<TopWhereSql>,
@@ -50,7 +52,7 @@ pub fn clickhouse_sql(
         final_drill_cols = drill_cols;
     }
 
-    final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, limit);
+    final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, limit, filters);
 
     final_sql
 }
@@ -137,8 +139,10 @@ mod test {
             MeasureSql { aggregator: Aggregator::Sum, column: "quantity".into() }
         ];
 
+        let filters = vec![];
+
         assert_eq!(
-            clickhouse_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None, &None),
+            clickhouse_sql(&table, &cuts, &drills, &meas, &filters, &None, &None, &None, &None, &None, &None),
             "select * from (select year, month, day, product_group_id, product_group_label, product_id_raw, product_label, sum(m0) as final_m0 from (select year, month, day, product_id, product_group_id, product_group_label, product_id_raw, product_label, m0 from (select product_group_id, product_group_label, product_id_raw, product_label, product_id as product_id from dim_products where product_group_id in (3)) all inner join (select year, month, day, product_id, sum(quantity) as m0 from sales where product_id in (select product_id from dim_products where product_group_id in (3)) group by year, month, day, product_id) using product_id) group by year, month, day, product_group_id, product_group_label, product_id_raw, product_label) order by year, month, day, product_group_id, product_group_label, product_id_raw, product_label asc ".to_owned()
         );
     }

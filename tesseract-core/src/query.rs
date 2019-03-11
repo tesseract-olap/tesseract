@@ -16,6 +16,7 @@ pub struct Query {
     pub drilldowns: Vec<Drilldown>,
     pub measures: Vec<Measure>,
     pub properties: Vec<Property>,
+    pub filters: Vec<FilterQuery>,
     pub parents: bool,
     pub top: Option<TopQuery>,
     pub top_where: Option<TopWhereQuery>,
@@ -33,6 +34,7 @@ impl Query {
             cuts: vec![],
             measures: vec![],
             properties: vec![],
+            filters: vec![],
             parents: false,
             top: None,
             top_where: None,
@@ -237,6 +239,7 @@ impl FromStr for Comparison {
 
 #[derive(Debug, Clone)]
 pub struct LimitQuery {
+    pub offset: Option<u64>,
     pub n: u64,
 }
 
@@ -244,7 +247,21 @@ impl FromStr for LimitQuery {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(LimitQuery { n: s.parse::<u64>()? })
+        match &s.split(",").collect::<Vec<_>>()[..] {
+            [offset, n] => {
+                Ok(LimitQuery {
+                    offset: Some(offset.parse::<u64>()?),
+                    n: n.parse::<u64>()?,
+                })
+            },
+            [n] => {
+                Ok(LimitQuery {
+                    offset: None,
+                    n: n.parse::<u64>()?,
+                })
+            },
+            _ => bail!("Could not parse a limit query"),
+        }
     }
 }
 
@@ -352,5 +369,33 @@ impl FromStr for GrowthQuery {
             _ => bail!("Could not parse a growth query, wrong number of args"),
         }
 
+    }
+}
+
+/// For filtering on a measure after Top is calculated (wrapper around end aggregation)
+#[derive(Debug, Clone)]
+pub struct FilterQuery {
+    pub by_mea_or_calc: MeaOrCalc,
+    pub constraint: Constraint,
+}
+
+// Currently only allows one sort_measure
+impl FromStr for FilterQuery {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.split(",").collect::<Vec<_>>()[..] {
+            [by_mea, constraint] => {
+
+                let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
+                let constraint = constraint.parse::<Constraint>()?;
+
+                Ok(FilterQuery {
+                    by_mea_or_calc,
+                    constraint,
+                })
+            },
+            _ => bail!("Could not parse a filter query"),
+        }
     }
 }
