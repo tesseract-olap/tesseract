@@ -280,9 +280,9 @@ impl From<HierarchyConfigJson> for Hierarchy {
         Hierarchy {
             name: hierarchy_config.name,
             table: hierarchy_config.table.map(|t| t.into()),
-            primary_key: primary_key,
-            levels: levels,
-            annotations: annotations,
+            primary_key,
+            levels,
+            annotations,
         }
     }
 }
@@ -318,7 +318,7 @@ impl From<LevelConfigJson> for Level {
             name_column: level_config.name_column,
             properties,
             key_type: level_config.key_type,
-            annotations: annotations,
+            annotations,
         }
     }
 }
