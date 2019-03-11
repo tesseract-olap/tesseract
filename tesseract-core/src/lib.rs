@@ -492,6 +492,7 @@ impl Schema {
                 column,
                 members: cut.members.clone(),
                 member_type: level.key_type.clone().unwrap_or(MemberType::NonText),
+                mask: cut.mask.clone(),
             });
         }
 

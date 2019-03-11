@@ -120,16 +120,17 @@ pub fn primary_agg(
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
         let inline_cut_clause = inline_cuts
             .iter()
-            .map(|c| format!("{} in ({})", c.column, c.members_string()));
+            .map(|c| format!("{} {} ({})", c.column, c.mask_sql_string(), c.members_string()));
 
         let ext_cut_clause = ext_cuts_for_inline
             .iter()
             .map(|c| {
-                format!("{} in (select {} from {} where {} in ({}))",
+                format!("{} in (select {} from {} where {} {} ({}))",
                     c.foreign_key,
                     c.primary_key,
                     c.table.full_name(),
                     c.column,
+                    c.mask_sql_string(),
                     c.members_string(),
                     )
             });

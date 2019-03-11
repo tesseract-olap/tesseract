@@ -70,9 +70,13 @@ pub fn wrap_options(
         }
     };
 
-    let filters_sql = filters.iter()
-        .map(|f| format!("{} {}", f.by_column, f.constraint.sql_string()));
-    let filters_sql = format!("where {}", join(filters_sql, " and "));
+    let filters_sql = if !filters.is_empty() {
+        let filter_clauses = filters.iter()
+            .map(|f| format!("{} {}", f.by_column, f.constraint.sql_string()));
+        format!("where {}", join(filter_clauses, " and "))
+    } else {
+        "".into()
+    };
 
 
     final_sql = format!("select * from ({}) {} {} {}",
