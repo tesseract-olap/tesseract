@@ -179,10 +179,7 @@ pub struct CutSql {
 impl CutSql {
     pub fn members_string(&self) -> String {
         let members = match self.member_type {
-            MemberType::NonText => {
-                println!("{:?}", self);
-                join(&self.members, ", ")
-            },
+            MemberType::NonText => join(&self.members, ", "),
             MemberType::Text => {
                 let quoted = self.members.iter()
                 .map(|m| format!("'{}'", m));

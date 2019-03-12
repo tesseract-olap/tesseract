@@ -24,7 +24,6 @@ use failure::{Error, bail, format_err, ensure};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
-use std::collections::HashMap;
 
 
 /// Fully qualified name of Dimension, Hierarchy, and Level

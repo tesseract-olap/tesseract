@@ -120,10 +120,6 @@ impl Schema {
             return Err(format_err!("Either a drilldown or cut is required"));
         }
 
-        if query.drilldowns.is_empty() && query.cuts.is_empty(){
-            return Err(format_err!("Please provide a valid drilldown or cut"));
-        }
-
         // also check that properties have a matching drilldown
         if let Some(ref rca) = query.rca {
             let rca_drills = [&rca.drill_1, &rca.drill_2];

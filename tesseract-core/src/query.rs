@@ -1,6 +1,5 @@
 use failure::{Error, format_err, bail};
 use std::str::FromStr;
-use std::collections::HashMap;
 
 use crate::names::{
     Cut,

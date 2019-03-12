@@ -27,19 +27,15 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
         for dimension in cube.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
                 for level in hierarchy.levels.clone() {
-                    if levels.contains(&level.name) {
+                    if !levels.insert(level.name) {
                         return Err(format_err!("Make sure the {} cube has unique level names", cube.name))
-                    } else {
-                        levels.insert(level.name);
                     }
 
                     match level.properties {
                         Some(props) => {
                             for property in props {
-                                if properties.contains(&property.name) {
+                                if !properties.insert(property.name) {
                                     return Err(format_err!("Make sure the {} cube has unique property names", cube.name))
-                                } else {
-                                    properties.insert(property.name);
                                 }
                             }
                         },
