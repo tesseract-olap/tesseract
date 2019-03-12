@@ -58,21 +58,8 @@ pub fn logic_layer_aggregation(
     info!("format: {:?}", format);
 
     let query = req.query_string();
-
-    let agg_query_res = serde_urlencoded::from_str::<Vec<(String, String)>>(query);
-    let agg_query = match agg_query_res {
-        Ok(q) => {
-            let mut map: HashMap<String, String> = HashMap::new();
-
-            for p in q {
-                let param = p.0;
-                let value = p.1;
-
-                map.insert(param, value);
-            }
-
-            map
-        },
+    let agg_query: HashMap<String, String> = match serde_urlencoded::from_str::<Vec<(String, String)>>(query) {
+        Ok(q) => q.into_iter().collect(),
         Err(err) => {
             return Box::new(
                 future::result(
