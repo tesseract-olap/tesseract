@@ -2,6 +2,8 @@ use failure::{Error, format_err};
 use std::convert::{TryFrom};
 use std::collections::HashMap;
 
+use serde_derive::{Serialize, Deserialize};
+
 use tesseract_core::names::{LevelName, Cut};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
@@ -94,14 +96,16 @@ impl Time {
 }
 
 
-#[derive(Debug, Clone)]
-pub struct LogicLayerQueryOpt {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogicLayerQueryOptTest {
     pub cube: String,
-    pub drilldowns: Option<Vec<String>>,
-    pub cuts: Option<Vec<String>>,
-    pub time: Option<HashMap<String, String>>,
-    measures: Option<Vec<String>>,
-    properties: Option<Vec<String>>,
+    pub drilldowns: Option<String>,
+    #[serde(flatten)]
+    pub cuts: Option<HashMap<String, String>>,
+    pub time: Option<String>,
+    measures: Option<String>,
+    properties: Option<String>,
+    filters: Option<String>,
     parents: Option<bool>,
     top: Option<String>,
     top_where: Option<String>,
@@ -110,11 +114,151 @@ pub struct LogicLayerQueryOpt {
     growth: Option<String>,
     rca: Option<String>,
     debug: Option<bool>,
-    filters: Option<Vec<String>>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
 }
+
+
+#[derive(Debug, Clone)]
+pub struct LogicLayerQueryOpt {
+    pub cube: String,
+    pub drilldowns: Option<Vec<String>>,
+    pub cuts: Option<Vec<String>>,
+    pub time: Option<HashMap<String, String>>,
+    measures: Option<Vec<String>>,
+    properties: Option<Vec<String>>,
+    filters: Option<Vec<String>>,
+    parents: Option<bool>,
+    top: Option<String>,
+    top_where: Option<String>,
+    sort: Option<String>,
+    limit: Option<String>,
+    growth: Option<String>,
+    rca: Option<String>,
+    debug: Option<bool>,
+//    distinct: Option<bool>,
+//    nonempty: Option<bool>,
+//    sparse: Option<bool>,
+}
+
+
+impl TryFrom<LogicLayerQueryOptTest> for TsQuery {
+    type Error = Error;
+
+    fn try_from(agg_query_opt: LogicLayerQueryOptTest) -> Result<Self, Self::Error> {
+//        let drilldowns: Vec<_> = agg_query_opt.drilldowns
+//            .map(|ds| {
+//                ds.iter().map(|d| d.parse()).collect()
+//            })
+//            .unwrap_or(Ok(vec![]))?;
+//
+//        let cuts: Vec<_> = agg_query_opt.cuts
+//            .map(|cs| {
+//                cs.iter().map(|c| c.parse()).collect()
+//            })
+//            .unwrap_or(Ok(vec![]))?;
+//
+//        let measures: Vec<_> = agg_query_opt.measures
+//            .map(|ms| {
+//                ms.iter().map(|m| m.parse()).collect()
+//            })
+//            .unwrap_or(Ok(vec![]))?;
+//
+//        let properties: Vec<_> = agg_query_opt.properties
+//            .map(|ms| {
+//                ms.iter().map(|m| m.parse()).collect()
+//            })
+//            .unwrap_or(Ok(vec![]))?;
+//
+//        let filters: Vec<_> = agg_query_opt.filters
+//            .map(|fs| {
+//                fs.iter().map(|f| f.parse()).collect()
+//            })
+//            .unwrap_or(Ok(vec![]))?;
+
+        let drilldowns = vec![];
+        let cuts = vec![];
+        let measures = vec![];
+        let properties = vec![];
+        let filters= vec![];
+
+        let parents = agg_query_opt.parents.unwrap_or(false);
+
+        let top = agg_query_opt.top
+            .map(|t| t.parse())
+            .transpose()?;
+        let top_where = agg_query_opt.top_where
+            .map(|t| t.parse())
+            .transpose()?;
+        let sort = agg_query_opt.sort
+            .map(|s| s.parse())
+            .transpose()?;
+        let limit = agg_query_opt.limit
+            .map(|l| l.parse())
+            .transpose()?;
+        let growth = agg_query_opt.growth
+            .map(|g| g.parse())
+            .transpose()?;
+        let rca = agg_query_opt.rca
+            .map(|r| r.parse())
+            .transpose()?;
+
+        let debug = agg_query_opt.debug.unwrap_or(false);
+
+        Ok(TsQuery {
+            drilldowns,
+            cuts,
+            measures,
+            parents,
+            properties,
+            top,
+            top_where,
+            sort,
+            limit,
+            rca,
+            growth,
+            debug,
+            filters,
+        })
+    }
+}
+
+
+pub fn deserialize_args(arg: String) -> Vec<String> {
+    let mut open = false;
+    let mut curr_str = "".to_string();
+    let mut arg_vec: Vec<String> = vec![];
+
+    for c in arg.chars() {
+        let c_str = c.to_string();
+        if c_str == "[" {
+            open = true;
+        } else if c_str == "]" {
+            arg_vec.push(curr_str);
+            curr_str = "".to_string();
+            open = false;
+        } else if c_str == "," {
+            if open {
+                curr_str += &c_str;
+            } else {
+                continue;
+            }
+        } else {
+            curr_str += &c_str;
+        }
+    }
+
+    if curr_str.len() >= 1 {
+        arg_vec.push(curr_str);
+    }
+
+    arg_vec
+}
+
+
+
+
 
 impl LogicLayerQueryOpt {
     fn deserialize_args(arg: String) -> Vec<String> {
