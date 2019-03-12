@@ -484,16 +484,27 @@ impl Schema {
                 .clone()
                 .ok_or(format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
 
-            let column = level.key_column.clone();
+            let column = if cut.for_match {
+                level.name_column.clone().unwrap_or(level.key_column.clone())
+            } else {
+                level.key_column.clone()
+            };
+
+            let member_type = if cut.for_match {
+                MemberType::Text
+            } else {
+                level.key_type.clone().unwrap_or(MemberType::NonText)
+            };
 
             res.push(CutSql {
                 table,
                 primary_key,
                 foreign_key,
                 column,
+                member_type,
                 members: cut.members.clone(),
-                member_type: level.key_type.clone().unwrap_or(MemberType::NonText),
                 mask: cut.mask.clone(),
+                for_match: cut.for_match,
             });
         }
 

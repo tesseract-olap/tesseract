@@ -177,6 +177,8 @@ pub struct CutSql {
     pub member_type: MemberType,
     // Mask is Includes or Excludes on set of cut members
     pub mask: Mask,
+    // if for_match, then use LIKE syntax
+    pub for_match: bool,
 }
 
 impl CutSql {
@@ -193,14 +195,46 @@ impl CutSql {
         format!("{}", members)
     }
 
+    pub fn members_like_string(&self) -> String {
+        match self.member_type {
+            MemberType::NonText => {
+                // this behavior doesn't really make sense; it should be for
+                // labels only, which are almost always strings.
+                let unquoted = self.members.iter()
+                    .map(|m| format!("{} {} {}", self.column, self.mask_sql_like_string(), m));
+
+                match self.mask {
+                    Mask::Include => format!("{}", join(unquoted, " or ")),
+                    Mask::Exclude => format!("{}", join(unquoted, " and ")),
+                }
+            },
+            MemberType::Text => {
+                let quoted = self.members.iter()
+                    .map(|m| format!("{} {} '%{}%'", self.column, self.mask_sql_like_string(), m));
+
+                match self.mask {
+                    Mask::Include => format!("{}", join(quoted, " or ")),
+                    Mask::Exclude => format!("{}", join(quoted, " and ")),
+                }
+            }
+        }
+    }
+
     pub fn col_qual_string(&self) -> String {
         format!("{}.{}", self.table.name, self.column)
     }
 
-    pub fn mask_sql_string(&self) -> String {
+    pub fn mask_sql_in_string(&self) -> String {
         match self.mask {
             Mask::Include => "in".into(),
             Mask::Exclude => "not in".into(),
+        }
+    }
+
+    pub fn mask_sql_like_string(&self) -> String {
+        match self.mask {
+            Mask::Include => "like".into(),
+            Mask::Exclude => "not like".into(),
         }
     }
 }

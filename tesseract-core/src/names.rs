@@ -182,6 +182,7 @@ pub struct Cut {
     pub level_name: LevelName,
     pub members: Vec<String>,
     pub mask: Mask,
+    pub for_match: bool,
 }
 
 impl Cut {
@@ -191,17 +192,19 @@ impl Cut {
         level: S,
         members: Vec<S>,
         mask: Mask,
+        for_match: bool,
         ) -> Self
     {
         Cut {
             level_name: LevelName::new(dimension, hierarchy, level),
             members: members.into_iter().map(|s| s.into()).collect(),
             mask,
+            for_match,
         }
     }
 
     /// Names must have already been trimmed of [] delimiters.
-    pub fn from_vec<S: Into<String> + Clone>(cut_level: Vec<S>, members: Vec<S>, mask: Mask) -> Result<Self, Error>
+    pub fn from_vec<S: Into<String> + Clone>(cut_level: Vec<S>, members: Vec<S>, mask: Mask, for_match: bool) -> Result<Self, Error>
     {
         ensure!(members.len() > 0, "No members found");
 
@@ -212,6 +215,7 @@ impl Cut {
                     level_name,
                     members: members.clone().into_iter().map(|s| s.into()).collect(),
                     mask,
+                    for_match,
                 }
             })
             .map_err(|err| {
@@ -224,6 +228,7 @@ impl Cut {
     }
 }
 
+// TODO fix this, it only displays "keys" and not "labels"
 impl fmt::Display for Cut {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // members must be more than 0, checked by assert on serialization
@@ -273,6 +278,15 @@ impl FromStr for Cut {
             s
         };
 
+        // then check for match (*)
+        let for_match = s.chars().nth(0).unwrap() == '*';
+        let s = if for_match {
+            // ok to slice string, because '~' is definitely one char
+            &s[1..]
+        } else {
+            s
+        };
+
         // then do rest of processing normally
         let name_vec: Vec<_> = if s.chars().nth(0).unwrap() == '[' {
             // check if starts with '[', then assume
@@ -308,6 +322,7 @@ impl FromStr for Cut {
             level_name: LevelName::from_vec(name_vec[0..name_vec.len()-1].to_vec())?,
             members,
             mask,
+            for_match,
         })
     }
 }
