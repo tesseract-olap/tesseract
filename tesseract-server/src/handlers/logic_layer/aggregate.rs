@@ -17,7 +17,7 @@ use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, LogicLayerQueryOptTest, Time};
+use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time, return_error};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -35,16 +35,6 @@ pub fn logic_layer_handler(
 ) -> FutureResponse<HttpResponse>
 {
     logic_layer_aggregation(req, cube_format.to_owned())
-}
-
-
-/// Helper method to return errors (FutureResponse<HttpResponse>).
-pub fn return_error(message: String) -> FutureResponse<HttpResponse> {
-    Box::new(
-        future::result(
-            Ok(HttpResponse::NotFound().json(message))
-        )
-    )
 }
 
 
@@ -69,7 +59,7 @@ pub fn logic_layer_aggregation(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
-    let agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOptTest>(query) {
+    let mut agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
         Ok(mut q) => {
             let cube = match schema.get_cube_by_name(&q.cube) {
                 Ok(c) => c.clone(),
@@ -82,44 +72,54 @@ pub fn logic_layer_aggregation(
         Err(err) => return return_error(err.to_string())
     };
 
-//    // Process `time` param (latest/oldest)
-//    match &agg_query.time {
-//        Some(s) => {
-//            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name);
-//
-//            for (k, v) in s.iter() {
-//                let time = match Time::from_key_value(k.clone(), v.clone()) {
-//                    Ok(time) => time,
-//                    Err(err) => return return_error(err.to_string())
-//                };
-//
-//                match cube_cache.clone() {
-//                    Some(cache) => {
-//                        let cut = match cache.get_time_cut(time) {
-//                            Ok(cut) => cut,
-//                            Err(err) => return return_error(err.to_string())
-//                        };
-//
-//                        agg_query.cuts = match agg_query.cuts {
-//                            Some(mut cuts) => {
-//                                cuts.push(cut);
-//                                Some(cuts)
-//                            },
-//                            None => {
-//                                Some(vec![cut])
-//                            },
-//                        }
-//                    },
-//                    None => (),
-//                };
-//            }
-//        },
-//        None => (),
-//    }
+    let cube_name = agg_query.cube.clone();
+
+    // Process `time` param (latest/oldest)
+    match &agg_query.time {
+        Some(s) => {
+            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name);
+
+            let time_cuts: Vec<String> = s.split(",").map(|s| s.to_string()).collect();
+
+            for time_cut in time_cuts {
+                let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
+
+                if tc.len() != 2 {
+                    return return_error("Malformatted time cut".to_string());
+                }
+
+                let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
+                    Ok(time) => time,
+                    Err(err) => return return_error(err.to_string())
+                };
+
+                match cube_cache.clone() {
+                    Some(cache) => {
+                        let (cut, cut_value) = match cache.get_time_cut(time) {
+                            Ok(cut) => cut,
+                            Err(err) => return return_error(err.to_string())
+                        };
+
+                        agg_query.cuts = match agg_query.cuts {
+                            Some(mut cuts) => {
+                                cuts.insert(cut, cut_value);
+                                Some(cuts)
+                            },
+                            None => {
+                                let mut m: HashMap<String, String> = HashMap::new();
+                                m.insert(cut, cut_value);
+                                Some(m)
+                            },
+                        }
+                    },
+                    None => (),
+                };
+            }
+        },
+        None => (),
+    }
 
     info!("aggregate query: {:?}", agg_query);
-
-    let cube_name = agg_query.cube.clone();
 
     // TODO: Remove serde_urlencoded
     // Turn AggregateQueryOpt into TsQuery
