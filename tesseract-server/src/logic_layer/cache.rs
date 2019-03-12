@@ -1,3 +1,4 @@
+use actix::SystemRunner;
 use failure::{Error, format_err};
 use log::*;
 
@@ -80,10 +81,9 @@ impl CubeCache {
 
 
 /// Populates a `Cache` object that will be shared through `AppState`.
-pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -> Result<Cache, Error> {
+pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>, sys: &mut SystemRunner) -> Result<Cache, Error> {
     info!("Populating cache...");
 
-    let mut sys = actix::System::new("cache");
     let mut cubes: Vec<CubeCache> = vec![];
 
     for cube in schema.cubes {
@@ -107,6 +107,7 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>) -
                 return Err(format_err!("Error populating cache with backend data: {}", err));
             }
         };
+        println!("finished populating cache");
 
         // TODO: Do we want to return an error if no columns are returned?
         if df.columns.len() >= 1 {

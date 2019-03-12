@@ -74,15 +74,17 @@ fn main() -> Result<(), Error> {
         flush_secret,
     };
 
+    // Initialize actix system
+    let mut sys = actix::System::new("tesseract");
+
     // Populate internal cache
-    let cache = match logic_layer::populate_cache(schema.clone(), db.clone()) {
+    let cache = match logic_layer::populate_cache(schema.clone(), db.clone(), &mut sys) {
         Ok(cache) => cache,
         Err(_) => panic!("Cache population failed."),
     };
     let cache_arc = Arc::new(RwLock::new(cache));
 
     // Initialize Server
-    let sys = actix::System::new("tesseract");
     server::new(move|| create_app(db.clone(), db_type.clone(), env_vars.clone(), schema_arc.clone(), cache_arc.clone()))
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
