@@ -46,7 +46,9 @@ impl Query {
     }
 }
 
-/// Clickhouse:
+// TODO: Move ClickHouse specific queries away from ts-core
+
+/// ClickHouse:
 /// select * from table_name order by sort_measures sort_direction
 /// limit n by by_dimension
 #[derive(Debug, Clone)]

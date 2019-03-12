@@ -185,10 +185,11 @@ impl CutSql {
             MemberType::NonText => join(&self.members, ", "),
             MemberType::Text => {
                 let quoted = self.members.iter()
-                    .map(|m| format!("'{}'", m));
+                .map(|m| format!("'{}'", m));
                 join(quoted, ", ")
             }
         };
+
         format!("{}", members)
     }
 

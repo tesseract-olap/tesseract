@@ -13,6 +13,7 @@ use actix_web::{
 use crate::app::{AppState, SchemaSource};
 use crate::schema_config;
 
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FlushQueryOpt {
     pub secret: String,
@@ -55,9 +56,21 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 
         // Update shared schema
         let mut w = req.state().schema.write().unwrap();
-        *w = schema;
+        *w = schema.clone();
 
-        // TODO: Clear internal cache once that's implemented
+        // TODO: Uncomment when issue with SystemRunner is solved
+//        // Re-populate cache with the new schema
+//        let cache = match populate_cache(schema, req.state().backend.clone()) {
+//            Ok(cache) => cache,
+//            Err(err) => {
+//                error!("{}", err);
+//                return Ok(HttpResponse::InternalServerError().finish());
+//            },
+//        };
+//
+//        // Update shared cache
+//        let mut w = req.state().cache.write().unwrap();
+//        *w = cache;
 
         Ok(HttpResponse::Ok().finish())
     } else {

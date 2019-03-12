@@ -1,5 +1,6 @@
-use serde_derive::Serialize;
+use serde_derive::{Serialize, Deserialize};
 use std::convert::From;
+use failure::{Error, format_err};
 
 pub mod aggregator;
 pub mod metadata;
@@ -23,10 +24,12 @@ pub use crate::schema::{
     xml::TableConfigXML,
     xml::PropertyConfigXML,
 };
+use crate::names::{LevelName, Measure as MeasureName};
 use crate::query_ir::MemberType;
 pub use self::aggregator::Aggregator;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Schema {
     pub name: String,
     pub cubes: Vec<Cube>,
@@ -92,7 +95,7 @@ impl From<SchemaConfigJson> for Schema {
                                 dimensions.push(Dimension {
                                     name: shared_dim_config.name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
-                                    hierarchies: hierarchies,
+                                    hierarchies,
                                     annotations: dim_annotations,
                                 });
                             }
@@ -105,8 +108,8 @@ impl From<SchemaConfigJson> for Schema {
                 name: cube_config.name,
                 table: cube_config.table.into(),
                 can_aggregate: false,
-                dimensions: dimensions,
-                measures: measures,
+                dimensions,
+                measures,
                 annotations: cube_annotations,
             });
         }
@@ -120,7 +123,7 @@ impl From<SchemaConfigJson> for Schema {
 
         Schema {
             name: schema_config.name,
-            cubes: cubes,
+            cubes,
             annotations: schema_annotations,
         }
     }
@@ -128,7 +131,7 @@ impl From<SchemaConfigJson> for Schema {
 
 /// No `From<CubeConfig>` because the transition needs to be made at Schema
 /// level in order to take into account shared dims.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Cube {
     pub name: String,
     pub table: Table,
@@ -138,7 +141,84 @@ pub struct Cube {
     pub annotations: Option<Vec<Annotation>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+impl Cube {
+    /// Returns a Vec<String> of all the dimension name options for a given Cube.
+    pub fn get_all_level_names(&self) -> Vec<LevelName> {
+        let mut dimension_names: Vec<LevelName> = vec![];
+
+        for dimension in &self.dimensions {
+            let dimension_name = dimension.name.clone();
+            for hierarchy in &dimension.hierarchies {
+                let hierarchy_name = hierarchy.name.clone();
+                for level in &hierarchy.levels {
+                    let level_name = level.name.clone();
+                    dimension_names.push(
+                        LevelName {
+                            dimension: dimension_name.clone(),
+                            hierarchy: hierarchy_name.clone(),
+                            level: level_name,
+                        }
+                    );
+                }
+            }
+        }
+
+        dimension_names
+    }
+
+    /// Returns a Vec<String> of all the measure names for a given Cube.
+    pub fn get_all_measure_names(&self) -> Vec<MeasureName> {
+        let mut measure_names: Vec<MeasureName> = vec![];
+
+        for measure in &self.measures {
+            measure_names.push(
+                MeasureName::new(measure.name.clone())
+            );
+        }
+
+        measure_names
+    }
+
+    /// Finds the dimension and hierarchy names for a given level.
+    pub fn identify_level(&self, level_name: String) -> Result<(String, String), Error> {
+        for dimension in self.dimensions.clone() {
+            for hierarchy in dimension.hierarchies.clone() {
+                for level in hierarchy.levels.clone() {
+                    if level.name == level_name {
+                        return Ok((dimension.name, hierarchy.name))
+                    }
+                }
+            }
+        }
+
+        Err(format_err!("'{}' not found", level_name))
+    }
+
+    /// Finds the dimension, hierarchy, and level names for a given property.
+    pub fn identify_property(&self, property_name: String) -> Result<(String, String, String), Error> {
+        for dimension in self.dimensions.clone() {
+            for hierarchy in dimension.hierarchies.clone() {
+                for level in hierarchy.levels.clone() {
+                    match level.properties {
+                        Some(props) => {
+                            for property in props {
+                                if property.name == property_name {
+                                    return Ok((dimension.name, hierarchy.name, level.name))
+                                }
+                            }
+                        },
+                        None => continue
+                    }
+                }
+            }
+        }
+
+        Err(format_err!("'{}' not found", property_name))
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Dimension {
     pub name: String,
     pub foreign_key: Option<String>,
@@ -167,7 +247,7 @@ impl From<DimensionConfigJson> for Dimension {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Hierarchy {
     pub name: String,
     pub table: Option<Table>,
@@ -200,14 +280,14 @@ impl From<HierarchyConfigJson> for Hierarchy {
         Hierarchy {
             name: hierarchy_config.name,
             table: hierarchy_config.table.map(|t| t.into()),
-            primary_key: primary_key,
-            levels: levels,
-            annotations: annotations,
+            primary_key,
+            levels,
+            annotations,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Level {
     pub name: String,
     pub key_column: String,
@@ -238,12 +318,12 @@ impl From<LevelConfigJson> for Level {
             name_column: level_config.name_column,
             properties,
             key_type: level_config.key_type,
-            annotations: annotations,
+            annotations,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Measure{
     pub name: String,
     pub column: String,
@@ -269,7 +349,7 @@ impl From<MeasureConfigJson> for Measure {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Table{
     pub name: String,
     pub schema: Option<String>,
@@ -296,7 +376,7 @@ impl Table {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Property{
     pub name: String,
     pub column: String,
@@ -320,7 +400,7 @@ impl From<PropertyConfigJson> for Property {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Annotation{
     pub name: String,
     pub text: String,

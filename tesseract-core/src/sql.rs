@@ -33,9 +33,9 @@ pub(crate) fn standard_sql(
     // hack for now... remove later
     fn agg_sql_string(m: &MeasureSql) -> String {
         match &m.aggregator {
-            Aggregator::Sum => format!("sum"),
-            Aggregator::Count => format!("count"),
-            Aggregator::Average => format!("avg"),
+            Aggregator::Sum => format!("sum({})", &m.column),
+            Aggregator::Count => format!("count({})", &m.column),
+            Aggregator::Average => format!("avg({})", &m.column),
             // median doesn't work like this
             Aggregator::Median => format!("median"),
             Aggregator::WeightedAverage {..} => format!("avg"),
@@ -44,6 +44,7 @@ pub(crate) fn standard_sql(
             Aggregator::Custom(s) => format!("{}", s),
         }
     }
+
     // --------------------------------------------------
     // copied from primary_agg for clickhouse
     let ext_drills: Vec<_> = drills.iter()
@@ -90,8 +91,8 @@ pub(crate) fn standard_sql(
     }
 
     if !cuts.is_empty() {
-        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.col_qual_string(), c.members_string())), ", ");
-        final_sql = format!("{} WHERE {}", final_sql, cut_clauses);
+        let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.col_qual_string(), c.members_string())), " and ");
+        final_sql = format!("{} where {}", final_sql, cut_clauses);
     }
 
     final_sql = format!("{} group by {};", final_sql, drill_cols);

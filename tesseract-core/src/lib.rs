@@ -1,9 +1,9 @@
 mod backend;
 mod dataframe;
+mod sql;
 pub mod format;
 pub mod names;
 pub mod schema;
-mod sql;
 pub mod query;
 pub mod query_ir;
 
@@ -13,8 +13,8 @@ use serde_xml::from_reader;
 
 use crate::schema::{
     SchemaConfigJson,
-    SchemaConfigXML}
-;
+    SchemaConfigXML
+};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -25,7 +25,7 @@ use self::names::{
     Property,
     LevelName,
 };
-pub use self::schema::{Schema, Cube, Table, Aggregator};
+pub use self::schema::{Schema, Cube, Dimension, Table, Aggregator};
 use self::schema::metadata::{SchemaMetadata, CubeMetadata};
 use self::query_ir::{
     CutSql,
@@ -41,7 +41,7 @@ use self::query_ir::{
     GrowthSql,
     FilterSql,
 };
-pub use self::query::{Query, MeaOrCalc};
+pub use self::query::{Query, MeaOrCalc, FilterQuery};
 pub use self::query_ir::QueryIr;
 
 
@@ -119,6 +119,7 @@ impl Schema {
         if query.drilldowns.is_empty() && query.cuts.is_empty(){
             return Err(format_err!("Either a drilldown or cut is required"));
         }
+
         // also check that properties have a matching drilldown
         if let Some(ref rca) = query.rca {
             let rca_drills = [&rca.drill_1, &rca.drill_2];
@@ -776,6 +777,12 @@ impl Schema {
         let column = mea.column.clone();
 
         Ok(column)
+    }
+
+    pub fn get_cube_by_name(&self, cube_name: &str) -> Result<&Cube, Error> {
+        self.cubes.iter()
+            .find(|c| &c.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))
     }
 }
 

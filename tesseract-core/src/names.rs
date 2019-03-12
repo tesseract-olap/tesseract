@@ -25,6 +25,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
+
 /// Fully qualified name of Dimension, Hierarchy, and Level
 /// Basis for other names.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -110,6 +111,7 @@ impl FromStr for LevelName {
     }
 }
 
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Drilldown(pub LevelName);
 
@@ -141,6 +143,7 @@ impl FromStr for Drilldown {
     }
 }
 
+
 /// Naive impl, does not check that [Measure]. is NOT
 /// prepended. But does remove brackets on FromStr
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -167,6 +170,7 @@ impl FromStr for Measure {
         Ok(Measure(s.to_owned()))
     }
 }
+
 
 /// Note: FromStr impl aggressively left trims ampersands
 /// from the beginning of member list and from the
@@ -205,7 +209,7 @@ impl Cut {
         Ok(LevelName::from_vec(cut_level.clone())
             .map(|level_name| {
                 Cut {
-                    level_name: level_name,
+                    level_name,
                     members: members.clone().into_iter().map(|s| s.into()).collect(),
                     mask,
                 }
@@ -302,11 +306,12 @@ impl FromStr for Cut {
 
         Ok(Cut {
             level_name: LevelName::from_vec(name_vec[0..name_vec.len()-1].to_vec())?,
-            members: members,
+            members,
             mask,
         })
     }
 }
+
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Mask {
@@ -349,7 +354,7 @@ impl Property {
         Ok(LevelName::from_vec(property[0..property.len()-1].to_vec())
             .map(|level_name| {
                 Property {
-                    level_name: level_name,
+                    level_name,
                     property: property[property.len()-1].clone().into(),
                 }
             })
@@ -397,11 +402,12 @@ impl FromStr for Property {
         }).collect();
 
         Ok(Property {
-            level_name: LevelName::from_vec(name_vec[0..name_vec.len()-1].to_vec())?,
-            property: name_vec[name_vec.len()-1].to_owned(),
+            level_name: LevelName::from_vec(name_vec[0..name_vec.len() - 1].to_vec())?,
+            property: name_vec[name_vec.len() - 1].to_owned(),
         })
     }
 }
+
 
 #[cfg(test)]
 mod test {
