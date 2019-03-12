@@ -131,13 +131,32 @@ pub fn logic_layer_aggregation(
 
 
     // TODO: Remove serde_urlencoded
+//    let query = req.query_string();
+//    let schema = req.state().schema.read().unwrap();
+
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
     let agg_query_test = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOptTest>(query) {
-        Ok(q) => q,
+        Ok(mut q) => {
+            let cube = match schema.get_cube_by_name(&agg_query.cube) {
+                Ok(c) => c.clone(),
+                Err(err) => return return_error(err.to_string())
+            };
+            // Hack for now since can't provide extra arguments on try_into
+            q.cube_obj = Some(cube.clone());
+            q
+        },
         Err(err) => return return_error(err.to_string())
     };
+
+    let ts_query_test: Result<TsQuery, _> = agg_query_test.try_into();
+
+//    println!(" ");
+//    println!("{:?}", agg_query_test);
+    println!(" ");
+    println!("{:?}", ts_query_test);
+    println!(" ");
 
 
 

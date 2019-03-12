@@ -1,10 +1,11 @@
-use failure::{Error, format_err};
+use failure::{Error, format_err, bail};
 use std::convert::{TryFrom};
 use std::collections::HashMap;
 
 use serde_derive::{Serialize, Deserialize};
 
-use tesseract_core::names::{LevelName, Cut};
+use tesseract_core::names::{LevelName, Cut, Drilldown, Property, Measure};
+use tesseract_core::query::{FilterQuery};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
 
@@ -99,6 +100,8 @@ impl Time {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogicLayerQueryOptTest {
     pub cube: String,
+    pub cube_obj: Option<Cube>,
+
     pub drilldowns: Option<String>,
     #[serde(flatten)]
     pub cuts: Option<HashMap<String, String>>,
@@ -119,69 +122,43 @@ pub struct LogicLayerQueryOptTest {
 //    sparse: Option<bool>,
 }
 
-
-#[derive(Debug, Clone)]
-pub struct LogicLayerQueryOpt {
-    pub cube: String,
-    pub drilldowns: Option<Vec<String>>,
-    pub cuts: Option<Vec<String>>,
-    pub time: Option<HashMap<String, String>>,
-    measures: Option<Vec<String>>,
-    properties: Option<Vec<String>>,
-    filters: Option<Vec<String>>,
-    parents: Option<bool>,
-    top: Option<String>,
-    top_where: Option<String>,
-    sort: Option<String>,
-    limit: Option<String>,
-    growth: Option<String>,
-    rca: Option<String>,
-    debug: Option<bool>,
-//    distinct: Option<bool>,
-//    nonempty: Option<bool>,
-//    sparse: Option<bool>,
-}
-
-
 impl TryFrom<LogicLayerQueryOptTest> for TsQuery {
     type Error = Error;
 
     fn try_from(agg_query_opt: LogicLayerQueryOptTest) -> Result<Self, Self::Error> {
-//        let drilldowns: Vec<_> = agg_query_opt.drilldowns
-//            .map(|ds| {
-//                ds.iter().map(|d| d.parse()).collect()
-//            })
-//            .unwrap_or(Ok(vec![]))?;
-//
-//        let cuts: Vec<_> = agg_query_opt.cuts
-//            .map(|cs| {
-//                cs.iter().map(|c| c.parse()).collect()
-//            })
-//            .unwrap_or(Ok(vec![]))?;
-//
-//        let measures: Vec<_> = agg_query_opt.measures
-//            .map(|ms| {
-//                ms.iter().map(|m| m.parse()).collect()
-//            })
-//            .unwrap_or(Ok(vec![]))?;
-//
-//        let properties: Vec<_> = agg_query_opt.properties
-//            .map(|ms| {
-//                ms.iter().map(|m| m.parse()).collect()
-//            })
-//            .unwrap_or(Ok(vec![]))?;
-//
-//        let filters: Vec<_> = agg_query_opt.filters
-//            .map(|fs| {
-//                fs.iter().map(|f| f.parse()).collect()
-//            })
-//            .unwrap_or(Ok(vec![]))?;
+        let cube = match agg_query_opt.cube_obj {
+            Some(c) => c,
+            None => bail!("No cubes found with the given name")
+        };
 
-        let drilldowns = vec![];
-        let cuts = vec![];
-        let measures = vec![];
-        let properties = vec![];
-        let filters= vec![];
+        let mut drilldowns: Vec<Drilldown> = vec![];
+        let mut cuts: Vec<Cut> = vec![];
+        let mut measures: Vec<Measure> = vec![];
+        let mut properties: Vec<Property> = vec![];
+        let mut filters: Vec<FilterQuery>= vec![];
+
+
+        match agg_query_opt.drilldowns {
+            Some(d) => {
+                let drilldown_levels = deserialize_args(d);
+//                println!(" ");
+//                println!("{:?}", drilldown_levels);
+
+                for level in drilldown_levels {
+                    let (dimension, hierarchy) = match cube.identify_level(level.clone()) {
+                        Ok(dh) => dh,
+                        Err(_) => break
+                    };
+//                    println!("[{}].[{}].[{}]", dimension, hierarchy, level);
+
+//                    drilldowns.push(
+//
+//                    );
+                }
+            },
+            None => ()
+        }
+
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 
@@ -258,7 +235,27 @@ pub fn deserialize_args(arg: String) -> Vec<String> {
 
 
 
-
+#[derive(Debug, Clone)]
+pub struct LogicLayerQueryOpt {
+    pub cube: String,
+    pub drilldowns: Option<Vec<String>>,
+    pub cuts: Option<Vec<String>>,
+    pub time: Option<HashMap<String, String>>,
+    measures: Option<Vec<String>>,
+    properties: Option<Vec<String>>,
+    filters: Option<Vec<String>>,
+    parents: Option<bool>,
+    top: Option<String>,
+    top_where: Option<String>,
+    sort: Option<String>,
+    limit: Option<String>,
+    growth: Option<String>,
+    rca: Option<String>,
+    debug: Option<bool>,
+//    distinct: Option<bool>,
+//    nonempty: Option<bool>,
+//    sparse: Option<bool>,
+}
 
 impl LogicLayerQueryOpt {
     fn deserialize_args(arg: String) -> Vec<String> {

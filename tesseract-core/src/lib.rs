@@ -41,7 +41,7 @@ use self::query_ir::{
     GrowthSql,
     FilterSql,
 };
-pub use self::query::{Query, MeaOrCalc};
+pub use self::query::{Query, MeaOrCalc, FilterQuery};
 pub use self::query_ir::QueryIr;
 
 

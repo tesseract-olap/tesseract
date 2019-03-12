@@ -1,4 +1,4 @@
-use serde_derive::Serialize;
+use serde_derive::{Serialize, Deserialize};
 use std::convert::From;
 use failure::{Error, format_err};
 
@@ -29,7 +29,7 @@ use crate::query_ir::MemberType;
 pub use self::aggregator::Aggregator;
 
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Schema {
     pub name: String,
     pub cubes: Vec<Cube>,
@@ -131,7 +131,7 @@ impl From<SchemaConfigJson> for Schema {
 
 /// No `From<CubeConfig>` because the transition needs to be made at Schema
 /// level in order to take into account shared dims.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Cube {
     pub name: String,
     pub table: Table,
@@ -218,7 +218,7 @@ impl Cube {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Dimension {
     pub name: String,
     pub foreign_key: Option<String>,
@@ -247,7 +247,7 @@ impl From<DimensionConfigJson> for Dimension {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Hierarchy {
     pub name: String,
     pub table: Option<Table>,
@@ -287,7 +287,7 @@ impl From<HierarchyConfigJson> for Hierarchy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Level {
     pub name: String,
     pub key_column: String,
@@ -323,7 +323,7 @@ impl From<LevelConfigJson> for Level {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Measure{
     pub name: String,
     pub column: String,
@@ -349,7 +349,7 @@ impl From<MeasureConfigJson> for Measure {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Table{
     pub name: String,
     pub schema: Option<String>,
@@ -376,7 +376,7 @@ impl Table {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Property{
     pub name: String,
     pub column: String,
@@ -400,7 +400,7 @@ impl From<PropertyConfigJson> for Property {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Annotation{
     pub name: String,
     pub text: String,
