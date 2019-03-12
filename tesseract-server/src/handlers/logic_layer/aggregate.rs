@@ -17,7 +17,7 @@ use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time, return_error};
+use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time, boxed_error};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -47,7 +47,7 @@ pub fn logic_layer_aggregation(
     let format = format.parse::<FormatType>();
     let format = match format {
         Ok(f) => f,
-        Err(err) => return return_error(err.to_string()),
+        Err(err) => return boxed_error(err.to_string()),
     };
 
     info!("format: {:?}", format);
@@ -63,13 +63,13 @@ pub fn logic_layer_aggregation(
         Ok(mut q) => {
             let cube = match schema.get_cube_by_name(&q.cube) {
                 Ok(c) => c.clone(),
-                Err(err) => return return_error(err.to_string())
+                Err(err) => return boxed_error(err.to_string())
             };
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());
             q
         },
-        Err(err) => return return_error(err.to_string())
+        Err(err) => return boxed_error(err.to_string())
     };
 
     let cube_name = agg_query.cube.clone();
@@ -85,19 +85,19 @@ pub fn logic_layer_aggregation(
                 let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
 
                 if tc.len() != 2 {
-                    return return_error("Malformatted time cut".to_string());
+                    return boxed_error("Malformatted time cut".to_string());
                 }
 
                 let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
                     Ok(time) => time,
-                    Err(err) => return return_error(err.to_string())
+                    Err(err) => return boxed_error(err.to_string())
                 };
 
                 match cube_cache.clone() {
                     Some(cache) => {
                         let (cut, cut_value) = match cache.get_time_cut(time) {
                             Ok(cut) => cut,
-                            Err(err) => return return_error(err.to_string())
+                            Err(err) => return boxed_error(err.to_string())
                         };
 
                         agg_query.cuts = match agg_query.cuts {
@@ -126,7 +126,7 @@ pub fn logic_layer_aggregation(
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = match ts_query {
         Ok(q) => q,
-        Err(err) => return return_error(err.to_string())
+        Err(err) => return boxed_error(err.to_string())
     };
 
     info!("tesseract query: {:?}", ts_query);
@@ -138,7 +138,7 @@ pub fn logic_layer_aggregation(
 
     let (query_ir, headers) = match query_ir_headers {
         Ok(x) => x,
-        Err(err) => return return_error(err.to_string())
+        Err(err) => return boxed_error(err.to_string())
     };
 
     let sql = req.state()
