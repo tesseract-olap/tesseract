@@ -131,34 +131,85 @@ impl TryFrom<LogicLayerQueryOptTest> for TsQuery {
             None => bail!("No cubes found with the given name")
         };
 
-        let mut drilldowns: Vec<Drilldown> = vec![];
-        let mut cuts: Vec<Cut> = vec![];
-        let mut measures: Vec<Measure> = vec![];
-        let mut properties: Vec<Property> = vec![];
-        let mut filters: Vec<FilterQuery>= vec![];
+        let drilldowns: Vec<_> = agg_query_opt.drilldowns
+            .map(|ds| {
+                let mut drilldowns: Vec<Drilldown> = vec![];
 
-
-        match agg_query_opt.drilldowns {
-            Some(d) => {
-                let drilldown_levels = deserialize_args(d);
-//                println!(" ");
-//                println!("{:?}", drilldown_levels);
-
-                for level in drilldown_levels {
+                for level in deserialize_args(ds) {
                     let (dimension, hierarchy) = match cube.identify_level(level.clone()) {
                         Ok(dh) => dh,
                         Err(_) => break
                     };
-//                    println!("[{}].[{}].[{}]", dimension, hierarchy, level);
-
-//                    drilldowns.push(
-//
-//                    );
+                    let d = match format!("[{}].[{}].[{}]", dimension, hierarchy, level).parse() {
+                        Ok(d) => d,
+                        Err(_) => break
+                    };
+                    drilldowns.push(d);
                 }
-            },
-            None => ()
-        }
 
+                drilldowns
+            })
+            .unwrap_or(vec![]);
+
+        let cuts: Vec<_> = match agg_query_opt.cuts {
+            Some(cs) => {
+                let mut cuts: Vec<Cut> = vec![];
+
+                for (cut, cut_value) in cs.iter() {
+                    let (dimension, hierarchy) = match cube.identify_level(cut.to_string()) {
+                        Ok(dh) => dh,
+                        Err(_) => break
+                    };
+                    let c = match format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, cut, cut_value).parse() {
+                        Ok(c) => c,
+                        Err(_) => break
+                    };
+                    cuts.push(c);
+                }
+
+                cuts
+            },
+            None => vec![]
+        };
+
+        let measures: Vec<_> = agg_query_opt.measures
+            .map(|ms| {
+                let mut measures: Vec<Measure> = vec![];
+
+                for measure in deserialize_args(ms) {
+                    let m = match measure.parse() {
+                        Ok(m) => m,
+                        Err(_) => break
+                    };
+                    measures.push(m);
+                }
+
+                measures
+            })
+            .unwrap_or(vec![]);
+
+        let properties: Vec<_> = agg_query_opt.properties
+            .map(|ps| {
+                let mut properties: Vec<Property> = vec![];
+
+                for property in deserialize_args(ps) {
+                    let (dimension, hierarchy, level) = match cube.identify_property(property.clone()) {
+                        Ok(dhl) => dhl,
+                        Err(_) => break
+                    };
+                    let p = match format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level, property).parse() {
+                        Ok(p) => p,
+                        Err(_) => break
+                    };
+                    properties.push(p);
+                }
+
+                properties
+            })
+            .unwrap_or(vec![]);
+
+        // TODO: Implement
+        let filters: Vec<FilterQuery>= vec![];
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 

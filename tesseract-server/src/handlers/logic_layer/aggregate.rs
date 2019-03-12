@@ -8,19 +8,16 @@ use actix_web::{
     HttpResponse,
     Path,
 };
-use log::*;
-use serde_urlencoded;
 use futures::future::{self, Future};
+use lazy_static::lazy_static;
+use log::*;
+use serde_qs as qs;
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, LogicLayerQueryOptTest, Time};
-
-use lazy_static::lazy_static;
-use serde_qs as qs;
-
 
 
 /// Handles default aggregation when a format is not specified.
@@ -66,80 +63,15 @@ pub fn logic_layer_aggregation(
     info!("format: {:?}", format);
 
     let query = req.query_string();
-    let agg_query: HashMap<String, String> = match serde_urlencoded::from_str::<Vec<(String, String)>>(query) {
-        Ok(q) => q.into_iter().collect(),
-        Err(err) => return return_error(err.to_string()),
-    };
-
     let schema = req.state().schema.read().unwrap();
-
-    // TODO: Future responses
-    let cube_name = match agg_query.get("cube") {
-        Some(c) => c.to_string(),
-        None => return return_error("`cube` param not provided".to_string())
-    };
-    let cube = match schema.get_cube_by_name(&cube_name) {
-        Ok(c) => c.clone(),
-        Err(err) => return return_error(err.to_string())
-    };
-
-    let mut agg_query = match LogicLayerQueryOpt::from_params_map(
-        agg_query, cube
-    ) {
-        Ok(q) => q,
-        Err(err) => return return_error(err.to_string())
-    };
-
-    // Process `time` param (latest/oldest)
-    match &agg_query.time {
-        Some(s) => {
-            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name);
-
-            for (k, v) in s.iter() {
-                let time = match Time::from_key_value(k.clone(), v.clone()) {
-                    Ok(time) => time,
-                    Err(err) => return return_error(err.to_string())
-                };
-
-                match cube_cache.clone() {
-                    Some(cache) => {
-                        let cut = match cache.get_time_cut(time) {
-                            Ok(cut) => cut,
-                            Err(err) => return return_error(err.to_string())
-                        };
-
-                        agg_query.cuts = match agg_query.cuts {
-                            Some(mut cuts) => {
-                                cuts.push(cut);
-                                Some(cuts)
-                            },
-                            None => {
-                                Some(vec![cut])
-                            },
-                        }
-                    },
-                    None => (),
-                };
-            }
-        },
-        None => (),
-    }
-
-    info!("aggregate query: {:?}", agg_query);
-
-
-
-
-    // TODO: Remove serde_urlencoded
-//    let query = req.query_string();
-//    let schema = req.state().schema.read().unwrap();
 
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
-    let agg_query_test = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOptTest>(query) {
+
+    let agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOptTest>(query) {
         Ok(mut q) => {
-            let cube = match schema.get_cube_by_name(&agg_query.cube) {
+            let cube = match schema.get_cube_by_name(&q.cube) {
                 Ok(c) => c.clone(),
                 Err(err) => return return_error(err.to_string())
             };
@@ -150,17 +82,46 @@ pub fn logic_layer_aggregation(
         Err(err) => return return_error(err.to_string())
     };
 
-    let ts_query_test: Result<TsQuery, _> = agg_query_test.try_into();
+//    // Process `time` param (latest/oldest)
+//    match &agg_query.time {
+//        Some(s) => {
+//            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name);
+//
+//            for (k, v) in s.iter() {
+//                let time = match Time::from_key_value(k.clone(), v.clone()) {
+//                    Ok(time) => time,
+//                    Err(err) => return return_error(err.to_string())
+//                };
+//
+//                match cube_cache.clone() {
+//                    Some(cache) => {
+//                        let cut = match cache.get_time_cut(time) {
+//                            Ok(cut) => cut,
+//                            Err(err) => return return_error(err.to_string())
+//                        };
+//
+//                        agg_query.cuts = match agg_query.cuts {
+//                            Some(mut cuts) => {
+//                                cuts.push(cut);
+//                                Some(cuts)
+//                            },
+//                            None => {
+//                                Some(vec![cut])
+//                            },
+//                        }
+//                    },
+//                    None => (),
+//                };
+//            }
+//        },
+//        None => (),
+//    }
 
-//    println!(" ");
-//    println!("{:?}", agg_query_test);
-    println!(" ");
-    println!("{:?}", ts_query_test);
-    println!(" ");
+    info!("aggregate query: {:?}", agg_query);
 
+    let cube_name = agg_query.cube.clone();
 
-
-
+    // TODO: Remove serde_urlencoded
     // Turn AggregateQueryOpt into TsQuery
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = match ts_query {
