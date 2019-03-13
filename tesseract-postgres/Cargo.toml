@@ -5,12 +5,16 @@ name = "tesseract-postgres"
 version = "0.1.0"
 
 [dependencies]
-tokio-postgres = {git = "https://github.com/sfackler/rust-postgres", rev = "e3a25ad"}
+#tokio-postgres = {git = "https://github.com/sfackler/rust-postgres", rev = "374fadb"}
+tokio-postgres = { git = "https://github.com/khuey/rust-postgres", branch = "puberror" }
 failure = "0.1.2"
 futures = "0.1.25"
 log = "0.4.3"
 tokio-core = "*"
 tokio = "0.1"
+bb8 = {git = "https://github.com/jspeis/bb8"}
+bb8-postgres = {git = "https://github.com/jspeis/bb8"}
+futures-state-stream = "0.2"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"
