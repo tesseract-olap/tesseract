@@ -130,6 +130,7 @@ pub struct AggregateQueryOpt {
     measures: Option<Vec<String>>,
     properties: Option<Vec<String>>,
     filters: Option<Vec<String>>,
+    captions: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,
     top_where: Option<String>,
@@ -177,11 +178,18 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             })
             .unwrap_or(Ok(vec![]));
 
+        let captions: Result<Vec<_>, _> = agg_query_opt.captions
+            .map(|cs| {
+                cs.iter().map(|c| c.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]));
+
         let drilldowns = drilldowns?;
         let cuts = cuts?;
         let measures = measures?;
         let properties = properties?;
         let filters = filters?;
+        let captions = captions?;
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 
@@ -215,6 +223,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             parents,
             properties,
             filters,
+            captions,
             top,
             top_where,
             sort,
