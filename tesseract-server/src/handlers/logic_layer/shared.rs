@@ -280,6 +280,9 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             .map(|r| r.parse())
             .transpose()?;
 
+        // TODO placeholder until we figure out caption resolution
+        let captions = vec![];
+
         let debug = agg_query_opt.debug.unwrap_or(false);
 
         Ok(TsQuery {
@@ -288,6 +291,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             measures,
             parents,
             properties,
+            captions,
             top,
             top_where,
             sort,
