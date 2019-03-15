@@ -361,7 +361,7 @@ impl Schema {
         };
 
         // getting headers, not for sql but needed for formatting
-        let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, &query.captions, query.parents)
+        let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
             .map_err(|err| format_err!("Error getting drill headers: {}", err))?;
 
         let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
@@ -370,7 +370,7 @@ impl Schema {
         // rca mea will always be first, so just put
         // in `Mea RCA` second
         if let Some(ref rca) = query.rca {
-            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &query.properties, &query.captions, query.parents)
+            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &query.properties, query.parents)
                 .map_err(|err| format_err!("Error getting rca drill headers: {}", err))?;
 
             drill_headers.extend_from_slice(&rca_drill_headers);
@@ -396,7 +396,7 @@ impl Schema {
             mea_headers.push(format!("{} Growth Value", growth.mea.0));
 
             // swapping around drilldown headers. Move time to back
-            let time_headers = self.cube_drill_headers(&cube, &[growth.time_drill.clone()], &[], &query.captions, query.parents)
+            let time_headers = self.cube_drill_headers(&cube, &[growth.time_drill.clone()], &[], query.parents)
                 .map_err(|err| format_err!("Error getting time drill headers for Growth: {}", err))?;
 
             let time_header_idxs: Result<Vec<_>,_> = time_headers.iter()
@@ -679,7 +679,6 @@ impl Schema {
         cube_name: &str,
         drills: &[Drilldown],
         properties: &[Property],
-        captions: &[Property],
         parents: bool,
         ) -> Result<Vec<String>, Error>
     {
@@ -705,65 +704,21 @@ impl Schema {
                 .position(|lvl| lvl.name == drill.0.level)
                 .ok_or(format_err!("could not find hierarchy for drill"))?;
 
-            // for this drill, get caption. For now, only allow on
-            // an explicitly specified drilldown
-            // - filter by properties for this drilldown
-            // - for each property, get the level
-            // - check theres only <= 1.
-            let caption_name: Result<Vec<_>, _>= captions.iter()
-                .filter(|p| p.level_name == drill.0)
-                .map(|p| {
-                    levels.iter()
-                        .find(|lvl| lvl.name == p.level_name.level)
-                        .and_then(|lvl| {
-                            if let Some(ref properties) = lvl.properties {
-                                properties.iter()
-                                    .find(|schema_p| schema_p.name == p.property)
-
-                            } else {
-                                None
-                            }
-                        })
-                        .map(|p| p.name.clone())
-                        .ok_or(format_err!("cannot find property-caption for {}", p))
-                })
-                .collect();
-            let caption_name = caption_name?;
-            assert!(caption_name.len() <= 1);
-
 
             // In this section, need to watch out for whether there's both a
             // key column and a name column and add ID to the first if necessary
             if parents {
                 for i in 0..=level_idx {
-                    // same as in cube_drill_cols, for dealing with captions
-                    let caption = if !caption_name.is_empty() && i == level_idx {
-                        Some(caption_name[0].clone())
-                    } else {
-                        levels[i].name_column.as_ref().map(|_| levels[i].name.clone())
-                    };
-
-                    if let Some(cap) = caption {
+                    if levels[i].name_column.is_some() {
                         level_headers.push(levels[i].name.clone() + " ID");
-                        level_headers.push(cap.clone());
-                    } else {
-                        level_headers.push(levels[i].name.clone());
                     }
+                    level_headers.push(levels[i].name.clone());
                 }
             } else {
-                // same as in cube_drill_cols, for dealing with captions
-                let caption = if !caption_name.is_empty() {
-                    Some(caption_name[0].clone())
-                } else {
-                    levels[level_idx].name_column.as_ref().map(|_| levels[level_idx].name.clone())
-                };
-
-                if let Some(cap) = caption {
+                if levels[level_idx].name_column.is_some() {
                     level_headers.push(levels[level_idx].name.clone() + " ID");
-                    level_headers.push(cap.clone());
-                } else {
-                    level_headers.push(levels[level_idx].name.clone());
                 }
+                level_headers.push(levels[level_idx].name.clone());
             }
 
             // for this drill, get related properties.
