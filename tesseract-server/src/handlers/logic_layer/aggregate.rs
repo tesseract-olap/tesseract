@@ -26,7 +26,7 @@ pub fn logic_layer_default_handler(
     (req, _cube): (HttpRequest<AppState>, Path<()>)
 ) -> FutureResponse<HttpResponse>
 {
-    logic_layer_aggregation(req, "csv".to_owned())
+    logic_layer_aggregation(req, "jsonrecords".to_owned())
 }
 
 /// Handles aggregation when a format is specified.
