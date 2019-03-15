@@ -132,6 +132,7 @@ pub struct LogicLayerQueryOpt {
     growth: Option<String>,
     rca: Option<String>,
     debug: Option<bool>,
+    locale: Option<String>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
@@ -179,20 +180,47 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => bail!("No cubes found with the given name")
         };
 
+        let mut caption_strings: Vec<String> = vec![];
+        let locales: Vec<String> = match agg_query_opt.locale {
+            Some(l) => l.split(",").map(|s| s.to_string()).collect(),
+            None => vec![]
+        };
+
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
 
-                for level in LogicLayerQueryOpt::deserialize_args(ds) {
-                    let (dimension, hierarchy) = match cube.identify_level(level.clone()) {
-                        Ok(dh) => dh,
+                for l in LogicLayerQueryOpt::deserialize_args(ds) {
+                    let (dimension, hierarchy, level) = match cube.identify_level(l.clone()) {
+                        Ok(dhl) => dhl,
                         Err(_) => break
                     };
-                    let d = match format!("[{}].[{}].[{}]", dimension, hierarchy, level).parse() {
+                    let d = match format!("[{}].[{}].[{}]", dimension, hierarchy, l).parse() {
                         Ok(d) => d,
                         Err(_) => break
                     };
                     drilldowns.push(d);
+
+                    // Check for captions for this drilldown
+                    match level.properties {
+                        Some(props) => {
+                            for prop in props {
+                                match prop.caption {
+                                    Some(cap) => {
+                                        for locale in locales.clone() {
+                                            if locale == cap {
+                                                caption_strings.push(
+                                                    format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, l, prop.name)
+                                                );
+                                            }
+                                        }
+                                    },
+                                    None => continue
+                                }
+                            }
+                        },
+                        None => continue
+                    }
                 }
 
                 drilldowns
@@ -204,7 +232,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 let mut cuts: Vec<Cut> = vec![];
 
                 for (cut, cut_value) in cs.iter() {
-                    let (dimension, hierarchy) = match cube.identify_level(cut.to_string()) {
+                    let (dimension, hierarchy, level) = match cube.identify_level(cut.to_string()) {
                         Ok(dh) => dh,
                         Err(_) => break
                     };
@@ -213,6 +241,27 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         Err(_) => break
                     };
                     cuts.push(c);
+
+                    // Check for captions for this cut
+                    match level.properties {
+                        Some(props) => {
+                            for prop in props {
+                                match prop.caption {
+                                    Some(cap) => {
+                                        for locale in locales.clone() {
+                                            if locale == cap {
+                                                caption_strings.push(
+                                                    format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level.name, prop.name)
+                                                );
+                                            }
+                                        }
+                                    },
+                                    None => continue
+                                }
+                            }
+                        },
+                        None => continue
+                    }
                 }
 
                 cuts
@@ -280,8 +329,13 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             .map(|r| r.parse())
             .transpose()?;
 
-        // TODO placeholder until we figure out caption resolution
-        let captions = vec![];
+        let mut captions: Vec<Property> = vec![];
+        for cap in caption_strings {
+            match cap.parse() {
+                Ok(c) => captions.push(c),
+                Err(_) => continue
+            }
+        }
 
         let debug = agg_query_opt.debug.unwrap_or(false);
 

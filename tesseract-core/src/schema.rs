@@ -180,12 +180,13 @@ impl Cube {
     }
 
     /// Finds the dimension and hierarchy names for a given level.
-    pub fn identify_level(&self, level_name: String) -> Result<(String, String), Error> {
+    /// Also returns the Level object matched.
+    pub fn identify_level(&self, level_name: String) -> Result<(String, String, Level), Error> {
         for dimension in self.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
                 for level in hierarchy.levels.clone() {
                     if level.name == level_name {
-                        return Ok((dimension.name, hierarchy.name))
+                        return Ok((dimension.name, hierarchy.name, level))
                     }
                 }
             }
@@ -344,7 +345,7 @@ impl From<MeasureConfigJson> for Measure {
             name: measure_config.name,
             column: measure_config.column,
             aggregator: measure_config.aggregator,
-            annotations: annotations,
+            annotations,
         }
     }
 }
@@ -380,6 +381,7 @@ impl Table {
 pub struct Property{
     pub name: String,
     pub column: String,
+    pub caption: Option<String>,
     pub annotations: Option<Vec<Annotation>>,
 }
 
@@ -395,7 +397,8 @@ impl From<PropertyConfigJson> for Property {
         Property {
             name: property_config.name,
             column: property_config.column,
-            annotations: annotations,
+            caption: property_config.caption,
+            annotations,
         }
     }
 }
