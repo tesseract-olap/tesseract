@@ -69,7 +69,7 @@ impl Backend for Postgres {
                 }
                 Err(e) => Either::B(err((e, connection))),
             })
-        }).map_err(|err| format_err!("Postgres error {}", err));
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
         Box::new(fut)
     }
 
