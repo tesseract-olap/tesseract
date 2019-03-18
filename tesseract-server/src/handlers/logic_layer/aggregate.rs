@@ -81,14 +81,11 @@ pub fn logic_layer_aggregation(
                 None => q.cube.clone()
             };
 
-            println!(" ");
-            println!("{}", cube_name);
-            println!(" ");
-
             let cube = match schema.get_cube_by_name(&cube_name) {
                 Ok(c) => c.clone(),
                 Err(err) => return boxed_error(err.to_string())
             };
+
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());
             q
@@ -143,7 +140,6 @@ pub fn logic_layer_aggregation(
 
     info!("aggregate query: {:?}", agg_query);
 
-    // TODO: Remove serde_urlencoded
     // Turn AggregateQueryOpt into TsQuery
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = match ts_query {

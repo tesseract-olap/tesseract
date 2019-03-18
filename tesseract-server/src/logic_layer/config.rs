@@ -6,11 +6,16 @@ use serde_json;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerConfig {
-    pub aliases: Option<Vec<AliasConfig>>,
+    pub aliases: Option<AliasConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AliasConfig {
+    pub cubes: Option<Vec<CubeAliasConfig>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CubeAliasConfig {
     pub name: String,
     pub cube: String,
 }
@@ -35,12 +40,17 @@ impl LogicLayerConfig {
     pub fn sub_cube_name(self, name: String) -> Result<String, Error> {
         match self.aliases {
             Some(aliases) => {
-                for alias in aliases {
-                    if alias.name == name {
-                        return Ok(alias.cube);
-                    }
+                match aliases.cubes {
+                    Some(cubes) => {
+                        for cube in cubes {
+                            if cube.name == name {
+                                return Ok(cube.cube);
+                            }
+                        }
+                        return Ok(name)
+                    },
+                    None => return Ok(name)
                 }
-                return Ok(name)
             },
             None => return Ok(name)
         };
