@@ -58,13 +58,34 @@ pub fn logic_layer_aggregation(
     let query = req.query_string();
     let schema = req.state().schema.read().unwrap();
 
+    let logic_layer_config = match &req.state().logic_layer_config {
+        Some(llc) => Some(llc.read().unwrap().clone()),
+        None => None
+    };
+
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
+    let mut cube_name;
+
     let mut agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
         Ok(mut q) => {
-            let cube = match schema.get_cube_by_name(&q.cube) {
+            cube_name = match logic_layer_config {
+                Some(llc) => {
+                    match llc.sub_cube_name(q.cube.clone()) {
+                        Ok(cn) => cn,
+                        Err(_) => q.cube.clone()
+                    }
+                },
+                None => q.cube.clone()
+            };
+
+            println!(" ");
+            println!("{}", cube_name);
+            println!(" ");
+
+            let cube = match schema.get_cube_by_name(&cube_name) {
                 Ok(c) => c.clone(),
                 Err(err) => return boxed_error(err.to_string())
             };
@@ -74,8 +95,6 @@ pub fn logic_layer_aggregation(
         },
         Err(err) => return boxed_error(err.to_string())
     };
-
-    let cube_name = agg_query.cube.clone();
 
     // Process `time` param (latest/oldest)
     match &agg_query.time {

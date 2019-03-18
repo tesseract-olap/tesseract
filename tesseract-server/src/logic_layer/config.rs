@@ -28,3 +28,21 @@ pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
         }
     };
 }
+
+impl LogicLayerConfig {
+    /// Given a cube name, loops over the LogicLayerConfig and returns the
+    /// actual cube name if an alias was provided.
+    pub fn sub_cube_name(self, name: String) -> Result<String, Error> {
+        match self.aliases {
+            Some(aliases) => {
+                for alias in aliases {
+                    if alias.name == name {
+                        return Ok(alias.cube);
+                    }
+                }
+                return Ok(name)
+            },
+            None => return Ok(name)
+        };
+    }
+}
