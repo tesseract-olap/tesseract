@@ -113,7 +113,7 @@ pub struct TableConfigXML {
 pub struct PropertyConfigXML {
     pub name: String,
     pub column: String,
-    pub caption: Option<String>,
+    pub caption_set: Option<String>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
 }

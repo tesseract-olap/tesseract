@@ -81,7 +81,7 @@ pub struct TableConfigJson {
 pub struct PropertyConfigJson {
     pub name: String,
     pub column: String,
-    pub caption: Option<String>,
+    pub caption_set: Option<String>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 

@@ -9,7 +9,7 @@ use actix_web::{
     Path,
 };
 use actix_web::http::header::ContentType;
-use futures::future::{self, Future};
+use futures::future::{Future};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;

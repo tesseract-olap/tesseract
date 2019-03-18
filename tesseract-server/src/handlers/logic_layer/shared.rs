@@ -2,14 +2,14 @@ use actix_web::{
     FutureResponse,
     HttpResponse,
 };
-use futures::future::{self, Future};
+use futures::future::{self};
 use failure::{Error, format_err, bail};
 use std::convert::{TryFrom};
 use std::collections::HashMap;
 
 use serde_derive::{Serialize, Deserialize};
 
-use tesseract_core::names::{LevelName, Cut, Drilldown, Property, Measure};
+use tesseract_core::names::{Cut, Drilldown, Property, Measure};
 use tesseract_core::query::{FilterQuery};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
@@ -205,7 +205,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     match level.properties {
                         Some(props) => {
                             for prop in props {
-                                match prop.caption {
+                                match prop.caption_set {
                                     Some(cap) => {
                                         for locale in locales.clone() {
                                             if locale == cap {
@@ -246,7 +246,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     match level.properties {
                         Some(props) => {
                             for prop in props {
-                                match prop.caption {
+                                match prop.caption_set {
                                     Some(cap) => {
                                         for locale in locales.clone() {
                                             if locale == cap {

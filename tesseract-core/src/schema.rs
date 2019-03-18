@@ -381,7 +381,7 @@ impl Table {
 pub struct Property{
     pub name: String,
     pub column: String,
-    pub caption: Option<String>,
+    pub caption_set: Option<String>,
     pub annotations: Option<Vec<Annotation>>,
 }
 
@@ -397,7 +397,7 @@ impl From<PropertyConfigJson> for Property {
         Property {
             name: property_config.name,
             column: property_config.column,
-            caption: property_config.caption,
+            caption_set: property_config.caption_set,
             annotations,
         }
     }
