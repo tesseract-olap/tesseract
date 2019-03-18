@@ -1,6 +1,7 @@
 use itertools::join;
 
 use crate::Aggregator;
+use crate::names::Mask;
 use crate::query_ir::{
     TableSql,
     CutSql,
@@ -126,6 +127,8 @@ mod test {
                 column: "id".into(),
                 members: vec!["3".into()],
                 member_type: MemberType::NonText,
+                mask: Mask::Include,
+                for_match: false
             },
         ];
         let drills = vec![

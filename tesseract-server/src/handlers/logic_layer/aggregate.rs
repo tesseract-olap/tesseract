@@ -8,7 +8,8 @@ use actix_web::{
     HttpResponse,
     Path,
 };
-use futures::future::{self, Future};
+use actix_web::http::header::ContentType;
+use futures::future::{Future};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
@@ -26,7 +27,7 @@ pub fn logic_layer_default_handler(
     (req, _cube): (HttpRequest<AppState>, Path<()>)
 ) -> FutureResponse<HttpResponse>
 {
-    logic_layer_aggregation(req, "csv".to_owned())
+    logic_layer_aggregation(req, "jsonrecords".to_owned())
 }
 
 /// Handles aggregation when a format is specified.
@@ -44,6 +45,8 @@ pub fn logic_layer_aggregation(
     format: String,
 ) -> FutureResponse<HttpResponse>
 {
+    let format_str = format.clone();
+
     let format = format.parse::<FormatType>();
     let format = match format {
         Ok(f) => f,
@@ -154,7 +157,15 @@ pub fn logic_layer_aggregation(
         .from_err()
         .and_then(move |df| {
             match format_records(&headers, df, format) {
-                Ok(res) => Ok(HttpResponse::Ok().body(res)),
+                Ok(res) => {
+                    if format_str == "jsonrecords" {
+                        Ok(HttpResponse::Ok()
+                            .set(ContentType::json())
+                            .body(res))
+                    } else {
+                        Ok(HttpResponse::Ok().body(res))
+                    }
+                },
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }
         })

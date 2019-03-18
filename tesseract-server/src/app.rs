@@ -74,10 +74,10 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, en
         })
 
         // Logic Layer
-        .resource("/logic-layer", |r| {
+        .resource("/data", |r| {
             r.method(Method::GET).with(logic_layer_default_handler)
         })
-        .resource("/logic-layer.{format}", |r| {
+        .resource("/data.{format}", |r| {
             r.method(Method::GET).with(logic_layer_handler)
         })
 
