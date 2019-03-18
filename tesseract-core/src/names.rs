@@ -461,11 +461,12 @@ mod test {
 
     #[test]
     fn test_cut() {
-        let cut = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include);
+        let cut = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include, false);
         let cut_from_vec = Cut::from_vec(
             vec!["Geography", "County"],
             vec!["1", "2"],
             Mask::Include,
+            false
             ).unwrap();
 
         assert_eq!(cut, cut_from_vec);
@@ -486,9 +487,9 @@ mod test {
     fn test_display() {
         let level = LevelName::new("Geography", "Geography", "County");
         let drilldown = Drilldown::new("Geography", "Geography", "County");
-        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"], Mask::Include);
-        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include);
-        let cut2_not = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Exclude);
+        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"], Mask::Include, false);
+        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include, false);
+        let cut2_not = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Exclude, false);
         let property = Property::new("Geography", "Geography", "County", "name_en");
 
         println!("{}", level);
@@ -507,9 +508,9 @@ mod test {
 
         let level = LevelName::new("Geography", "Geography", "County");
         let drilldown = Drilldown::new("Geography", "Geography", "County");
-        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"], Mask::Include);
-        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include);
-        let cut2_not = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Exclude);
+        let cut1 = Cut::new("Geography", "Geography", "County", vec!["1"], Mask::Include, false);
+        let cut2 = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Include, false);
+        let cut2_not = Cut::new("Geography", "Geography", "County", vec!["1", "2"], Mask::Exclude, false);
         let property = Property::new("Geography", "Geography", "County", "name_en");
 
         // test level_name

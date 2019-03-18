@@ -5,6 +5,7 @@ mod options;
 mod primary_agg;
 mod rca;
 
+use tesseract_core::names::Mask;
 use tesseract_core::query_ir::{
     TableSql,
     CutSql,
@@ -89,6 +90,8 @@ mod test {
                 column: "product_group_id".into(),
                 members: vec!["3".into()],
                 member_type: MemberType::NonText,
+                mask: Mask::Include,
+                for_match: false,
             },
         ];
         let drills = vec![
@@ -158,6 +161,8 @@ mod test {
                 column: "geo".into(),
                 members: vec!["1".into(), "2".into()],
                 member_type: MemberType::Text,
+                mask: Mask::Include,
+                for_match: false,
             },
             CutSql {
                 foreign_key: "".into(),
@@ -166,6 +171,8 @@ mod test {
                 column: "age".into(),
                 members: vec!["3".into()],
                 member_type: MemberType::NonText,
+                mask: Mask::Include,
+                for_match: false,
             },
         ];
 
