@@ -17,7 +17,7 @@ pub struct AliasConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct CubeAliasConfig {
     pub name: String,
-    pub cube: String,
+    pub alternatives: Vec<String>
 }
 
 
@@ -43,8 +43,10 @@ impl LogicLayerConfig {
                 match aliases.cubes {
                     Some(cubes) => {
                         for cube in cubes {
-                            if cube.name == name {
-                                return Ok(cube.cube);
+                            for alt in cube.alternatives {
+                                if alt == name {
+                                    return Ok(cube.name);
+                                }
                             }
                         }
                         return Ok(name)
