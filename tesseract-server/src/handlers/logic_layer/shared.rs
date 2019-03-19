@@ -149,14 +149,15 @@ impl LogicLayerQueryOpt {
             if c_str == "[" {
                 open = true;
             } else if c_str == "]" {
-                arg_vec.push(curr_str);
+                arg_vec.push(curr_str.clone());
                 curr_str = "".to_string();
                 open = false;
             } else if c_str == "," {
                 if open {
                     curr_str += &c_str;
                 } else {
-                    continue;
+                    arg_vec.push(curr_str.clone());
+                    curr_str = "".to_string();
                 }
             } else {
                 curr_str += &c_str;
@@ -164,7 +165,7 @@ impl LogicLayerQueryOpt {
         }
 
         if curr_str.len() >= 1 {
-            arg_vec.push(curr_str);
+            arg_vec.push(curr_str.clone());
         }
 
         arg_vec
