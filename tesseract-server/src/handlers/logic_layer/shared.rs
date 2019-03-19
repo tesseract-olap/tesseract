@@ -146,11 +146,10 @@ impl LogicLayerQueryOpt {
 
         for c in arg.chars() {
             let c_str = c.to_string();
+
             if c_str == "[" {
                 open = true;
             } else if c_str == "]" {
-                arg_vec.push(curr_str.clone());
-                curr_str = "".to_string();
                 open = false;
             } else if c_str == "," {
                 if open {
