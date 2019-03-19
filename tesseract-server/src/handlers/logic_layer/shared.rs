@@ -232,13 +232,17 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 let mut cuts: Vec<Cut> = vec![];
 
                 for (cut, cut_value) in cs.iter() {
+                    if cut_value.is_empty() {
+                        continue;
+                    }
+
                     let (dimension, hierarchy, level) = match cube.identify_level(cut.to_string()) {
                         Ok(dh) => dh,
-                        Err(_) => break
+                        Err(_) => continue
                     };
                     let c = match format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, cut, cut_value).parse() {
                         Ok(c) => c,
-                        Err(_) => break
+                        Err(_) => continue
                     };
                     cuts.push(c);
 
