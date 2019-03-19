@@ -18,7 +18,7 @@ use crate::handlers::{
     members_handler,
     members_default_handler,
 };
-use crate::logic_layer::{Cache};
+use crate::logic_layer::{Cache, LogicLayerConfig};
 
 use std::sync::{Arc, RwLock};
 
@@ -48,12 +48,21 @@ pub struct AppState {
     pub env_vars: EnvVars,
     pub schema: Arc<RwLock<Schema>>,
     pub cache: Arc<RwLock<Cache>>,
+    pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
 }
 
 /// Creates an ActixWeb application with an `AppState`.
-pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, env_vars: EnvVars, schema: Arc<RwLock<Schema>>, cache: Arc<RwLock<Cache>>) -> App<AppState> {
-    App::with_state(AppState { backend, db_type, env_vars, schema, cache })
+pub fn create_app(
+        backend: Box<dyn Backend + Sync + Send>,
+        db_type: Database,
+        env_vars: EnvVars,
+        schema: Arc<RwLock<Schema>>,
+        cache: Arc<RwLock<Cache>>,
+        logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>
+    ) -> App<AppState> {
+    App::with_state(AppState { backend, db_type, env_vars, schema, cache, logic_layer_config })
         .middleware(middleware::Logger::default())
+
         // Metadata
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)

@@ -84,8 +84,27 @@ fn main() -> Result<(), Error> {
     };
     let cache_arc = Arc::new(RwLock::new(cache));
 
+    // Logic Layer Config
+    let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
+        Ok(config_path) => {
+            let logic_layer_config = match logic_layer::read_config(&config_path) {
+                Ok(config_obj) => config_obj,
+                Err(err) => return Err(err)
+            };
+            Some(Arc::new(RwLock::new(logic_layer_config)))
+        },
+        Err(_) => None
+    };
+
     // Initialize Server
-    server::new(move|| create_app(db.clone(), db_type.clone(), env_vars.clone(), schema_arc.clone(), cache_arc.clone()))
+    server::new(move|| create_app(
+            db.clone(),
+            db_type.clone(),
+            env_vars.clone(),
+            schema_arc.clone(),
+            cache_arc.clone(),
+            logic_layer_config.clone()),
+        )
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
@@ -109,4 +128,3 @@ struct Opt {
     #[structopt(long="db-url")]
     database_url: Option<String>,
 }
-
