@@ -10,7 +10,7 @@ The base URL for the logic layer is `/data`. The accepted parameters are:
     - `drill 1,drill 2`
     - `[drill, 1],drill 2`
 - **Cuts**: Cuts are defined arbitrarily in the format `level=val 1,val 2`. Only level names are required as the param name. Values can be comma separated and follow the same square brackets convention explained above.
-- `time` (list): Comma separated list of time cuts in the format `precision.value`, where precision could be one of `year`, ~~quarter~~, ~~month~~, ~~week~~, ~~day~~, and value is either `latest` or `oldest`.
+- `time` (list): Comma separated list of time cuts in the format `precision.value`, where precision could be one of `year`, `quarter`, `month`, `week`, or `day`, and value is either `latest` or `oldest`.
 - `measures` (list): Comma separated list of measure names. Follows the square brackets convention.
 - `properties` (list): : Comma separated list of property names. Follows the square brackets convention.
 - `filters`: Not yet implemented.
