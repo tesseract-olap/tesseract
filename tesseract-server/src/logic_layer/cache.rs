@@ -1,11 +1,11 @@
 use actix::SystemRunner;
 use failure::{Error, format_err};
-use log::*;
+use log::info;
 
-use tesseract_core::{Schema, Cube, Dimension, Backend, ColumnData};
-use tesseract_core::names::LevelName;
+use tesseract_core::{Schema, Backend, ColumnData};
+use tesseract_core::schema::Level;
 
-use super::super::handlers::logic_layer::shared::{Time, TimeValue};
+use super::super::handlers::logic_layer::shared::{Time, TimePrecision, TimeValue};
 
 
 /// Holds cache information.
@@ -30,111 +30,178 @@ impl Cache {
 #[derive(Debug, Clone)]
 pub struct CubeCache {
     pub name: String,
-    pub time_dim: Dimension,
-    pub years: Vec<u32>,
+
+    pub year_level: Option<Level>,
+    pub year_values: Option<Vec<String>>,
+
+    pub quarter_level: Option<Level>,
+    pub quarter_values: Option<Vec<String>>,
+
+    pub month_level: Option<Level>,
+    pub month_values: Option<Vec<String>>,
+
+    pub week_level: Option<Level>,
+    pub week_values: Option<Vec<String>>,
+
+    pub day_level: Option<Level>,
+    pub day_values: Option<Vec<String>>,
 }
 
 impl CubeCache {
-    /// Returns dimension name in the format: `Dimension.Hierarchy.Level`.
-    pub fn get_time_level_name(&self) -> LevelName {
-        LevelName {
-            dimension: self.time_dim.name.clone(),
-            hierarchy: self.time_dim.hierarchies[0].name.clone(),
-            level: self.time_dim.hierarchies[0].levels[0].name.clone(),
-        }
-    }
-
-    pub fn get_time_cut(&self, t: Time) -> Result<(String, String), Error> {
-        let year_opt;
-
-        // TODO: Add check for precision type
-        match t.value {
-            TimeValue::Last => year_opt = self.max_year(),
-            TimeValue::First => year_opt = self.min_year(),
-            TimeValue::Value(time) => year_opt = Some(time),
-        }
-
-        let year = match year_opt {
-            None => { return Err(format_err!("Unable to get requested year.")); }
-            Some(year) => year
+    pub fn get_time_cut(&self, time: Time) -> Result<(String, String), Error> {
+        let (val_res, ln_res) = match time.precision {
+            TimePrecision::Year => {
+                let v = self.get_value(&time, self.year_values.clone());
+                let l = self.get_level_name(&time, self.year_level.clone());
+                (v, l)
+            },
+            TimePrecision::Quarter => {
+                let v = self.get_value(&time, self.quarter_values.clone());
+                let l = self.get_level_name(&time, self.quarter_level.clone());
+                (v, l)
+            },
+            TimePrecision::Month => {
+                let v = self.get_value(&time, self.month_values.clone());
+                let l = self.get_level_name(&time, self.month_level.clone());
+                (v, l)
+            },
+            TimePrecision::Week => {
+                let v = self.get_value(&time, self.week_values.clone());
+                let l = self.get_level_name(&time, self.week_level.clone());
+                (v, l)
+            },
+            TimePrecision::Day => {
+                let v = self.get_value(&time, self.day_values.clone());
+                let l = self.get_level_name(&time, self.day_level.clone());
+                (v, l)
+            }
         };
 
-        let ln = self.get_time_level_name();
+        let val = match val_res {
+            Some(o) => o,
+            None => return Err(format_err!("Unable to get requested time precision data."))
+        };
 
-        Ok((ln.level().to_string(), year.to_string()))
+        let ln = match ln_res {
+            Some(o) => o,
+            None => return Err(format_err!("Unable to get requested time precision level name."))
+        };
+
+        Ok((ln, val))
     }
 
-    pub fn min_year(&self) -> Option<u32> {
-        if self.years.len() >= 1 {
-            return Some(self.years[0]);
+    pub fn get_level_name(&self, time: &Time, level: Option<Level>) -> Option<String> {
+        match level {
+            Some(l) => Some(l.name),
+            None => None
         }
-        None
     }
 
-    pub fn max_year(&self) -> Option<u32> {
-        if self.years.len() >= 1 {
-            return Some(*self.years.last().unwrap());
+    pub fn get_value(&self, time: &Time, opt: Option<Vec<String>>) -> Option<String> {
+        match opt {
+            Some(v) => {
+                match time.value {
+                    TimeValue::First => {
+                        if v.len() >= 1 {
+                            return Some(v[0].clone());
+                        }
+                        None
+                    },
+                    TimeValue::Last => {
+                        if v.len() >= 1 {
+                            return Some(v.last().unwrap().clone())
+                        }
+                        None
+                    },
+                    TimeValue::Value(t) => return Some(t.to_string())
+                }
+            },
+            None => None
         }
-        None
     }
 }
 
 
 /// Populates a `Cache` object that will be shared through `AppState`.
-pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>, sys: &mut SystemRunner) -> Result<Cache, Error> {
+pub fn populate_cache(
+        schema: Schema,
+        backend: Box<dyn Backend + Sync + Send>,
+        sys: &mut SystemRunner
+) -> Result<Cache, Error> {
     info!("Populating cache...");
+
+    let time_column_names = vec![
+        "Year".to_string(),
+        "Quarter".to_string(),
+        "Month".to_string(),
+        "Week".to_string(),
+        "Day".to_string()
+    ];
 
     let mut cubes: Vec<CubeCache> = vec![];
 
     for cube in schema.cubes {
-        let preferred_time_dim = match find_years(cube.clone()) {
-            Ok(r) => match r {
-                Some(dim) => dim,
-                None => continue
-            },
-            Err(_) => continue
-        };
-        let year_column = get_year_column(&preferred_time_dim);
+        let mut year_level: Option<Level> = None;
+        let mut year_values: Option<Vec<String>> = None;
+        let mut quarter_level: Option<Level> = None;
+        let mut quarter_values: Option<Vec<String>> = None;
+        let mut month_level: Option<Level> = None;
+        let mut month_values: Option<Vec<String>> = None;
+        let mut week_level: Option<Level> = None;
+        let mut week_values: Option<Vec<String>> = None;
+        let mut day_level: Option<Level> = None;
+        let mut day_values: Option<Vec<String>> = None;
 
-        let future = backend
-            .exec_sql(
-                format!("select distinct {} from {}", year_column, cube.table.name)
-                        .to_string()
-            );
-        let df = match sys.block_on(future) {
-            Ok(df) => df,
-            Err(err) => {
-                return Err(format_err!("Error populating cache with backend data: {}", err));
-            }
-        };
-        println!("finished populating cache");
+        for dimension in cube.dimensions.clone() {
+            for hierarchy in dimension.hierarchies.clone() {
+                for level in hierarchy.levels.clone() {
+                    if time_column_names.contains(&level.name) {
+                        let values_res = get_time_values(
+                            level.key_column.clone(),
+                            cube.table.name.clone(),
+                            backend.clone(),
+                            sys
+                        );
 
-        // TODO: Do we want to return an error if no columns are returned?
-        if df.columns.len() >= 1 {
-            let mut original_years = match &df.columns[0].column_data {
-                ColumnData::Int8(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::Int16(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::Int32(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::Int64(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::UInt8(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::UInt16(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::UInt32(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::UInt64(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::Float32(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::Float64(v) => { let s: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect(); s },
-                ColumnData::Text(v) => { let s: Vec<u32> = v.iter().map(|e| e.parse::<u32>().unwrap().clone()).collect(); s },
-            };
-
-            original_years.sort();
-
-            cubes.push(
-                CubeCache {
-                    name: cube.name.clone(),
-                    time_dim: preferred_time_dim,
-                    years: original_years
+                        match values_res {
+                            Ok(val) => {
+                                if level.name == "Year" {
+                                    year_level = Some(level);
+                                    year_values = Some(val);
+                                } else if level.name == "Quarter" {
+                                    quarter_level = Some(level);
+                                    quarter_values = Some(val);
+                                } else if level.name == "Month" {
+                                    month_level = Some(level);
+                                    month_values = Some(val);
+                                } else if level.name == "Week" {
+                                    week_level = Some(level);
+                                    week_values = Some(val);
+                                } else if level.name == "Day" {
+                                    day_level = Some(level);
+                                    day_values = Some(val);
+                                }
+                            },
+                            Err(err) => return Err(err)
+                        };
+                    }
                 }
-            )
+            }
         }
+
+        cubes.push(CubeCache {
+            name: cube.name,
+            year_level,
+            year_values,
+            quarter_level,
+            quarter_values,
+            month_level,
+            month_values,
+            week_level,
+            week_values,
+            day_level,
+            day_values,
+        })
     }
 
     info!("Cache ready!");
@@ -142,54 +209,66 @@ pub fn populate_cache(schema: Schema, backend: Box<dyn Backend + Sync + Send>, s
     Ok(Cache { cubes })
 }
 
-/// Helper to get the name of the year column in a given cube.
-/// Right now it assumes that the first level provided containing the word
-/// `year` in its `key_column` value is the one we're looking for.
-/// If such level is not found, the method returns a default value of `year`.
-pub fn get_year_column(dim: &Dimension) -> String {
-    for hierarchy in &dim.hierarchies {
-        if hierarchy.name.contains("Year") {
-            for level in &hierarchy.levels {
-                if level.key_column.contains("year") {
-                    return level.key_column.clone();
-                }
-            }
+
+/// Queries the database to get all the distinct values for a given time level.
+pub fn get_time_values(
+        column: String,
+        table: String,
+        backend: Box<dyn Backend + Sync + Send>,
+        sys: &mut SystemRunner
+) -> Result<Vec<String>, Error> {
+    let future = backend
+        .exec_sql(
+            format!("select distinct {} from {}", column, table).to_string()
+        );
+    let df = match sys.block_on(future) {
+        Ok(df) => df,
+        Err(err) => {
+            return Err(format_err!("Error populating cache with backend data: {}", err));
         }
+    };
+
+    if df.columns.len() >= 1 {
+        let mut values: Vec<String> = match &df.columns[0].column_data {
+            ColumnData::Int8(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::Int16(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::Int32(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::Int64(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::UInt8(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::UInt16(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::UInt32(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::UInt64(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::Float32(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::Float64(v) => {
+                v.iter().map(|&e| e.to_string()).collect()
+            },
+            ColumnData::Text(v) => {
+                v.to_vec()
+            },
+        };
+
+        values.sort();
+
+        return Ok(values);
     }
 
-    String::from("year")
-}
-
-/// Finds cubes and dimensions with year/time information.
-/// The current logic is similar to the one for the existing Mondrian logic
-/// layer, but we may want to change this in the future.
-fn find_years(cube: Cube) -> Result<Option<Dimension>, Error> {
-    let mut time_dimensions: Vec<Dimension> = vec![];
-
-    for dimension in cube.dimensions {
-        // TODO: implement and check for d.type and d.annotations
-        if dimension.name.contains("Year") {
-            time_dimensions.push(dimension);
-        }
-    }
-
-    if time_dimensions.len() == 0 {
-        return Ok(None);
-    } else if time_dimensions.len() == 1 {
-        return Ok(Some(time_dimensions[0].clone()));
-    } else {
-        for dim in &time_dimensions {
-            if dim.name == "Year" {
-                return Ok(Some(dim.clone()));
-            }
-        }
-
-        for dim in &time_dimensions {
-            if dim.name.contains("Year") {
-                return Ok(Some(dim.clone()));
-            }
-        }
-    }
-
-    return Ok(Some(time_dimensions[0].clone()));
+    return Ok(vec![]);
 }
