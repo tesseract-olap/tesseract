@@ -154,11 +154,16 @@ pub fn populate_cache(
 
         for dimension in cube.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
+                let table = match hierarchy.table {
+                    Some(t) => t.name,
+                    None => cube.table.name.clone()
+                };
+
                 for level in hierarchy.levels.clone() {
                     if time_column_names.contains(&level.name) {
                         let values_res = get_time_values(
                             level.key_column.clone(),
-                            cube.table.name.clone(),
+                            table.clone(),
                             backend.clone(),
                             sys
                         );
