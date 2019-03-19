@@ -30,16 +30,21 @@ impl Cache {
 #[derive(Debug, Clone)]
 pub struct CubeCache {
     pub name: String,
+
     pub year_level: Option<Level>,
-    pub year_values: Option<Vec<u32>>,
+    pub year_values: Option<Vec<String>>,
+
     pub quarter_level: Option<Level>,
-    pub quarter_values: Option<Vec<u32>>,
+    pub quarter_values: Option<Vec<String>>,
+
     pub month_level: Option<Level>,
-    pub month_values: Option<Vec<u32>>,
+    pub month_values: Option<Vec<String>>,
+
     pub week_level: Option<Level>,
-    pub week_values: Option<Vec<u32>>,
+    pub week_values: Option<Vec<String>>,
+
     pub day_level: Option<Level>,
-    pub day_values: Option<Vec<u32>>,
+    pub day_values: Option<Vec<String>>,
 }
 
 impl CubeCache {
@@ -73,7 +78,7 @@ impl CubeCache {
         };
 
         let val = match val_res {
-            Some(o) => o.to_string(),
+            Some(o) => o,
             None => return Err(format_err!("Unable to get requested time precision data."))
         };
 
@@ -92,13 +97,23 @@ impl CubeCache {
         }
     }
 
-    pub fn get_value(&self, time: &Time, opt: Option<Vec<u32>>) -> Option<u32> {
+    pub fn get_value(&self, time: &Time, opt: Option<Vec<String>>) -> Option<String> {
         match opt {
             Some(v) => {
                 match time.value {
-                    TimeValue::First => return Some(v[0]),
-                    TimeValue::Last => return Some(*v.last().unwrap()),
-                    TimeValue::Value(t) => return Some(t)
+                    TimeValue::First => {
+                        if v.len() >= 1 {
+                            return Some(v[0].clone());
+                        }
+                        None
+                    },
+                    TimeValue::Last => {
+                        if v.len() >= 1 {
+                            return Some(v.last().unwrap().clone())
+                        }
+                        None
+                    },
+                    TimeValue::Value(t) => return Some(t.to_string())
                 }
             },
             None => None
@@ -127,15 +142,15 @@ pub fn populate_cache(
 
     for cube in schema.cubes {
         let mut year_level: Option<Level> = None;
-        let mut year_values: Option<Vec<u32>> = None;
+        let mut year_values: Option<Vec<String>> = None;
         let mut quarter_level: Option<Level> = None;
-        let mut quarter_values: Option<Vec<u32>> = None;
+        let mut quarter_values: Option<Vec<String>> = None;
         let mut month_level: Option<Level> = None;
-        let mut month_values: Option<Vec<u32>> = None;
+        let mut month_values: Option<Vec<String>> = None;
         let mut week_level: Option<Level> = None;
-        let mut week_values: Option<Vec<u32>> = None;
+        let mut week_values: Option<Vec<String>> = None;
         let mut day_level: Option<Level> = None;
-        let mut day_values: Option<Vec<u32>> = None;
+        let mut day_values: Option<Vec<String>> = None;
 
         for dimension in cube.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
@@ -201,7 +216,7 @@ pub fn get_time_values(
         table: String,
         backend: Box<dyn Backend + Sync + Send>,
         sys: &mut SystemRunner
-) -> Result<Vec<u32>, Error> {
+) -> Result<Vec<String>, Error> {
     let future = backend
         .exec_sql(
             format!("select distinct {} from {}", column, table).to_string()
@@ -214,40 +229,39 @@ pub fn get_time_values(
     };
 
     if df.columns.len() >= 1 {
-        let mut values: Vec<u32> = match &df.columns[0].column_data {
+        let mut values: Vec<String> = match &df.columns[0].column_data {
             ColumnData::Int8(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Int16(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Int32(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Int64(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt8(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt16(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt32(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt64(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Float32(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Float64(v) => {
-                v.iter().map(|&e| e.clone() as u32).collect()
+                v.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Text(v) => {
-                // TODO: Add better support for text types
-                v.iter().map(|e| e.parse::<u32>().unwrap().clone()).collect()
+                v.to_vec()
             },
         };
 
