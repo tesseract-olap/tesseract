@@ -43,117 +43,65 @@ pub struct CubeCache {
 }
 
 impl CubeCache {
-    pub fn get_time_cut(&self, t: Time) -> Result<(String, String), Error> {
-        let val = match self.get_value(t.clone()) {
-            None => { return Err(format_err!("Unable to get requested time precision data.")); }
-            Some(o) => o.to_string()
+    pub fn get_time_cut(&self, time: Time) -> Result<(String, String), Error> {
+        let (val_res, ln_res) = match time.precision {
+            TimePrecision::Year => {
+                let v = self.get_value(&time, self.year_values.clone());
+                let l = self.get_level_name(&time, self.year_level.clone());
+                (v, l)
+            },
+            TimePrecision::Quarter => {
+                let v = self.get_value(&time, self.quarter_values.clone());
+                let l = self.get_level_name(&time, self.quarter_level.clone());
+                (v, l)
+            },
+            TimePrecision::Month => {
+                let v = self.get_value(&time, self.month_values.clone());
+                let l = self.get_level_name(&time, self.month_level.clone());
+                (v, l)
+            },
+            TimePrecision::Week => {
+                let v = self.get_value(&time, self.week_values.clone());
+                let l = self.get_level_name(&time, self.week_level.clone());
+                (v, l)
+            },
+            TimePrecision::Day => {
+                let v = self.get_value(&time, self.day_values.clone());
+                let l = self.get_level_name(&time, self.day_level.clone());
+                (v, l)
+            }
         };
 
-        let ln = match self.get_level_name(t) {
+        let val = match val_res {
+            Some(o) => o.to_string(),
+            None => return Err(format_err!("Unable to get requested time precision data."))
+        };
+
+        let ln = match ln_res {
             Some(o) => o,
-            None => { return Err(format_err!("Unable to get requested time precision level name.")); }
+            None => return Err(format_err!("Unable to get requested time precision level name."))
         };
 
         Ok((ln, val))
     }
 
-    pub fn get_level_name(&self, time: Time) -> Option<String> {
-        match time.precision {
-            TimePrecision::Year => {
-                match self.year_level.clone() {
-                    Some(ln) => Some(ln.name),
-                    None => None
-                }
-            },
-            TimePrecision::Quarter => {
-                match self.quarter_level.clone() {
-                    Some(ln) => Some(ln.name),
-                    None => None
-                }
-            },
-            TimePrecision::Month => {
-                match self.month_level.clone() {
-                    Some(ln) => Some(ln.name),
-                    None => None
-                }
-            },
-            TimePrecision::Week => {
-                match self.week_level.clone() {
-                    Some(ln) => Some(ln.name),
-                    None => None
-                }
-            },
-            TimePrecision::Day => {
-                match self.day_level.clone() {
-                    Some(ln) => Some(ln.name),
-                    None => None
-                }
-            },
+    pub fn get_level_name(&self, time: &Time, level: Option<Level>) -> Option<String> {
+        match level {
+            Some(l) => Some(l.name),
+            None => None
         }
     }
 
-    pub fn get_value(&self, time: Time) -> Option<u32> {
-        match time.precision {
-            TimePrecision::Year => {
-                match self.year_values.clone() {
-                    Some(v) => {
-                        match time.value {
-                            TimeValue::First => return Some(v[0]),
-                            TimeValue::Last => return Some(*v.last().unwrap()),
-                            TimeValue::Value(t) => return Some(t)
-                        }
-                    },
-                    None => None
+    pub fn get_value(&self, time: &Time, opt: Option<Vec<u32>>) -> Option<u32> {
+        match opt {
+            Some(v) => {
+                match time.value {
+                    TimeValue::First => return Some(v[0]),
+                    TimeValue::Last => return Some(*v.last().unwrap()),
+                    TimeValue::Value(t) => return Some(t)
                 }
             },
-            TimePrecision::Quarter => {
-                match self.quarter_values.clone() {
-                    Some(v) => {
-                        match time.value {
-                            TimeValue::First => return Some(v[0]),
-                            TimeValue::Last => return Some(*v.last().unwrap()),
-                            TimeValue::Value(t) => return Some(t)
-                        }
-                    },
-                    None => None
-                }
-            },
-            TimePrecision::Month => {
-                match self.month_values.clone() {
-                    Some(v) => {
-                        match time.value {
-                            TimeValue::First => return Some(v[0]),
-                            TimeValue::Last => return Some(*v.last().unwrap()),
-                            TimeValue::Value(t) => return Some(t)
-                        }
-                    },
-                    None => None
-                }
-            },
-            TimePrecision::Week => {
-                match self.week_values.clone() {
-                    Some(v) => {
-                        match time.value {
-                            TimeValue::First => return Some(v[0]),
-                            TimeValue::Last => return Some(*v.last().unwrap()),
-                            TimeValue::Value(t) => return Some(t)
-                        }
-                    },
-                    None => None
-                }
-            },
-            TimePrecision::Day => {
-                match self.day_values.clone() {
-                    Some(v) => {
-                        match time.value {
-                            TimeValue::First => return Some(v[0]),
-                            TimeValue::Last => return Some(*v.last().unwrap()),
-                            TimeValue::Value(t) => return Some(t)
-                        }
-                    },
-                    None => None
-                }
-            },
+            None => None
         }
     }
 }
@@ -246,6 +194,8 @@ pub fn populate_cache(
     Ok(Cache { cubes })
 }
 
+
+/// Queries the database to get all the distinct values for a given time level.
 pub fn get_time_values(
         column: String,
         table: String,
