@@ -2,6 +2,8 @@
 
 ## Constructing Queries
 
+The base URL for the logic layer is `/data`. The accepted parameters are:
+
 - `cube` (str): Specifies the cube the query will be performed against.
 - `drilldowns` (list): Comma separated list of level names for each desired drilldown. Each level name may or may not be wrapped in square brackets. Note that levels with a comma in their name, require the use of square brackets to work properly. Examples:
     - `[drill 1],[drill 2]`
