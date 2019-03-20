@@ -9,4 +9,3 @@ To run tests, set `TESSERACT_DATABASE_URL` to a valid Postgres database URL, the
 ## Limitations
 
 * Does not currently support columns with `numeric` type.
-* Does not currently implement connection pooling.

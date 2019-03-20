@@ -1,19 +1,12 @@
-use failure::{Error, format_err};
-use futures::future::{Future};
-//use std::str;
 use tesseract_core::Column as TesseractColumn;
 use tesseract_core::DataFrame;
 use tesseract_core::ColumnData;
-use tokio_postgres::Column;
-use futures::stream::Collect;
-use tokio_postgres::impls::Query;
+use tokio_postgres::{Column , Row};
 
-//use postgres::types::{FromSql, Kind, ToSql, Type};
-//use num_traits::cast::ToPrimitive;
 // TODO: numeric type not supported!
 // TODO: boolean support
 
-pub fn rows_to_df(qry_result: Collect<Query>, columns: &[Column]) -> Box<Future<Item=DataFrame, Error=Error>> {
+pub fn rows_to_df(rows: Vec<Row>, columns: &[Column]) -> DataFrame {
     let mut tcolumn_list = vec![];
     // For each column in the dataframe, setup the appropriate column vector
     // based on the underlying postgres types so that we will be able to add the values
@@ -63,48 +56,41 @@ pub fn rows_to_df(qry_result: Collect<Query>, columns: &[Column]) -> Box<Future<
         }
     }
 
-    let future = qry_result.map(|rows| {
-        let mut df = DataFrame::from_vec(tcolumn_list);
-        for row_idx in 0..rows.len() {
-            for col_idx in 0..df.columns.len() {
-                let column_data = df.columns
-                    .get_mut(col_idx)
-                    .expect("logic checked?")
-                    .column_data();
-                match column_data {
-                    ColumnData::Int32(col_data) => {
-                        let row = &rows[row_idx];
-                        let value = row.get::<_, i32>(col_idx);
-                        col_data.push(value);
-                    },
-                    ColumnData::Int64(col_data) => {
-                        let row = &rows[row_idx];
-                        let value = row.get::<_, i64>(col_idx);
-                        col_data.push(value);
-                    },
-                    ColumnData::Float32(col_data) => {
-                        let row = &rows[row_idx];
-                        let value = row.get::<_, f32>(col_idx);
-                        col_data.push(value);
-                    },
-                    ColumnData::Float64(col_data) => {
-                        let row = &rows[row_idx];
-                        let value = row.get::<_, f64>(col_idx);
-                        col_data.push(value);
-                    },
-                    ColumnData::Text(col_data) => {
-                        let row = &rows[row_idx];
-                        let value = row.get::<_, String>(col_idx);
-                        col_data.push(value);
-                    },
-                    _ => {
-                        println!("NO MATCH!");
-                    }
+    let mut df = DataFrame::from_vec(tcolumn_list);
+
+    for row in &rows {
+        for col_idx in 0..df.columns.len() {
+            let column_data = df.columns
+                .get_mut(col_idx)
+                .expect("logic checked?")
+                .column_data();
+            match column_data {
+                ColumnData::Int32(col_data) => {
+                    let value = row.get::<_, i32>(col_idx);
+                    col_data.push(value);
+                },
+                ColumnData::Int64(col_data) => {
+                    let value = row.get::<_, i64>(col_idx);
+                    col_data.push(value);
+                },
+                ColumnData::Float32(col_data) => {
+                    let value = row.get::<_, f32>(col_idx);
+                    col_data.push(value);
+                },
+                ColumnData::Float64(col_data) => {
+                    let value = row.get::<_, f64>(col_idx);
+                    col_data.push(value);
+                },
+                ColumnData::Text(col_data) => {
+                    let value = row.get::<_, String>(col_idx);
+                    col_data.push(value);
+                },
+                _ => {
+                    println!("NO MATCH!");
                 }
             }
         }
-        df
-    })
-        .map_err(|err| format_err!("postgres err {}", err));
-    Box::new(future)
+    }
+
+    df
 }
