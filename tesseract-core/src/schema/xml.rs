@@ -145,6 +145,6 @@ mod test {
                 </Cube>
             </Schema>
         "##;
-        let schema_config: SchemaConfigXML = from_reader(s.as_bytes()).unwrap();
+        let _schema_config: SchemaConfigXML = from_reader(s.as_bytes()).unwrap();
     }
 }

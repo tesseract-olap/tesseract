@@ -1,7 +1,6 @@
 use itertools::join;
 
 use crate::Aggregator;
-use crate::names::Mask;
 use crate::query_ir::{
     TableSql,
     CutSql,
@@ -103,6 +102,7 @@ pub(crate) fn standard_sql(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::names::Mask;
     use crate::query_ir::{MemberType, LevelColumn};
     use crate::Table;
 
