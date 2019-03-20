@@ -43,6 +43,10 @@ impl DrilldownSql {
         join(cols, ", ")
     }
 
+    // TODO for now it's ok to map 2 into one slot,
+    // because it's only used in col_alias_string.
+    // In big refactor, push onto col vec, like
+    // in col_alias_only_vec to match behavior
     fn col_alias_vec(&self) -> Vec<String> {
         let mut cols: Vec<_> = self.level_columns.iter()
             .map(|l| {
@@ -79,22 +83,25 @@ impl DrilldownSql {
     }
 
     pub fn col_alias_only_vec(&self) -> Vec<String> {
-        let mut cols: Vec<_> = self.level_columns.iter()
-            .map(|l| {
-                if let Some(ref name_col) = l.name_column {
-                    format!("{}_{}, {}_{}",
-                        l.key_column,
-                        self.alias_postfix,
-                        name_col,
-                        self.alias_postfix,
-                    )
-                } else {
-                    format!("{}_{}",
-                        l.key_column,
-                        self.alias_postfix,
-                    )
-                }
-            }).collect();
+        let mut cols = vec![]; 
+
+        // can't just map the cols, because some levels
+        // produce two and some produce one
+        // This matters because growth needs the vec
+        // version to map onto single cols.
+        for l in self.level_columns.iter() {
+            cols.push(format!("{}_{}",
+                l.key_column,
+                self.alias_postfix,
+            ));
+
+            if let Some(ref name_col) = l.name_column {
+                cols.push(format!("{}_{}",
+                    name_col,
+                    self.alias_postfix,
+                ));
+            }
+        }
 
         if self.property_columns.len() != 0 {
             cols.push(
