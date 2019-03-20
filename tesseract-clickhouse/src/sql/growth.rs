@@ -97,7 +97,7 @@ pub fn calculate(
 
     let final_sql = format!("\
         select \
-            {}, \
+            {all_drill_cols_except_growth}{comma_for_all_drill_cols_except_growth} \
             {final_times}, \
             {final_other_meas} \
             final_m, \
@@ -107,33 +107,33 @@ pub fn calculate(
             with \
                 {grouparray_times}, \
                 {grouparray_other_meas} \
-                groupArray({}) as all_m_in_group, \
+                groupArray({growth_mea}) as all_m_in_group, \
                 arrayEnumerate(all_m_in_group) as all_m_in_group_ids, \
                 arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff \
             select \
-                {}, \
+                {all_drill_cols_except_growth}{comma_for_all_drill_cols_except_growth} \
                 {other_meas} \
                 {times}, \
                 all_m_in_group, \
                 m_diff \
-            from ({} \
+            from ({fnl_sql} \
                 order by \
-                    {} \
+                    {growth_time_drill_alias} \
             ) \
-            group by \
-                {} \
+            {group_by_for_all_drill_cols_except_growth} \
+                {all_drill_cols_except_growth} \
         ) \
         array Join \
             m_diff as final_m_diff, \
             all_m_in_group as final_m, \
             {times_as_final_times} \
             {other_meas_as_final_other_meas}",
-        all_drill_cols_except_growth,
-        growth.mea,
-        all_drill_cols_except_growth,
-        final_sql,
-        growth.time_drill.col_alias_only_string(),
-        all_drill_cols_except_growth,
+        all_drill_cols_except_growth = all_drill_cols_except_growth,
+        comma_for_all_drill_cols_except_growth = if all_drill_cols_except_growth.is_empty() {""} else {","},
+        group_by_for_all_drill_cols_except_growth = if all_drill_cols_except_growth.is_empty() {""} else {"group by"},
+        growth_mea = growth.mea,
+        fnl_sql = final_sql,
+        growth_time_drill_alias = growth.time_drill.col_alias_only_string(),
         final_times = final_times,
         grouparray_times = grouparray_times,
         times = times,
@@ -146,7 +146,12 @@ pub fn calculate(
 
     // Externally, remember to switch out order of time cols. Internally, don't care, number
     // is the same
-    let final_drill_cols = format!("{}, {}, {} final_m, growth", all_drill_cols_except_growth, final_times, final_other_meas);
+    let final_drill_cols = format!("{}{} {}, {} final_m, growth",
+        all_drill_cols_except_growth,
+        if all_drill_cols_except_growth.is_empty() {""} else {","},
+        final_times,
+        final_other_meas,
+    );
 
     (final_sql, final_drill_cols)
 }
