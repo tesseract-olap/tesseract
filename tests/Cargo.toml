@@ -1,0 +1,12 @@
+[package]
+authors = ["Walther Chen <walther.chen@gmail.com>"]
+edition = "2018"
+name = "integration-tests"
+version = "0.1.0"
+
+[dev-dependencies.tesseract-clickhouse]
+path = "../tesseract-clickhouse"
+
+[dev-dependencies.tesseract-core]
+path = "../tesseract-core"
+
