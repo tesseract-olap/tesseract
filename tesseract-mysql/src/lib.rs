@@ -52,7 +52,9 @@ mod tests {
     use super::*;
     use std::env;
 
+    // TODO move to integration tests
     #[test]
+    #[ignore]
     fn test_simple_query() {
         let mysql_db = env::var("MYSQL_DATABASE_URL").unwrap();
         let sql = r"SELECT 1 as example_int, 'hello' as example_name, 0.5 as example_float;";

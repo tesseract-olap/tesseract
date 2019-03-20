@@ -151,35 +151,5 @@ pub fn calculate(
     (final_sql, final_drill_cols)
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use super::super::*;
-
-    use tesseract_core::Table;
-    use tesseract_core::query_ir::LevelColumn;
-
-    #[test]
-    fn test_growth() {
-        let (growth, _headers) = calculate("select * from test".to_owned(), "date, language, framework, ex_complete", 1,
-            &GrowthSql {
-                time_drill: DrilldownSql {
-                    alias_postfix: "".into(),
-                    table: Table { name: "".to_owned(), primary_key: None, schema: None },
-                    primary_key: "".to_owned(),
-                    foreign_key: "".to_owned(),
-                    level_columns: vec![LevelColumn { key_column: "date".to_owned(), name_column: None }],
-                    property_columns: vec![],
-                },
-                mea: "mea_1".to_owned(),
-            }
-        );
-
-        //println!("{}", growth);
-        //println!("{}", headers);
-        assert_eq!(
-            growth,
-            "select  language, framework, ex_complete, final_times_0, final_other_m0,  final_m, (final_m_diff / (final_m - final_m_diff)) as growth, final_m_diff from (with groupArray(date) as times_0, groupArray(final_m0) as other_m0,  groupArray(mea_1) as all_m_in_group, arrayEnumerate(all_m_in_group) as all_m_in_group_ids, arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff select  language, framework, ex_complete, other_m0,  times_0, all_m_in_group, m_diff from (select * from test order by date ) group by  language, framework, ex_complete ) array Join m_diff as final_m_diff, all_m_in_group as final_m, times_0 as final_times_0 ,other_m0 as final_other_m0".to_owned(),
-            );
-    }
-}
+// example growth sql
+//            "select  language, framework, ex_complete, final_times_0, final_other_m0,  final_m, (final_m_diff / (final_m - final_m_diff)) as growth, final_m_diff from (with groupArray(date) as times_0, groupArray(final_m0) as other_m0,  groupArray(mea_1) as all_m_in_group, arrayEnumerate(all_m_in_group) as all_m_in_group_ids, arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff select  language, framework, ex_complete, other_m0,  times_0, all_m_in_group, m_diff from (select * from test order by date ) group by  language, framework, ex_complete ) array Join m_diff as final_m_diff, all_m_in_group as final_m, times_0 as final_times_0 ,other_m0 as final_other_m0".to_owned(),
