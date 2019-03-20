@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde_derive::{Serialize, Deserialize};
 
 use tesseract_core::names::{Cut, Drilldown, Property, Measure};
-use tesseract_core::query::{FilterQuery, GrowthQuery};
+use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
 
@@ -332,7 +332,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 let gro_split: Vec<String> = g.split(",").map(|s| s.to_string()).collect();
 
                 if gro_split.len() == 1 {
-                    return Err(format_err!("Please provide a measure name."));
+                    return Err(format_err!("Please provide a growth measure name."));
                 } else if gro_split.len() != 2 {
                     return Err(format_err!("Bad formatting for growth param."));
                 }
@@ -357,9 +357,43 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => None
         };
 
-        let rca = agg_query_opt.rca
-            .map(|r| r.parse())
-            .transpose()?;
+        let rca = match agg_query_opt.rca {
+            Some(r) => {
+                let rca_split: Vec<String> = r.split(",").map(|s| s.to_string()).collect();
+
+                if rca_split.len() <= 2 || rca_split.len() >= 4 {
+                    return Err(format_err!("Bad formatting for RCA param."));
+                }
+
+                let drill1_l = rca_split[0].clone();
+                let drill2_l = rca_split[1].clone();
+                let measure = rca_split[2].clone();
+
+                let (drill1_d, drill1_h, _) = match cube.identify_level(drill1_l.clone()) {
+                    Ok(dh) => dh,
+                    Err(_) => return Err(format_err!("Unable to identify RCA drilldown #1 level."))
+                };
+
+                let (drill2_d, drill2_h, _) = match cube.identify_level(drill2_l.clone()) {
+                    Ok(dh) => dh,
+                    Err(_) => return Err(format_err!("Unable to identify RCA drilldown #2 level."))
+                };
+
+                let rca_f = format!("[{}].[{}].[{}],[{}].[{}].[{}],{}",
+                    drill1_d, drill1_h, drill1_l,
+                    drill2_d, drill2_h, drill2_l,
+                    measure
+                );
+
+                let rca = match rca_f.parse::<RcaQuery>() {
+                    Ok(r) => r,
+                    Err(_) => return Err(format_err!("Unable to create RCA query."))
+                };
+
+                Some(rca)
+            },
+            None => None
+        };
 
         let mut captions: Vec<Property> = vec![];
         for cap in caption_strings {
