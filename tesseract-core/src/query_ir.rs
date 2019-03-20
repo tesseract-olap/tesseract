@@ -38,30 +38,6 @@ pub struct DrilldownSql {
 }
 
 impl DrilldownSql {
-    fn col_string(&self) -> String {
-        let cols = self.col_vec();
-        join(cols, ", ")
-    }
-
-    fn col_vec(&self) -> Vec<String> {
-        let mut cols: Vec<_> = self.level_columns.iter()
-            .map(|l| {
-                if let Some(ref name_col) = l.name_column {
-                    format!("{}, {}", l.key_column, name_col)
-                } else {
-                    l.key_column.clone()
-                }
-            }).collect();
-
-        if self.property_columns.len() != 0 {
-            cols.push(
-                join(&self.property_columns, ", ")
-            );
-        }
-
-        cols
-    }
-
     pub fn col_alias_string(&self) -> String {
         let cols = self.col_alias_vec();
         join(cols, ", ")
