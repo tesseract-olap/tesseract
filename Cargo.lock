@@ -514,16 +514,6 @@ version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "data-gen"
-version = "0.1.0"
-dependencies = [
- "csv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.84 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "derive_state_machine_future"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"

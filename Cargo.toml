@@ -5,5 +5,4 @@ members = [
     "tesseract-postgres",
     "tesseract-core",
     "tesseract-server",
-    "data-gen"
 ]

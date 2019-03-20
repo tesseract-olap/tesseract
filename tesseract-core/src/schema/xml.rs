@@ -136,6 +136,12 @@ mod test {
             <Schema name="my_schema">
                 <Cube name="my_cube">
                     <Table name="my_table" />
+                    <Dimension name="my_dim">
+                        <Hierarchy name="my_hier">
+                            <Level name="my_level" key_column="key" />
+                        </Hierarchy>
+                    </Dimension>
+                    <Measure name="my_mea" column="mea" aggregator="sum" />
                 </Cube>
             </Schema>
         "##;
