@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use serde_derive::{Serialize, Deserialize};
 
 use tesseract_core::names::{Cut, Drilldown, Property, Measure};
-use tesseract_core::query::{FilterQuery};
+use tesseract_core::query::{FilterQuery, GrowthQuery};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
 
@@ -326,9 +326,37 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
         let limit = agg_query_opt.limit
             .map(|l| l.parse())
             .transpose()?;
-        let growth = agg_query_opt.growth
-            .map(|g| g.parse())
-            .transpose()?;
+
+        let growth = match agg_query_opt.growth {
+            Some(g) => {
+                let gro_split: Vec<String> = g.split(",").map(|s| s.to_string()).collect();
+
+                if gro_split.len() == 1 {
+                    return Err(format_err!("Please provide a measure name."));
+                } else if gro_split.len() != 2 {
+                    return Err(format_err!("Bad formatting for growth param."));
+                }
+
+                let level = gro_split[0].clone();
+                let measure = gro_split[1].clone();
+
+                let (dimension, hierarchy, _) = match cube.identify_level(level.clone()) {
+                    Ok(dh) => dh,
+                    Err(_) => return Err(format_err!("Unable to identify growth level."))
+                };
+
+                let growth_f = format!("{}.{}.{},{}", dimension, hierarchy, level, measure);
+
+                let growth = match growth_f.parse::<GrowthQuery>() {
+                    Ok(g) => g,
+                    Err(_) => return Err(format_err!("Unable to create growth query."))
+                };
+
+                Some(growth)
+            },
+            None => None
+        };
+
         let rca = agg_query_opt.rca
             .map(|r| r.parse())
             .transpose()?;
