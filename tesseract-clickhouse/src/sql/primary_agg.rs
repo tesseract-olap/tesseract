@@ -5,6 +5,7 @@ use super::aggregator::{
     agg_sql_string_pass_2,
     agg_sql_string_select_mea,
 };
+use super::cuts::cut_sql_string;
 use super::{
     TableSql,
     CutSql,
@@ -120,17 +121,16 @@ pub fn primary_agg(
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
         let inline_cut_clause = inline_cuts
             .iter()
-            .map(|c| format!("{} in ({})", c.column, c.members_string()));
+            .map(|c| cut_sql_string(&c));
 
         let ext_cut_clause = ext_cuts_for_inline
             .iter()
             .map(|c| {
-                format!("{} in (select {} from {} where {} in ({}))",
+                format!("{} in (select {} from {} where {})",
                     c.foreign_key,
                     c.primary_key,
                     c.table.full_name(),
-                    c.column,
-                    c.members_string(),
+                    cut_sql_string(&c),
                     )
             });
 

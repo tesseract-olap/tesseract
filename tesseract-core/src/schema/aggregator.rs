@@ -30,7 +30,7 @@ pub enum Aggregator {
     /// and a list of secondary column is provided to the MO aggregator:
     ///
     /// The general equation for Margin of Error is
-    /// ```
+    /// ```text
     /// 1.645 * pow(0.05 * (pow(sum(column) - sum(secondary_columns[0]), 2) + pow(sum(column) - sum(secondary_columns_[1]), 2) + ...), 0.5)
     /// ```
     #[serde(rename="moe")]
@@ -42,7 +42,7 @@ pub enum Aggregator {
     /// and a list of secondary weight columns is provided to the MO aggregator:
     ///
     /// The general equation for Margin of Error is
-    /// ```
+    /// ```text
     /// 1.645 * pow(0.05 * (pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[0])/sum(secondary_weight_columns[0]) ), 2) + pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[1]/sum(secondary_weight_columns[1]) ), 2) + ...), 0.5)
     /// ```
     #[serde(rename="weighted_average_moe")]

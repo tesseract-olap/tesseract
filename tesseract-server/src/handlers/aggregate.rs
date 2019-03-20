@@ -17,6 +17,8 @@ use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 
+/// Handles default aggregation when a format is not specified.
+/// Default format is CSV.
 pub fn aggregate_default_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
     ) -> FutureResponse<HttpResponse>
@@ -25,6 +27,7 @@ pub fn aggregate_default_handler(
     do_aggregate(req, cube_format)
 }
 
+/// Handles aggregation when a format is specified.
 pub fn aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
     ) -> FutureResponse<HttpResponse>
@@ -32,6 +35,7 @@ pub fn aggregate_handler(
     do_aggregate(req, cube_format.into_inner())
 }
 
+/// Performs data aggregation.
 pub fn do_aggregate(
     req: HttpRequest<AppState>,
     cube_format: (String, String),
@@ -70,8 +74,7 @@ pub fn do_aggregate(
     };
     info!("query opts:{:?}", agg_query);
 
-    // TODO turn AggregateQueryOpt into Query
-    // Then write the sql query thing.
+    // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = match ts_query {
         Ok(q) => q,
@@ -120,13 +123,14 @@ pub fn do_aggregate(
         .responder()
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {
     drilldowns: Option<Vec<String>>,
     cuts: Option<Vec<String>>,
     measures: Option<Vec<String>>,
     properties: Option<Vec<String>>,
     filters: Option<Vec<String>>,
+    captions: Option<Vec<String>>,
     parents: Option<bool>,
     top: Option<String>,
     top_where: Option<String>,
@@ -174,12 +178,20 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             })
             .unwrap_or(Ok(vec![]));
 
+        let captions: Result<Vec<_>, _> = agg_query_opt.captions
+            .map(|cs| {
+                cs.iter().map(|c| c.parse()).collect()
+            })
+            .unwrap_or(Ok(vec![]));
+
         let drilldowns = drilldowns?;
         let cuts = cuts?;
         let measures = measures?;
-        let parents = agg_query_opt.parents.unwrap_or(false);
         let properties = properties?;
         let filters = filters?;
+        let captions = captions?;
+
+        let parents = agg_query_opt.parents.unwrap_or(false);
 
         let top = agg_query_opt.top
             .map(|t| t.parse())
@@ -211,6 +223,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             parents,
             properties,
             filters,
+            captions,
             top,
             top_where,
             sort,

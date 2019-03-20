@@ -85,7 +85,10 @@ mod tests {
     use std::env;
     use tokio::runtime::current_thread::Runtime;
     use tesseract_core::{ColumnData};
+
+    // TODO move to integration tests
     #[test]
+    #[ignore]
     fn test_pg_query() {
         let postgres_db= env::var("TESSERACT_DATABASE_URL").expect("Please provide TESSERACT_DATABASE_URL");
         let pg = Postgres::new(&postgres_db);

@@ -23,7 +23,8 @@
 
 mod app;
 mod db_config;
-mod handlers;
+pub mod handlers;
+mod logic_layer;
 mod schema_config;
 
 use actix_web::server;
@@ -63,10 +64,8 @@ fn main() -> Result<(), Error> {
     // NOTE: Local schema is the only supported SchemaSource for now
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
-    let schema = schema_config::read_schema(&schema_path).map_err(|err| {
-        format_err!("Error reading schema: {}", err)
-    })?;
-    let schema_arc = Arc::new(RwLock::new(schema));
+    let schema = schema_config::read_schema(&schema_path)?;
+    let schema_arc = Arc::new(RwLock::new(schema.clone()));
 
     // Env
     let env_vars = EnvVars {
@@ -75,9 +74,37 @@ fn main() -> Result<(), Error> {
         flush_secret,
     };
 
+    // Initialize actix system
+    let mut sys = actix::System::new("tesseract");
+
+    // Populate internal cache
+    let cache = match logic_layer::populate_cache(schema.clone(), db.clone(), &mut sys) {
+        Ok(cache) => cache,
+        Err(_) => panic!("Cache population failed."),
+    };
+    let cache_arc = Arc::new(RwLock::new(cache));
+
+    // Logic Layer Config
+    let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
+        Ok(config_path) => {
+            let logic_layer_config = match logic_layer::read_config(&config_path) {
+                Ok(config_obj) => config_obj,
+                Err(err) => return Err(err)
+            };
+            Some(Arc::new(RwLock::new(logic_layer_config)))
+        },
+        Err(_) => None
+    };
+
     // Initialize Server
-    let sys = actix::System::new("tesseract");
-    server::new(move|| create_app(db.clone(), db_type.clone(), schema_arc.clone(), env_vars.clone()))
+    server::new(move|| create_app(
+            db.clone(),
+            db_type.clone(),
+            env_vars.clone(),
+            schema_arc.clone(),
+            cache_arc.clone(),
+            logic_layer_config.clone()),
+        )
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
         .start();
@@ -101,4 +128,3 @@ struct Opt {
     #[structopt(long="db-url")]
     database_url: Option<String>,
 }
-

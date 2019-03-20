@@ -16,6 +16,7 @@ pub struct Query {
     pub measures: Vec<Measure>,
     pub properties: Vec<Property>,
     pub filters: Vec<FilterQuery>,
+    pub captions: Vec<Property>,
     pub parents: bool,
     pub top: Option<TopQuery>,
     pub top_where: Option<TopWhereQuery>,
@@ -34,6 +35,7 @@ impl Query {
             measures: vec![],
             properties: vec![],
             filters: vec![],
+            captions: vec![],
             parents: false,
             top: None,
             top_where: None,
@@ -46,7 +48,9 @@ impl Query {
     }
 }
 
-/// Clickhouse:
+// TODO: Move ClickHouse specific queries away from ts-core
+
+/// ClickHouse:
 /// select * from table_name order by sort_measures sort_direction
 /// limit n by by_dimension
 #[derive(Debug, Clone)]

@@ -9,6 +9,8 @@ use crate::db_config::Database;
 use crate::handlers::{
     aggregate_handler,
     aggregate_default_handler,
+    logic_layer_default_handler,
+    logic_layer_handler,
     flush_handler,
     index_handler,
     metadata_handler,
@@ -16,6 +18,7 @@ use crate::handlers::{
     members_handler,
     members_default_handler,
 };
+use crate::logic_layer::{Cache, LogicLayerConfig};
 
 use std::sync::{Arc, RwLock};
 
@@ -42,14 +45,25 @@ pub struct AppState {
     // TODO this is a hack, until a better interface is set up with the Backend Trait
     // to generate its own sql.
     pub db_type: Database,
-    pub schema: Arc<RwLock<Schema>>,
     pub env_vars: EnvVars,
+    pub schema: Arc<RwLock<Schema>>,
+    pub cache: Arc<RwLock<Cache>>,
+    pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
 }
 
 /// Creates an ActixWeb application with an `AppState`.
-pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, schema: Arc<RwLock<Schema>>, env_vars: EnvVars) -> App<AppState> {
-    App::with_state(AppState { backend, db_type, schema, env_vars })
+pub fn create_app(
+        backend: Box<dyn Backend + Sync + Send>,
+        db_type: Database,
+        env_vars: EnvVars,
+        schema: Arc<RwLock<Schema>>,
+        cache: Arc<RwLock<Cache>>,
+        logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>
+    ) -> App<AppState> {
+    App::with_state(AppState { backend, db_type, env_vars, schema, cache, logic_layer_config })
         .middleware(middleware::Logger::default())
+
+        // Metadata
         .resource("/", |r| {
             r.method(Method::GET).with(index_handler)
         })
@@ -59,20 +73,32 @@ pub fn create_app(backend: Box<dyn Backend + Sync + Send>, db_type: Database, sc
         .resource("/cubes/{cube}", |r| {
             r.method(Method::GET).with(metadata_handler)
         })
+
+        // Aggregation
         .resource("/cubes/{cube}/aggregate", |r| {
             r.method(Method::GET).with(aggregate_default_handler)
         })
         .resource("/cubes/{cube}/aggregate.{format}", |r| {
             r.method(Method::GET).with(aggregate_handler)
         })
+
+        // Logic Layer
+        .resource("/data", |r| {
+            r.method(Method::GET).with(logic_layer_default_handler)
+        })
+        .resource("/data.{format}", |r| {
+            r.method(Method::GET).with(logic_layer_handler)
+        })
+
+        // Helpers
         .resource("/cubes/{cube}/members", |r| {
             r.method(Method::GET).with(members_default_handler)
         })
         .resource("/cubes/{cube}/members.{format}", |r| {
             r.method(Method::GET).with(members_handler)
         })
+
         .resource("/flush", |r| {
-            // TODO: Change this to POST?
-            r.method(Method::GET).with(flush_handler)
+            r.method(Method::POST).with(flush_handler)
         })
 }

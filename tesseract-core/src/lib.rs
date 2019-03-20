@@ -1,9 +1,9 @@
 mod backend;
 mod dataframe;
+mod sql;
 pub mod format;
 pub mod names;
 pub mod schema;
-mod sql;
 pub mod query;
 pub mod query_ir;
 
@@ -13,8 +13,8 @@ use serde_xml::from_reader;
 
 use crate::schema::{
     SchemaConfigJson,
-    SchemaConfigXML}
-;
+    SchemaConfigXML
+};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -25,7 +25,7 @@ use self::names::{
     Property,
     LevelName,
 };
-pub use self::schema::{Schema, Cube, Table, Aggregator};
+pub use self::schema::{Schema, Cube, Dimension, Table, Aggregator};
 use self::schema::metadata::{SchemaMetadata, CubeMetadata};
 use self::query_ir::{
     CutSql,
@@ -41,7 +41,7 @@ use self::query_ir::{
     GrowthSql,
     FilterSql,
 };
-pub use self::query::{Query, MeaOrCalc};
+pub use self::query::{Query, MeaOrCalc, FilterQuery};
 pub use self::query_ir::QueryIr;
 
 
@@ -119,6 +119,7 @@ impl Schema {
         if query.drilldowns.is_empty() && query.cuts.is_empty(){
             return Err(format_err!("Either a drilldown or cut is required"));
         }
+
         // also check that properties have a matching drilldown
         if let Some(ref rca) = query.rca {
             let rca_drills = [&rca.drill_1, &rca.drill_2];
@@ -175,7 +176,7 @@ impl Schema {
         let cut_cols = self.cube_cut_cols(&cube, &query.cuts)
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
 
-        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, &query.properties, query.parents)
+        let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, &query.properties, &query.captions, query.parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
 
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
@@ -321,8 +322,8 @@ impl Schema {
 
         // TODO check that no overlapping dim or mea cols between rca and others
         let rca = if let Some(ref rca) = query.rca {
-            let drill_1 = self.cube_drill_cols(&cube, &[rca.drill_1.clone()], &query.properties, query.parents)?;
-            let drill_2 = self.cube_drill_cols(&cube, &[rca.drill_2.clone()], &query.properties, query.parents)?;
+            let drill_1 = self.cube_drill_cols(&cube, &[rca.drill_1.clone()], &query.properties, &query.captions, query.parents)?;
+            let drill_2 = self.cube_drill_cols(&cube, &[rca.drill_2.clone()], &query.properties, &query.captions, query.parents)?;
 
             let mea = self.cube_mea_cols(&cube, &[rca.mea.clone()])?
                 .get(0)
@@ -340,7 +341,7 @@ impl Schema {
         };
 
         let growth = if let Some(ref growth) = query.growth {
-            let time_drill = self.cube_drill_cols(&cube, &[growth.time_drill.clone()], &query.properties, query.parents)?
+            let time_drill = self.cube_drill_cols(&cube, &[growth.time_drill.clone()], &query.properties, &query.captions, query.parents)?
                 .get(0)
                 .ok_or(format_err!("no measure found for growth"))?
                 .clone();
@@ -483,15 +484,27 @@ impl Schema {
                 .clone()
                 .ok_or(format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
 
-            let column = level.key_column.clone();
+            let column = if cut.for_match {
+                level.name_column.clone().unwrap_or(level.key_column.clone())
+            } else {
+                level.key_column.clone()
+            };
+
+            let member_type = if cut.for_match {
+                MemberType::Text
+            } else {
+                level.key_type.clone().unwrap_or(MemberType::NonText)
+            };
 
             res.push(CutSql {
                 table,
                 primary_key,
                 foreign_key,
                 column,
+                member_type,
                 members: cut.members.clone(),
-                member_type: level.key_type.clone().unwrap_or(MemberType::NonText),
+                mask: cut.mask.clone(),
+                for_match: cut.for_match,
             });
         }
 
@@ -505,6 +518,7 @@ impl Schema {
         cube_name: &str,
         drills: &[Drilldown],
         properties: &[Property],
+        captions: &[Property],
         parents: bool,
         ) -> Result<Vec<DrilldownSql>, Error>
     {
@@ -547,6 +561,32 @@ impl Schema {
                 .collect();
             let property_columns = property_columns?;
 
+            // for this drill, get caption. For now, only allow on
+            // an explicitly specified drilldown
+            // - filter by properties for this drilldown
+            // - for each property, get the level
+            // - check theres only <= 1.
+            let caption_col: Result<Vec<_>, _>= captions.iter()
+                .filter(|p| p.level_name == drill.0)
+                .map(|p| {
+                    levels.iter()
+                        .find(|lvl| lvl.name == p.level_name.level)
+                        .and_then(|lvl| {
+                            if let Some(ref properties) = lvl.properties {
+                                properties.iter()
+                                    .find(|schema_p| schema_p.name == p.property)
+
+                            } else {
+                                None
+                            }
+                        })
+                        .map(|p| p.column.clone())
+                        .ok_or(format_err!("cannot find property-caption for {}", p))
+                })
+                .collect();
+            let caption_col = caption_col?;
+            assert!(caption_col.len() <= 1);
+
             // No table (means inline table) will replace with fact table
             let table = hier.table
                 .clone()
@@ -571,15 +611,27 @@ impl Schema {
 
             if parents {
                 for i in 0..=level_idx {
+                    // caption replaces name_column with the col from property.
+                    let caption = if !caption_col.is_empty() && i == level_idx {
+                        Some(caption_col[0].clone()) // assertion that caption_col <= 1 above
+                    } else {
+                        levels[i].name_column.clone()
+                    };
                     level_columns.push(LevelColumn {
                         key_column: levels[i].key_column.clone(),
-                        name_column: levels[i].name_column.clone(),
+                        name_column: caption,
                     });
                 }
             } else {
+                // caption replaces name_column with the col from property.
+                let caption = if !caption_col.is_empty() {
+                    Some(caption_col[0].clone()) // assertion that caption_col <= 1 above
+                } else {
+                    levels[level_idx].name_column.clone()
+                };
                 level_columns.push(LevelColumn {
                     key_column: levels[level_idx].key_column.clone(),
-                    name_column: levels[level_idx].name_column.clone(),
+                    name_column: caption,
                 });
             }
 
@@ -775,6 +827,12 @@ impl Schema {
         let column = mea.column.clone();
 
         Ok(column)
+    }
+
+    pub fn get_cube_by_name(&self, cube_name: &str) -> Result<&Cube, Error> {
+        self.cubes.iter()
+            .find(|c| &c.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))
     }
 }
 

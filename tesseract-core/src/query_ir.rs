@@ -1,6 +1,7 @@
 use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 
+use crate::names::Mask;
 use crate::query::{LimitQuery, SortDirection, Constraint};
 use crate::schema::Table;
 use crate::schema::aggregator::Aggregator;
@@ -37,30 +38,6 @@ pub struct DrilldownSql {
 }
 
 impl DrilldownSql {
-    fn col_string(&self) -> String {
-        let cols = self.col_vec();
-        join(cols, ", ")
-    }
-
-    fn col_vec(&self) -> Vec<String> {
-        let mut cols: Vec<_> = self.level_columns.iter()
-            .map(|l| {
-                if let Some(ref name_col) = l.name_column {
-                    format!("{}, {}", l.key_column, name_col)
-                } else {
-                    l.key_column.clone()
-                }
-            }).collect();
-
-        if self.property_columns.len() != 0 {
-            cols.push(
-                join(&self.property_columns, ", ")
-            );
-        }
-
-        cols
-    }
-
     pub fn col_alias_string(&self) -> String {
         let cols = self.col_alias_vec();
         join(cols, ", ")
@@ -174,6 +151,10 @@ pub struct CutSql {
     pub column: String,
     pub members: Vec<String>,
     pub member_type: MemberType,
+    // Mask is Includes or Excludes on set of cut members
+    pub mask: Mask,
+    // if for_match, then use LIKE syntax
+    pub for_match: bool,
 }
 
 impl CutSql {
@@ -182,15 +163,55 @@ impl CutSql {
             MemberType::NonText => join(&self.members, ", "),
             MemberType::Text => {
                 let quoted = self.members.iter()
-                    .map(|m| format!("'{}'", m));
+                .map(|m| format!("'{}'", m));
                 join(quoted, ", ")
             }
         };
+
         format!("{}", members)
+    }
+
+    pub fn members_like_string(&self) -> String {
+        match self.member_type {
+            MemberType::NonText => {
+                // this behavior doesn't really make sense; it should be for
+                // labels only, which are almost always strings.
+                let unquoted = self.members.iter()
+                    .map(|m| format!("{} {} {}", self.column, self.mask_sql_like_string(), m));
+
+                match self.mask {
+                    Mask::Include => format!("{}", join(unquoted, " or ")),
+                    Mask::Exclude => format!("{}", join(unquoted, " and ")),
+                }
+            },
+            MemberType::Text => {
+                let quoted = self.members.iter()
+                    .map(|m| format!("{} {} '%{}%'", self.column, self.mask_sql_like_string(), m));
+
+                match self.mask {
+                    Mask::Include => format!("{}", join(quoted, " or ")),
+                    Mask::Exclude => format!("{}", join(quoted, " and ")),
+                }
+            }
+        }
     }
 
     pub fn col_qual_string(&self) -> String {
         format!("{}.{}", self.table.name, self.column)
+    }
+
+    pub fn mask_sql_in_string(&self) -> String {
+        match self.mask {
+            Mask::Include => "in".into(),
+            Mask::Exclude => "not in".into(),
+        }
+    }
+
+    pub fn mask_sql_like_string(&self) -> String {
+        match self.mask {
+            Mask::Include => "like".into(),
+            Mask::Exclude => "not like".into(),
+        }
     }
 }
 
