@@ -20,7 +20,7 @@ pub fn wrap_options(
 ) -> String
 {
     let mut final_sql = final_sql;
-    
+
     // TODO: top query not yet supported
 
     // There's a final wrapper clause no matter what.

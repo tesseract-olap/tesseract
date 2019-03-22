@@ -62,11 +62,6 @@ pub fn postgres_sql(
         },
         _ => None
     };
-
-
-
-    println!("COL INDX={:?}", sort_alias);
-
     final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, sort_alias, limit, filters);
 
     final_sql
