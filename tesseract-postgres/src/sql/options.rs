@@ -8,9 +8,11 @@ use super::{
     FilterSql,
 };
 
+use tesseract_core::query_ir::{DrilldownSql};
+
 pub fn wrap_options(
     final_sql: String,
-    final_drill_cols: &str,
+    drills:  &[DrilldownSql],
     top: &Option<TopSql>,
     top_where: &Option<TopWhereSql>,
     sort: &Option<SortSql>,
@@ -22,6 +24,13 @@ pub fn wrap_options(
     let mut final_sql = final_sql;
 
     // TODO: top query not yet supported
+
+    let final_drill_cols = drills.iter().map(|drill| {
+        let tmp: Vec<String> = drill.col_alias_only_vec().iter().map(|alias| format!("options_subquery.{}", alias)).collect();
+        return join(tmp, ", ");
+    });
+    let final_drill_cols = join(final_drill_cols, ", ");
+
 
     // There's a final wrapper clause no matter what.
     // - it sorts by final_drill_cols

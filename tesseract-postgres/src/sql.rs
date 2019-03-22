@@ -38,21 +38,13 @@ pub fn postgres_sql(
     growth: &Option<GrowthSql>,
 ) -> String
 {
-    let (mut final_sql) = primary_agg(table, cuts, drills, meas);
-
-
+    let mut final_sql = primary_agg(table, cuts, drills, meas);
 
     if let Some(growth) = growth {
         let (sql, drill_cols) = growth::calculate(final_sql, drills, meas.len(), growth);
         final_sql = sql;
     }
 
-
-    let final_drill_cols = drills.iter().map(|drill| {
-        let tmp: Vec<String> = drill.col_alias_only_vec().iter().map(|alias| format!("options_subquery.{}", alias)).collect();
-        return join(tmp, ", ");
-    });
-    let final_drill_cols = join(final_drill_cols, ", ");
 
     // sorting magic
     let sort_alias: Option<String> = match sort {
@@ -62,7 +54,7 @@ pub fn postgres_sql(
         },
         _ => None
     };
-    final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, sort_alias, limit, filters);
+    final_sql = wrap_options(final_sql, drills, top, top_where, sort, sort_alias, limit, filters);
 
     final_sql
 }
