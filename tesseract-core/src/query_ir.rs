@@ -77,13 +77,50 @@ impl DrilldownSql {
         cols
     }
 
+    pub fn col_alias_string2(&self) -> String {
+        let cols = self.col_alias_vec2();
+        join(cols, ", ")
+    }
+
+    fn col_alias_vec2(&self) -> Vec<String> {
+        let mut cols: Vec<_> = self.level_columns.iter()
+            .map(|l| {
+                if let Some(ref name_col) = l.name_column {
+                    format!("{}.{} as {}_{}, {} as {}_{}",
+                        self.table.name,
+                        l.key_column,
+                        l.key_column,
+                        self.alias_postfix,
+                        name_col,
+                        name_col,
+                        self.alias_postfix,
+                    )
+                } else {
+                    format!("{}.{} as {}_{}",
+                        self.table.name,
+                        l.key_column,
+                        l.key_column,
+                        self.alias_postfix,
+                    )
+                }
+            }).collect();
+
+        if self.property_columns.len() != 0 {
+            cols.push(
+                join(&self.property_columns, ", ")
+            );
+        }
+
+        cols
+    }
+
     pub fn col_alias_only_string(&self) -> String {
         let cols = self.col_alias_only_vec();
         join(cols, ", ")
     }
 
     pub fn col_alias_only_vec(&self) -> Vec<String> {
-        let mut cols = vec![]; 
+        let mut cols = vec![];
 
         // can't just map the cols, because some levels
         // produce two and some produce one
@@ -370,4 +407,3 @@ pub fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSu
         dim_cols: None,
     }
 }
-
