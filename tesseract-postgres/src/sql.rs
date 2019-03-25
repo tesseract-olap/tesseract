@@ -45,16 +45,7 @@ pub fn postgres_sql(
         final_sql = sql;
     }
 
-
-    // sorting magic
-    let sort_alias: Option<String> = match sort {
-        Some(sort_obj) => {
-            let position = meas.iter().position(|mea_obj| mea_obj.column == sort_obj.column).expect("Missing column position");
-            Some(format!("m{}", position))
-        },
-        _ => None
-    };
-    final_sql = wrap_options(final_sql, drills, top, top_where, sort, sort_alias, limit, filters);
+    final_sql = wrap_options(final_sql, drills, top, top_where, sort, limit, filters);
 
     final_sql
 }

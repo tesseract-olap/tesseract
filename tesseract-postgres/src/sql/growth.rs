@@ -27,8 +27,8 @@ pub fn calculate(
     let non_time_drills: Vec<&DrilldownSql> = drills.iter().filter(|drill| drill.col_qual_string() != growth.time_drill.col_qual_string()).collect();
     let final_non_time_drill_cols: String = drilldown_list_helper(growth_table_alias, &non_time_drills);
     let growth_sql = format!("SELECT *, \
-        coalesce(m{measure_idx} - (lag(m{measure_idx}) OVER w), 0) as growth_value, \
-        coalesce(((m{measure_idx} - (lag(m0) OVER w)) / (lag(m0::float) OVER w)), 0) as growth_pct \
+        coalesce(final_m{measure_idx} - (lag(final_m{measure_idx}) OVER w), 0) as growth_value, \
+        coalesce(((final_m{measure_idx} - (lag(final_m{measure_idx}) OVER w)) / (lag(final_m{measure_idx}::float) OVER w)), 0) as growth_pct \
         FROM ({0}) {growth_table_alias} \
         WINDOW w as (PARTITION BY {drilldowns_ex_time} ORDER BY {growth_table_alias}.{time_col})",
                                  final_sql.to_string(),

@@ -23,9 +23,9 @@ pub fn primary_agg(
     // hack for now... remove later
     fn agg_sql_string(measure_idx: usize, m: &MeasureSql) -> String {
         match &m.aggregator {
-            Aggregator::Sum => format!("sum({}) as m{}", &m.column, measure_idx),
-            Aggregator::Count => format!("count({}) as m{}", &m.column, measure_idx),
-            Aggregator::Average => format!("avg({}) as m{}", &m.column, measure_idx),
+            Aggregator::Sum => format!("sum({}) as final_m{}", &m.column, measure_idx),
+            Aggregator::Count => format!("count({}) as final_m{}", &m.column, measure_idx),
+            Aggregator::Average => format!("avg({}) as final_m{}", &m.column, measure_idx),
             // median doesn't work like this
             Aggregator::Median => format!("median"),
             Aggregator::WeightedAverage {..} => format!("avg"),

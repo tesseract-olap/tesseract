@@ -16,7 +16,6 @@ pub fn wrap_options(
     top: &Option<TopSql>,
     top_where: &Option<TopWhereSql>,
     sort: &Option<SortSql>,
-    sort_alias: Option<String>,
     limit: &Option<LimitSql>,
     filters: &[FilterSql],
 ) -> String
@@ -52,7 +51,7 @@ pub fn wrap_options(
     let sort_sql = {
         if let Some(sort) = sort {
             format!("ORDER BY {} {}, {}",
-                    sort_alias.expect("sort column error"),
+                    sort.column,
                     sort.direction.sql_string(),
                     final_drill_cols
             )
