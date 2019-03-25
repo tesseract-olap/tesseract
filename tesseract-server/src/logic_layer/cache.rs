@@ -270,6 +270,7 @@ pub fn get_time_values(
             },
         };
 
+        // TODO: Fix this ordering (months)
         values.sort();
 
         return Ok(values);

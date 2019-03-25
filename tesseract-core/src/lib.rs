@@ -310,11 +310,15 @@ impl Schema {
         let filters = filters?;
 
         let sort = if let Some(ref s) = query.sort {
-            let sort_column = self.get_mea_col(&cube, &s.measure)?;
+            // sort column needs to be named by alias
+            let sort_column = query.measures.iter()
+                .position(|m| m == &s.measure)
+                .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
+
 
             Some(SortSql {
                 direction: s.direction.clone(),
-                column: sort_column,
+                column: format!("final_m{}", sort_column),
             })
         } else {
             None

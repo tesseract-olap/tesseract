@@ -9,6 +9,7 @@ use crate::dataframe::{DataFrame, ColumnData};
 pub enum FormatType{
     Csv,
     JsonRecords,
+    JsonArrays,
 }
 
 impl std::str::FromStr for FormatType {
@@ -18,6 +19,7 @@ impl std::str::FromStr for FormatType {
         match s {
             "csv" => Ok(FormatType::Csv),
             "jsonrecords" => Ok(FormatType::JsonRecords),
+            "jsonarrays" => Ok(FormatType::JsonArrays),
             _ => Err(format_err!("{} is not a supported format", s)),
         }
     }
@@ -28,6 +30,7 @@ pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType
     match format_type {
         FormatType::Csv => Ok(format_csv(headers, df)?),
         FormatType::JsonRecords => Ok(format_jsonrecords(headers, df)?),
+        FormatType::JsonArrays => Ok(format_jsonarrays(headers, df)?),
     }
 }
 
@@ -101,6 +104,42 @@ fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error
     }
 
     let res = json!({
+        "data": rows,
+    });
+
+    Ok(res.to_string())
+}
+
+/// Formats response `DataFrame` to JSON arrays.
+fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error> {
+    let mut rows = vec![];
+
+    // then write data
+    for row_idx in 0..df.len() {
+        let mut row: Vec<serde_json::Value> = vec![];
+        for col_idx in 0..df.columns.len() {
+            let val = match df.columns[col_idx].column_data {
+                ColumnData::Int8(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Int16(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Int32(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Int64(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt8(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt16(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt32(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::UInt64(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Float32(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Float64(ref ns) => ns[row_idx].clone().into(),
+                ColumnData::Text(ref ss) => ss[row_idx].clone().into(),
+            };
+
+            row.push(val);
+        }
+
+        rows.push(row);
+    }
+
+    let res = json!({
+        "headers": headers,
         "data": rows,
     });
 
