@@ -7,6 +7,7 @@ use serde_json;
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerConfig {
     pub aliases: Option<AliasConfig>,
+    pub name_sets: Option<Vec<NameSetsConfig>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -18,6 +19,18 @@ pub struct AliasConfig {
 pub struct CubeAliasConfig {
     pub name: String,
     pub alternatives: Vec<String>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NameSetsConfig {
+    pub level_name: String,
+    pub sets: Vec<NameSetConfig>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NameSetConfig {
+    pub set_name: String,
+    pub values: Vec<String>
 }
 
 

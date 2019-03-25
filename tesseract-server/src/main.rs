@@ -91,6 +91,7 @@ fn main() -> Result<(), Error> {
                 Ok(config_obj) => config_obj,
                 Err(err) => return Err(err)
             };
+
             Some(Arc::new(RwLock::new(logic_layer_config)))
         },
         Err(_) => None
