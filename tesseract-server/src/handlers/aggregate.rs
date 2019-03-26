@@ -120,8 +120,12 @@ pub fn do_aggregate(
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }
         })
-        .map_err(|e| {
-            ServerError::Db { cause: e.to_string() }.into()
+        .map_err(move |e| {
+            if req.state().debug {
+                ServerError::Db { cause: e.to_string() }.into()
+            } else {
+                ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
+            }
         })
         .responder()
 }
