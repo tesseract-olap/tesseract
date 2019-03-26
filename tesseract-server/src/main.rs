@@ -23,6 +23,7 @@
 
 mod app;
 mod db_config;
+mod errors;
 pub mod handlers;
 mod logic_layer;
 mod schema_config;
