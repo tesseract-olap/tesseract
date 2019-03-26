@@ -19,6 +19,7 @@ use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time, boxed_error};
+use crate::logic_layer::LogicLayerConfig;
 
 
 /// Handles default aggregation when a format is not specified.
@@ -58,7 +59,7 @@ pub fn logic_layer_aggregation(
     let query = req.query_string();
     let schema = req.state().schema.read().unwrap();
 
-    let logic_layer_config = match &req.state().logic_layer_config {
+    let logic_layer_config: Option<LogicLayerConfig> = match &req.state().logic_layer_config {
         Some(llc) => Some(llc.read().unwrap().clone()),
         None => None
     };
@@ -71,7 +72,7 @@ pub fn logic_layer_aggregation(
 
     let mut agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
         Ok(mut q) => {
-            cube_name = match logic_layer_config {
+            cube_name = match logic_layer_config.clone() {
                 Some(llc) => {
                     match llc.sub_cube_name(q.cube.clone()) {
                         Ok(cn) => cn,
@@ -88,6 +89,7 @@ pub fn logic_layer_aggregation(
 
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());
+            q.config = logic_layer_config;
             q
         },
         Err(err) => return boxed_error(err.to_string())

@@ -7,6 +7,7 @@ use serde_json;
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerConfig {
     pub aliases: Option<AliasConfig>,
+    pub name_sets: Option<Vec<NameSetsConfig>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -18,6 +19,18 @@ pub struct AliasConfig {
 pub struct CubeAliasConfig {
     pub name: String,
     pub alternatives: Vec<String>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NameSetsConfig {
+    pub level_name: String,
+    pub sets: Vec<NameSetConfig>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NameSetConfig {
+    pub set_name: String,
+    pub values: Vec<String>
 }
 
 
@@ -56,5 +69,41 @@ impl LogicLayerConfig {
             },
             None => return Ok(name)
         };
+    }
+
+    /// Given a cut string, find if that matches any of the substitutions
+    /// defined in `name_sets`. If so, substitute the cut value.
+    pub fn substitute_cut(self, level_name: String, cut: String) -> String {
+        match self.name_sets {
+            Some(name_sets) => {
+                let cuts: Vec<String> = cut.split(",").map(|s| s.to_string()).collect();
+
+                let mut final_cuts: Vec<String> = vec![];
+
+                for c in cuts.clone() {
+                    let mut found = false;
+
+                    for name_set in name_sets.clone() {
+                        if name_set.level_name == level_name {
+                            for set in name_set.sets.clone() {
+                                if c == set.set_name {
+                                    final_cuts.extend(set.values);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // No substitutions found, so just add the raw cut
+                    if found == false {
+                        final_cuts.push(c);
+                    }
+                }
+
+                final_cuts.join(",")
+            },
+            None => cut
+        }
     }
 }

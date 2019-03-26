@@ -234,44 +234,63 @@ pub fn get_time_values(
     };
 
     if df.columns.len() >= 1 {
-        let mut values: Vec<String> = match &df.columns[0].column_data {
+        let values: Vec<String> = match &df.columns[0].column_data {
             ColumnData::Int8(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Int16(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Int32(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Int64(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt8(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt16(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt32(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::UInt64(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Float32(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Float64(v) => {
-                v.iter().map(|&e| e.to_string()).collect()
+                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+                t.sort();
+                t.iter().map(|&e| e.to_string()).collect()
             },
             ColumnData::Text(v) => {
-                v.to_vec()
+                let mut t = v.to_vec();
+                t.sort();
+                t
             },
         };
-
-        // TODO: Fix this ordering (months)
-        values.sort();
 
         return Ok(values);
     }

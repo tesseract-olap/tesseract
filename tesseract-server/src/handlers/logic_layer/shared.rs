@@ -14,6 +14,8 @@ use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
 
+use crate::logic_layer::LogicLayerConfig;
+
 
 #[derive(Debug, Clone)]
 pub enum TimeValue {
@@ -112,11 +114,12 @@ pub fn boxed_error(message: String) -> FutureResponse<HttpResponse> {
 }
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerQueryOpt {
-    pub cube: String,
     pub cube_obj: Option<Cube>,
+    pub config: Option<LogicLayerConfig>,
 
+    pub cube: String,
     pub drilldowns: Option<String>,
     #[serde(flatten)]
     pub cuts: Option<HashMap<String, String>>,
@@ -175,6 +178,8 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
 
     fn try_from(agg_query_opt: LogicLayerQueryOpt) -> Result<Self, Self::Error> {
+        println!("{:?}", agg_query_opt.config);
+
         let cube = match agg_query_opt.cube_obj {
             Some(c) => c,
             None => bail!("No cubes found with the given name")
@@ -231,16 +236,24 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             Some(cs) => {
                 let mut cuts: Vec<Cut> = vec![];
 
-                for (cut, cut_value) in cs.iter() {
-                    if cut_value.is_empty() {
+                for (level_name, cut) in cs.iter() {
+                    if cut.is_empty() {
                         continue;
                     }
 
-                    let (dimension, hierarchy, level) = match cube.identify_level(cut.to_string()) {
+                    // Check logic layer config for any cut substitutions
+                    let cut_value = match agg_query_opt.config.clone() {
+                        Some(llc) => {
+                            llc.substitute_cut(level_name.clone(), cut.clone())
+                        },
+                        None => cut.clone()
+                    };
+
+                    let (dimension, hierarchy, level) = match cube.identify_level(level_name.to_string()) {
                         Ok(dh) => dh,
                         Err(_) => continue
                     };
-                    let c = match format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, cut, cut_value).parse() {
+                    let c = match format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level_name, cut_value).parse() {
                         Ok(c) => c,
                         Err(_) => continue
                     };
