@@ -179,7 +179,7 @@ pub fn primary_agg(
         };
 
         // Now construct subquery
-        sub_queries = format!("select {}{} from ({}) all right join ({}) using {}",
+        sub_queries = format!("select {}{} from ({}) all inner join ({}) using {}",
             sub_queries_dim_cols,
             select_mea_cols,
             dim_subquery.sql,
