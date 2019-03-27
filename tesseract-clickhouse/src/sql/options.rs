@@ -52,10 +52,10 @@ pub fn wrap_options(
 
     let sort_sql = {
         if let Some(sort) = sort {
-            format!("order by {}, {} {}",
+            format!("order by {} {}, {}",
                 sort.column,
+                sort.direction.sql_string(),
                 final_drill_cols,
-                sort.direction.sql_string()
             )
         } else if let Some(top) = top {
             format!("order by {} asc, {}",
@@ -64,7 +64,8 @@ pub fn wrap_options(
             )
         } else {
             // default uses just final drill cols
-            format!("order by {} asc",
+            // asc default for all cols
+            format!("order by {}",
                 final_drill_cols,
             )
         }
