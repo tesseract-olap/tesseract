@@ -41,6 +41,7 @@ pub struct EnvVars {
 
 /// Holds [ActixWeb State](https://actix.rs/docs/application/).
 pub struct AppState {
+    pub debug: bool,
     pub backend: Box<dyn Backend + Sync + Send>,
     // TODO this is a hack, until a better interface is set up with the Backend Trait
     // to generate its own sql.
@@ -53,6 +54,7 @@ pub struct AppState {
 
 /// Creates an ActixWeb application with an `AppState`.
 pub fn create_app(
+        debug: bool,
         backend: Box<dyn Backend + Sync + Send>,
         db_type: Database,
         env_vars: EnvVars,
@@ -60,7 +62,7 @@ pub fn create_app(
         cache: Arc<RwLock<Cache>>,
         logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>
     ) -> App<AppState> {
-    App::with_state(AppState { backend, db_type, env_vars, schema, cache, logic_layer_config })
+    App::with_state(AppState { debug, backend, db_type, env_vars, schema, cache, logic_layer_config })
         .middleware(middleware::Logger::default())
 
         // Metadata

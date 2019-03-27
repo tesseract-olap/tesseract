@@ -23,6 +23,7 @@
 
 mod app;
 mod db_config;
+mod errors;
 pub mod handlers;
 mod logic_layer;
 mod schema_config;
@@ -44,6 +45,24 @@ fn main() -> Result<(), Error> {
     pretty_env_logger::init();
     dotenv().ok();
     let opt = Opt::from_args();
+
+    // debug is boolean, but env var is Result.
+    // cli opt overrides env var if env_var is false
+    let env_var_debug = env::var("TESSERACT_DEBUG")
+        .map_err(|_| format_err!(""))
+        .and_then(|d| {
+             d.parse::<bool>()
+            .map_err(|_| format_err!("could not parse bool from env_var TESSERACT_DEBUG"))
+        });
+    let debug = if !opt.debug {
+        if let Ok(d) = env_var_debug {
+            d
+        } else {
+            opt.debug // false
+        }
+    } else {
+        opt.debug // true
+    };
 
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
 
@@ -98,6 +117,7 @@ fn main() -> Result<(), Error> {
 
     // Initialize Server
     server::new(move|| create_app(
+            debug,
             db.clone(),
             db_type.clone(),
             env_vars.clone(),
@@ -112,6 +132,9 @@ fn main() -> Result<(), Error> {
     println!("Tesseract listening on: {}", server_addr);
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
+    if debug {
+        println!("Tesseract debug mode: ON");
+    }
 
     sys.run();
 
@@ -127,4 +150,7 @@ struct Opt {
 
     #[structopt(long="db-url")]
     database_url: Option<String>,
+
+    #[structopt(long="debug")]
+    debug: bool,
 }
