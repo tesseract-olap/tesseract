@@ -45,7 +45,6 @@ impl Backend for Clickhouse {
 
         let fut = self.pool
             .get_handle()
-            .and_then(|c| c.ping())
             .and_then(move |c| c.query(&sql[..]).fetch_all())
             .from_err()
             .and_then(move |(_, block)| {
