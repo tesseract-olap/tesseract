@@ -91,6 +91,72 @@ pub fn block_to_df(block: Block) -> Result<DataFrame, Error> {
                     ColumnData::Float64(vec![]),
                 ))
             },
+            SqlType::Nullable(SqlType::UInt8) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableUInt8(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::UInt16) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableUInt16(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::UInt32) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableUInt32(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::UInt64) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableUInt64(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::Int8) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableInt8(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::Int16) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableInt16(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::Int32) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableInt32(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::Int64) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableInt64(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::String) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableText(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::Float32) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableFloat32(vec![]),
+                ))
+            },
+            SqlType::Nullable(SqlType::Float64) => {
+                df.push(Column::new(
+                    col.name().to_owned(),
+                    ColumnData::NullableFloat64(vec![]),
+                ))
+            },
             s => bail!("{} is not supported by tesseract", s),
         }
     }
@@ -134,6 +200,39 @@ pub fn block_to_df(block: Block) -> Result<DataFrame, Error> {
                     col_data.push(block.get(row_idx, col_idx)?);
                 },
                 ColumnData::Float64(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableUInt8(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableUInt16(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableUInt32(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableUInt64(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableInt8(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableInt16(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableInt32(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableInt64(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableText(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableFloat32(col_data) => {
+                    col_data.push(block.get(row_idx, col_idx)?);
+                },
+                ColumnData::NullableFloat64(col_data) => {
                     col_data.push(block.get(row_idx, col_idx)?);
                 },
             }
