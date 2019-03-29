@@ -79,6 +79,36 @@ pub struct HierarchyConfigXML {
     pub levels: Vec<LevelConfigXML>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
+    #[serde(rename(deserialize="InlineTable"))]
+    pub inline_table: Option<InlineTableXML>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct InlineTableXML {
+    pub alias: String,
+    #[serde(rename(deserialize="ColumnDef"))]
+    pub column_definitions: Vec<InlineTableColumnDefinitionXML>,
+    #[serde(rename(deserialize="Row"))]
+    pub rows: Vec<InlineTableRowXML>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct InlineTableColumnDefinitionXML {
+    pub name: String,
+    pub key_type: MemberType,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct InlineTableRowXML {
+    #[serde(rename(deserialize="Value"))]
+    pub row_values: Vec<InlineTableRowValueXML>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct InlineTableRowValueXML {
+    pub column: String,
+    #[serde(rename(deserialize="$value"))]
+    pub value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

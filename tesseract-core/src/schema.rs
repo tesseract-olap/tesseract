@@ -16,6 +16,12 @@ pub use crate::schema::{
     json::TableConfigJson,
     json::PropertyConfigJson,
     json::AnnotationConfigJson,
+    json::InlineTableJson,
+
+    json::InlineTableColumnDefinitionJson,
+    json::InlineTableRowJson,
+    json::InlineTableRowValueJson,
+
     xml::SchemaConfigXML,
     xml::DimensionConfigXML,
     xml::HierarchyConfigXML,
@@ -242,11 +248,12 @@ impl From<DimensionConfigJson> for Dimension {
         Dimension {
             name: dimension_config.name,
             foreign_key: dimension_config.foreign_key,
-            hierarchies: hierarchies,
-            annotations: annotations,
+            hierarchies,
+            annotations,
         }
     }
 }
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Hierarchy {
@@ -255,6 +262,7 @@ pub struct Hierarchy {
     pub primary_key: String,
     pub levels: Vec<Level>,
     pub annotations: Option<Vec<Annotation>>,
+    pub inline_table: Option<InlineTable>,
 }
 
 impl From<HierarchyConfigJson> for Hierarchy {
@@ -262,6 +270,7 @@ impl From<HierarchyConfigJson> for Hierarchy {
         let levels: Vec<Level> = hierarchy_config.levels.into_iter()
             .map(|l| l.into())
             .collect();
+
         let annotations = hierarchy_config.annotations
             .map(|anns| {
                 anns.into_iter()
@@ -284,9 +293,81 @@ impl From<HierarchyConfigJson> for Hierarchy {
             primary_key,
             levels,
             annotations,
+            inline_table: hierarchy_config.inline_table.map(|t| t.into()),
         }
     }
 }
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InlineTable {
+    pub alias: String,
+    pub column_definitions: Vec<InlineTableColumnDefinition>,
+    pub rows: Vec<InlineTableRow>,
+}
+
+impl From<InlineTableJson> for InlineTable {
+    fn from(inline_table_config: InlineTableJson) -> Self {
+        InlineTable {
+            alias: inline_table_config.alias,
+            column_definitions: inline_table_config.column_definitions.into_iter()
+                .map(|l| l.into())
+                .collect(),
+            rows: inline_table_config.rows.into_iter()
+                .map(|l| l.into())
+                .collect(),
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InlineTableColumnDefinition {
+    pub name: String,
+    pub key_type: MemberType,
+}
+
+impl From<InlineTableColumnDefinitionJson> for InlineTableColumnDefinition {
+    fn from(column_definition_config: InlineTableColumnDefinitionJson) -> Self {
+        InlineTableColumnDefinition {
+            name: column_definition_config.name,
+            key_type: column_definition_config.key_type,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InlineTableRow {
+    pub row_values: Vec<InlineTableRowValue>,
+}
+
+impl From<InlineTableRowJson> for InlineTableRow {
+    fn from(row_config: InlineTableRowJson) -> Self {
+        InlineTableRow {
+            row_values: row_config.row_values.into_iter()
+                .map(|l| l.into())
+                .collect(),
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InlineTableRowValue {
+    pub column: String,
+    pub value: String,
+}
+
+impl From<InlineTableRowValueJson> for InlineTableRowValue {
+    fn from(row_value_config: InlineTableRowValueJson) -> Self {
+        InlineTableRowValue {
+            column: row_value_config.column,
+            value: row_value_config.value,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Level {
@@ -324,6 +405,7 @@ impl From<LevelConfigJson> for Level {
     }
 }
 
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Measure{
     pub name: String,
@@ -349,6 +431,7 @@ impl From<MeasureConfigJson> for Measure {
         }
     }
 }
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Table{
