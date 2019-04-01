@@ -11,10 +11,7 @@ use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 
-use crate::schema::{
-    SchemaConfigJson,
-    SchemaConfigXML
-};
+use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTable};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -272,7 +269,7 @@ impl Schema {
             None
         };
 
-        // Filter, from Query to Query IR. SHould be exactly the same as TopWhere
+        // Filter, from Query to Query IR. Should be exactly the same as TopWhere
         let filters = query.filters.iter()
             .map(|filter| {
                 let by_column = match &filter.by_mea_or_calc {
@@ -425,6 +422,13 @@ impl Schema {
             [&drill_headers[..], &mea_headers[..]].concat()
         };
 
+        let inline_tables_res = self.get_inline_tables(
+            &cube, &query.drilldowns, &query.cuts
+        );
+        let inline_tables = match inline_tables_res {
+            Ok(it) => it,
+            Err(_) => None
+        };
 
         Ok((
             QueryIr {
@@ -439,6 +443,7 @@ impl Schema {
                 limit,
                 rca,
                 growth,
+                inline_tables
             },
             headers,
         ))
@@ -446,6 +451,64 @@ impl Schema {
 }
 
 impl Schema {
+    fn get_inline_tables(&self, cube_name: &str, drills: &[Drilldown], cuts: &[Cut]) -> Result<Option<Vec<InlineTable>>, Error> {
+        let mut inline_tables: Vec<InlineTable> = vec![];
+        let mut inline_table_aliases: Vec<String> = vec![];
+
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        for drill in drills {
+            let dim = cube.dimensions.iter()
+                .find(|dim| dim.name == drill.0.dimension)
+                .ok_or(format_err!("could not find dimension for drill {}", drill.0))?;
+            let hier = dim.hierarchies.iter()
+                .find(|hier| hier.name == drill.0.hierarchy)
+                .ok_or(format_err!("could not find hierarchy for drill {}", drill.0))?;
+
+            match &hier.inline_table {
+                Some(it) => {
+                    if inline_table_aliases.contains(&it.alias) {
+                        continue
+                    } else {
+                        inline_tables.push(it.clone());
+                        inline_table_aliases.push(it.alias.clone());
+                    }
+                }
+                None => continue
+            };
+        }
+
+        for cut in cuts {
+            let dim = cube.dimensions.iter()
+                .find(|dim| dim.name == cut.level_name.dimension)
+                .ok_or(format_err!("could not find dimension for cut {}", cut.level_name))?;
+            let hier = dim.hierarchies.iter()
+                .find(|hier| hier.name == cut.level_name.hierarchy)
+                .ok_or(format_err!("could not find hierarchy for cut {}", cut.level_name))?;
+
+            match &hier.inline_table {
+                Some(it) => {
+                    if inline_table_aliases.contains(&it.alias) {
+                        continue
+                    } else {
+                        inline_tables.push(it.clone());
+                        inline_table_aliases.push(it.alias.clone());
+                    }
+                }
+                None => continue
+            };
+        }
+
+        if inline_tables.len() >= 1 {
+            Ok(Some(inline_tables))
+        } else {
+            Ok(None)
+        }
+    }
+
+
     fn cube_table(&self, cube_name: &str) -> Option<TableSql> {
         self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
@@ -479,6 +542,10 @@ impl Schema {
             let table = hier.table
                 .clone()
                 .unwrap_or(cube.table.clone());
+            let inline_table = match hier.inline_table {
+                Some(_) => true,
+                None => false
+            };
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
@@ -509,6 +576,7 @@ impl Schema {
                 members: cut.members.clone(),
                 mask: cut.mask.clone(),
                 for_match: cut.for_match,
+                inline_table,
             });
         }
 
@@ -595,6 +663,10 @@ impl Schema {
             let table = hier.table
                 .clone()
                 .unwrap_or(cube.table.clone());
+            let inline_table = match hier.inline_table {
+                Some(_) => true,
+                None => false
+            };
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
@@ -648,6 +720,7 @@ impl Schema {
                 foreign_key,
                 level_columns,
                 property_columns,
+                inline_table
             });
         }
 

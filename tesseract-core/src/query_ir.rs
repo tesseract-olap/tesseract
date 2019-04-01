@@ -3,9 +3,11 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::names::Mask;
 use crate::query::{LimitQuery, SortDirection, Constraint};
-use crate::schema::Table;
+use crate::schema::{Table, InlineTable};
 use crate::schema::aggregator::Aggregator;
 
+
+#[derive(Debug)]
 pub struct QueryIr {
     pub table: TableSql,
     pub cuts: Vec<CutSql>,
@@ -19,6 +21,7 @@ pub struct QueryIr {
     pub limit: Option<LimitSql>,
     pub rca: Option<RcaSql>,
     pub growth: Option<GrowthSql>,
+    pub inline_tables: Option<Vec<InlineTable>>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +38,7 @@ pub struct DrilldownSql {
     pub foreign_key: String,
     pub level_columns: Vec<LevelColumn>,
     pub property_columns: Vec<String>,
+    pub inline_table: bool,
 }
 
 impl DrilldownSql {
@@ -162,6 +166,7 @@ pub struct CutSql {
     pub mask: Mask,
     // if for_match, then use LIKE syntax
     pub for_match: bool,
+    pub inline_table: bool,
 }
 
 impl CutSql {

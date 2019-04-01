@@ -87,19 +87,6 @@ pub fn logic_layer_aggregation(
                 Err(err) => return boxed_error(err.to_string())
             };
 
-            // TODO: Inline tables need to be treated as tables for queries
-//            println!(" ");
-//            for dimension in cube.dimensions.clone() {
-//                if dimension.name == "Category" {
-//                    for hierarchy in dimension.hierarchies.clone() {
-//                        if hierarchy.name == "Category" {
-//                            println!("{:?}", hierarchy.inline_table);
-//                        }
-//                    }
-//                }
-//            }
-//            println!(" ");
-
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());
             q.config = logic_layer_config;
@@ -164,15 +151,37 @@ pub fn logic_layer_aggregation(
 
     info!("tesseract query: {:?}", ts_query);
 
+
+
+    let cube = match schema.get_cube_by_name(&cube_name) {
+        Ok(c) => c.clone(),
+        Err(err) => return boxed_error(err.to_string())
+    };
+
+    println!(" ");
+    for dimension in cube.dimensions.clone() {
+        if dimension.name == "Category" {
+            for hierarchy in dimension.hierarchies.clone() {
+                if hierarchy.name == "Category" {
+                    println!("{:?}", hierarchy.inline_table);
+                }
+            }
+        }
+    }
+    println!(" ");
+
+
+
     let query_ir_headers = req
         .state()
         .schema.read().unwrap()
         .sql_query(&cube_name, &ts_query);
-
     let (query_ir, headers) = match query_ir_headers {
         Ok(x) => x,
         Err(err) => return boxed_error(err.to_string())
     };
+
+    info!("Query IR: {:?}", query_ir);
 
     let sql = req.state()
         .backend
