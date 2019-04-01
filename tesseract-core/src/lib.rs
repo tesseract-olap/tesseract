@@ -569,7 +569,7 @@ impl Schema {
             // an explicitly specified drilldown
             // - filter by properties for this drilldown
             // - for each property, get the level
-            // - check theres only <= 1.
+            // - check there's only <= 1.
             let caption_col: Result<Vec<_>, _>= captions.iter()
                 .filter(|p| p.level_name == drill.0)
                 .map(|p| {
