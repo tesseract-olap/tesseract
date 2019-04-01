@@ -3,6 +3,7 @@ use serde_derive::Deserialize;
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
 
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct SchemaConfigJson {
     pub name: String,
@@ -115,4 +116,3 @@ pub struct AnnotationConfigJson {
     pub name: String,
     pub text: String,
 }
-

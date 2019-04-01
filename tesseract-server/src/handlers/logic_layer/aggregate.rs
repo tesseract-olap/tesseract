@@ -87,17 +87,18 @@ pub fn logic_layer_aggregation(
                 Err(err) => return boxed_error(err.to_string())
             };
 
-            println!(" ");
-            for dimension in cube.dimensions.clone() {
-                if dimension.name == "Category" {
-                    for hierarchy in dimension.hierarchies.clone() {
-                        if hierarchy.name == "Category" {
-                            println!("{:?}", hierarchy.inline_table);
-                        }
-                    }
-                }
-            }
-            println!(" ");
+            // TODO: Inline tables need to be treated as tables for queries
+//            println!(" ");
+//            for dimension in cube.dimensions.clone() {
+//                if dimension.name == "Category" {
+//                    for hierarchy in dimension.hierarchies.clone() {
+//                        if hierarchy.name == "Category" {
+//                            println!("{:?}", hierarchy.inline_table);
+//                        }
+//                    }
+//                }
+//            }
+//            println!(" ");
 
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());

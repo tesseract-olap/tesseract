@@ -14,6 +14,7 @@ use super::{
     dim_subquery,
 };
 
+
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 pub fn primary_agg(
