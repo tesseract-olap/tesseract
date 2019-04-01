@@ -1,7 +1,9 @@
 use csv;
 use failure::{Error, format_err};
 use indexmap::IndexMap;
-use serde_json::{json, Value};
+use serde::Serializer;
+use serde::ser::{SerializeSeq};
+use serde_json::{Value};
 
 use crate::dataframe::{DataFrame, ColumnData};
 
@@ -86,8 +88,24 @@ fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
 
 /// Formats response `DataFrame` to JSON records.
 fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error> {
-    // each HashMap is a row
-    let mut rows = vec![];
+    // use streaming serializer
+    // Necessary because this way we don't create a huge vec of rows containing Value
+    // (very expensive)
+
+    // I've ended up doing this a bit more manually than I want; but I don't know how
+    // to easily move between manually calling serializing methods, and having some
+    // done more automatically. For example, the rows have to be serialized using
+    // seq, but I can't easily call serialize_data including those rows, since I'm using
+    // a manual method different from the serialize_data.
+
+    // I had a hard time figuring out how to serialize the struct before the data.
+    // So I just wrote the bytes in and put a '}' at the end, and serialized
+    // the values in between.
+    let mut ser = serde_json::Serializer::new(
+        b"{\"data\":".to_vec()
+    );
+
+    let mut seq = ser.serialize_seq(Some(df.len()))?;
 
 
     // write data
@@ -122,19 +140,53 @@ fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error
             row.insert(&headers[col_idx], val);
         }
 
-        rows.push(row);
+        seq.serialize_element(&row)?;
     }
 
-    let res = json!({
-        "data": rows,
-    });
+    seq.end()?;
+    let mut res = String::from_utf8(ser.into_inner())?;
+    res.push('}');
+    Ok(res)
 
-    Ok(res.to_string())
+//    let res = json!({
+//        "data": rows,
+//    });
+//
+//    Ok(res.to_string())
 }
 
 /// Formats response `DataFrame` to JSON arrays.
 fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error> {
-    let mut rows = vec![];
+    // use streaming serializer
+    // Necessary because this way we don't create a huge vec of rows containing Value
+    // (very expensive)
+
+    // I've ended up doing this a bit more manually than I want; but I don't know how
+    // to easily move between manually calling serializing methods, and having some
+    // done more automatically. For example, the rows have to be serialized using
+    // seq, but I can't easily call serialize_data including those rows, since I'm using
+    // a manual method different from the serialize_data.
+
+    // serialize headers
+    let mut ser = serde_json::Serializer::new(
+        b"{\"headers\":".to_vec()
+    );
+    let mut seq_headers = ser.serialize_seq(Some(headers.len()))?;
+
+    for header in headers {
+        seq_headers.serialize_element(&header)?;
+    }
+    seq_headers.end()?;
+
+
+    // now the data
+    let mut intermediate = ser.into_inner();
+    intermediate.extend(b",\"data\":");
+
+
+    let mut ser = serde_json::Serializer::new(intermediate);
+    let mut seq_data = ser.serialize_seq(Some(df.len()))?;
+
 
     // then write data
     for row_idx in 0..df.len() {
@@ -168,13 +220,18 @@ fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error>
             row.push(val);
         }
 
-        rows.push(row);
+        seq_data.serialize_element(&row)?;;
     }
 
-    let res = json!({
-        "headers": headers,
-        "data": rows,
-    });
+    seq_data.end()?;
 
-    Ok(res.to_string())
+    // now take out vec, convert to string, and return
+    let mut res = String::from_utf8(ser.into_inner())?;
+    res.push('}');
+    Ok(res)
+
+//    let res = json!({
+//        "headers": headers,
+//        "data": rows,
+//    });
 }
