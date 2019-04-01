@@ -191,11 +191,14 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => vec![]
         };
 
+        let mut drilldown_levels: Vec<String> = vec![];
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
 
                 for l in LogicLayerQueryOpt::deserialize_args(ds) {
+                    drilldown_levels.push(l.clone());
+
                     let (dimension, hierarchy, level) = match cube.identify_level(l.clone()) {
                         Ok(dhl) => dhl,
                         Err(_) => break
@@ -206,7 +209,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     };
                     drilldowns.push(d);
 
-                    // Check for captions for this drilldown
+                    // Check for captions for this level
                     match level.properties {
                         Some(props) => {
                             for prop in props {
@@ -259,25 +262,29 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     };
                     cuts.push(c);
 
-                    // Check for captions for this cut
-                    match level.properties {
-                        Some(props) => {
-                            for prop in props {
-                                match prop.caption_set {
-                                    Some(cap) => {
-                                        for locale in locales.clone() {
-                                            if locale == cap {
-                                                caption_strings.push(
-                                                    format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level.name, prop.name)
-                                                );
+                    if !drilldown_levels.contains(level_name) {
+                        // Check for captions for this level
+                        match level.properties {
+                            Some(props) => {
+                                for prop in props {
+                                    match prop.caption_set {
+                                        Some(cap) => {
+                                            for locale in locales.clone() {
+                                                if locale == cap {
+                                                    caption_strings.push(
+                                                        format!("[{}].[{}].[{}].[{}]",
+                                                            dimension, hierarchy,
+                                                            level.name, prop.name)
+                                                    );
+                                                }
                                             }
-                                        }
-                                    },
-                                    None => continue
+                                        },
+                                        None => continue
+                                    }
                                 }
-                            }
-                        },
-                        None => continue
+                            },
+                            None => continue
+                        }
                     }
                 }
 
