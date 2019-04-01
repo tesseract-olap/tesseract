@@ -206,7 +206,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     };
                     drilldowns.push(d);
 
-                    // Check for captions for this drilldown
+                    // Check for captions for this level
                     match level.properties {
                         Some(props) => {
                             for prop in props {
@@ -258,27 +258,6 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         Err(_) => continue
                     };
                     cuts.push(c);
-
-                    // Check for captions for this cut
-                    match level.properties {
-                        Some(props) => {
-                            for prop in props {
-                                match prop.caption_set {
-                                    Some(cap) => {
-                                        for locale in locales.clone() {
-                                            if locale == cap {
-                                                caption_strings.push(
-                                                    format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level.name, prop.name)
-                                                );
-                                            }
-                                        }
-                                    },
-                                    None => continue
-                                }
-                            }
-                        },
-                        None => continue
-                    }
                 }
 
                 cuts
