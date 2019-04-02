@@ -422,13 +422,13 @@ impl Schema {
             [&drill_headers[..], &mea_headers[..]].concat()
         };
 
-        let inline_tables_res = self.get_inline_tables(
-            &cube, &query.drilldowns, &query.cuts
-        );
-        let inline_tables = match inline_tables_res {
-            Ok(it) => it,
-            Err(_) => None
-        };
+//        let inline_tables_res = self.get_inline_tables(
+//            &cube, &query.drilldowns, &query.cuts
+//        );
+//        let inline_tables = match inline_tables_res {
+//            Ok(it) => it,
+//            Err(_) => None
+//        };
 
         Ok((
             QueryIr {
@@ -443,7 +443,6 @@ impl Schema {
                 limit,
                 rca,
                 growth,
-                inline_tables
             },
             headers,
         ))
@@ -508,7 +507,6 @@ impl Schema {
         }
     }
 
-
     fn cube_table(&self, cube_name: &str) -> Option<TableSql> {
         self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
@@ -542,10 +540,6 @@ impl Schema {
             let table = hier.table
                 .clone()
                 .unwrap_or(cube.table.clone());
-            let inline_table = match hier.inline_table {
-                Some(_) => true,
-                None => false
-            };
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
@@ -576,7 +570,7 @@ impl Schema {
                 members: cut.members.clone(),
                 mask: cut.mask.clone(),
                 for_match: cut.for_match,
-                inline_table,
+                inline_table: hier.inline_table.clone(),
             });
         }
 
@@ -663,10 +657,6 @@ impl Schema {
             let table = hier.table
                 .clone()
                 .unwrap_or(cube.table.clone());
-            let inline_table = match hier.inline_table {
-                Some(_) => true,
-                None => false
-            };
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
@@ -720,7 +710,7 @@ impl Schema {
                 foreign_key,
                 level_columns,
                 property_columns,
-                inline_table
+                inline_table: hier.inline_table.clone()
             });
         }
 

@@ -21,7 +21,6 @@ pub struct QueryIr {
     pub limit: Option<LimitSql>,
     pub rca: Option<RcaSql>,
     pub growth: Option<GrowthSql>,
-    pub inline_tables: Option<Vec<InlineTable>>,
 }
 
 #[derive(Debug, Clone)]
@@ -38,7 +37,7 @@ pub struct DrilldownSql {
     pub foreign_key: String,
     pub level_columns: Vec<LevelColumn>,
     pub property_columns: Vec<String>,
-    pub inline_table: bool,
+    pub inline_table: Option<InlineTable>,
 }
 
 impl DrilldownSql {
@@ -166,7 +165,7 @@ pub struct CutSql {
     pub mask: Mask,
     // if for_match, then use LIKE syntax
     pub for_match: bool,
-    pub inline_table: bool,
+    pub inline_table: Option<InlineTable>,
 }
 
 impl CutSql {

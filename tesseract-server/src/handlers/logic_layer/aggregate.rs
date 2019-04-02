@@ -140,7 +140,7 @@ pub fn logic_layer_aggregation(
         None => (),
     }
 
-    info!("aggregate query: {:?}", agg_query);
+    info!("Aggregate query: {:?}", agg_query);
 
     // Turn AggregateQueryOpt into TsQuery
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
@@ -149,28 +149,7 @@ pub fn logic_layer_aggregation(
         Err(err) => return boxed_error(err.to_string())
     };
 
-    info!("tesseract query: {:?}", ts_query);
-
-
-
-    let cube = match schema.get_cube_by_name(&cube_name) {
-        Ok(c) => c.clone(),
-        Err(err) => return boxed_error(err.to_string())
-    };
-
-    println!(" ");
-    for dimension in cube.dimensions.clone() {
-        if dimension.name == "Category" {
-            for hierarchy in dimension.hierarchies.clone() {
-                if hierarchy.name == "Category" {
-                    println!("{:?}", hierarchy.inline_table);
-                }
-            }
-        }
-    }
-    println!(" ");
-
-
+    info!("Tesseract query: {:?}", ts_query);
 
     let query_ir_headers = req
         .state()
