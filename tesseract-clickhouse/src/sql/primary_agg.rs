@@ -42,7 +42,7 @@ pub fn primary_agg(
 
     let mut ext_drills: Vec<_> = drills.iter()
         .filter(|d| {
-            if let Some(it) = &d.inline_table {
+            if d.inline_table.is_some() {
                 true
             } else {
                 d.table.name != table.name
@@ -57,7 +57,7 @@ pub fn primary_agg(
 
     let inline_drills: Vec<_> = drills.iter()
         .filter(|d| {
-            if let Some(it) = &d.inline_table {
+            if d.inline_table.is_some() {
                 false
             } else {
                 d.table.name == table.name

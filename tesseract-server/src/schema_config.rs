@@ -25,15 +25,8 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
 
         for dimension in cube.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
-                let has_table = match hierarchy.table {
-                    Some(_) => true,
-                    None => false
-                };
-
-                let has_inline_table = match hierarchy.inline_table {
-                    Some(_) => true,
-                    None => false
-                };
+                let has_table = hierarchy.table.is_some();
+                let has_inline_table = hierarchy.inline_table.is_some();
 
                 if has_table && has_inline_table {
                     return Err(format_err!("Can't have table and inline table definitions in the same hierarchy"))
