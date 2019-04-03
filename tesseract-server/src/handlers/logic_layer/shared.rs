@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use serde_derive::{Serialize, Deserialize};
 
-use tesseract_core::names::{Cut, Drilldown, Property, Measure};
+use tesseract_core::names::{Cut, Drilldown, Property, Measure, Mask};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
@@ -183,7 +183,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => bail!("No cubes found with the given name")
         };
 
-        let mut caption_strings: Vec<String> = vec![];
+        let mut captions: Vec<Property> = vec![];
         let locales: Vec<String> = match agg_query_opt.locale {
             Some(l) => l.split(",").map(|s| s.to_string()).collect(),
             None => vec![]
@@ -198,10 +198,9 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         Ok(dhl) => dhl,
                         Err(_) => break
                     };
-                    let d = match format!("[{}].[{}].[{}]", dimension, hierarchy, l).parse() {
-                        Ok(d) => d,
-                        Err(_) => break
-                    };
+                    let d = Drilldown::new(
+                        dimension.clone(), hierarchy.clone(), l.clone()
+                    );
                     drilldowns.push(d);
 
                     // Check for captions for this level
@@ -210,9 +209,13 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                             if let Some(cap) = prop.caption_set {
                                 for locale in locales.clone() {
                                     if locale == cap {
-                                        caption_strings.push(
-                                            format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, l, prop.name)
-                                        );
+                                        captions.push(
+                                            Property::new(
+                                                dimension.clone(),
+                                                hierarchy.clone(),
+                                                l.clone(), prop.name.clone()
+                                            )
+                                        )
                                     }
                                 }
                             } else {
@@ -249,10 +252,14 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         Ok(dh) => dh,
                         Err(_) => continue
                     };
-                    let c = match format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level_name, cut_value).parse() {
-                        Ok(c) => c,
-                        Err(_) => continue
-                    };
+
+                    let c = Cut::new(
+                        dimension.clone(), hierarchy.clone(),
+                        level_name.clone(),
+                        cut_value.split(",").map(|s| s.to_string()).collect(),
+                        Mask::Include, false
+                    );
+
                     cuts.push(c);
                 }
 
@@ -286,10 +293,10 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         Ok(dhl) => dhl,
                         Err(_) => break
                     };
-                    let p = match format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, level, property).parse() {
-                        Ok(p) => p,
-                        Err(_) => break
-                    };
+                    let p = Property::new(
+                        dimension.clone(), hierarchy.clone(),
+                        level.clone(), property.clone()
+                    );
                     properties.push(p);
                 }
 
@@ -333,12 +340,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     Err(_) => return Err(format_err!("Unable to identify growth level."))
                 };
 
-                let growth_f = format!("{}.{}.{},{}", dimension, hierarchy, level, measure);
-
-                let growth = match growth_f.parse::<GrowthQuery>() {
-                    Ok(g) => g,
-                    Err(_) => return Err(format_err!("Unable to create growth query."))
-                };
+                let growth = GrowthQuery::new(dimension, hierarchy, level, measure);
 
                 Some(growth)
             },
@@ -367,29 +369,16 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     Err(_) => return Err(format_err!("Unable to identify RCA drilldown #2 level."))
                 };
 
-                let rca_f = format!("[{}].[{}].[{}],[{}].[{}].[{}],{}",
+                let rca = RcaQuery::new(
                     drill1_d, drill1_h, drill1_l,
                     drill2_d, drill2_h, drill2_l,
                     measure
                 );
 
-                let rca = match rca_f.parse::<RcaQuery>() {
-                    Ok(r) => r,
-                    Err(_) => return Err(format_err!("Unable to create RCA query."))
-                };
-
                 Some(rca)
             },
             None => None
         };
-
-        let mut captions: Vec<Property> = vec![];
-        for cap in caption_strings {
-            match cap.parse() {
-                Ok(c) => captions.push(c),
-                Err(_) => continue
-            }
-        }
 
         let debug = agg_query_opt.debug.unwrap_or(false);
 
