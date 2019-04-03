@@ -178,8 +178,6 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
 
     fn try_from(agg_query_opt: LogicLayerQueryOpt) -> Result<Self, Self::Error> {
-        println!("{:?}", agg_query_opt.config);
-
         let cube = match agg_query_opt.cube_obj {
             Some(c) => c,
             None => bail!("No cubes found with the given name")
@@ -207,24 +205,22 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     drilldowns.push(d);
 
                     // Check for captions for this level
-                    match level.properties {
-                        Some(props) => {
-                            for prop in props {
-                                match prop.caption_set {
-                                    Some(cap) => {
-                                        for locale in locales.clone() {
-                                            if locale == cap {
-                                                caption_strings.push(
-                                                    format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, l, prop.name)
-                                                );
-                                            }
-                                        }
-                                    },
-                                    None => continue
+                    if let Some(props) = level.properties {
+                        for prop in props {
+                            if let Some(cap) = prop.caption_set {
+                                for locale in locales.clone() {
+                                    if locale == cap {
+                                        caption_strings.push(
+                                            format!("[{}].[{}].[{}].[{}]", dimension, hierarchy, l, prop.name)
+                                        );
+                                    }
                                 }
+                            } else {
+                                continue
                             }
-                        },
-                        None => continue
+                        }
+                    } else {
+                        continue
                     }
                 }
 
