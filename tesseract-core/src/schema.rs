@@ -306,8 +306,6 @@ pub struct InlineTable {
     pub rows: Vec<InlineTableRow>,
 }
 
-// TODO: Need to implement this type conversion to MySQL and PostgreSQL
-// TODO: Casting depends on type of foreign key column in fact table
 impl InlineTable {
     /// Transforms an InlineTable object into a SQL string.
     pub fn sql_string(&self) -> String {
@@ -321,7 +319,10 @@ impl InlineTable {
                     if col_def.name == row.column {
                         match col_def.key_type {
                             MemberType::Text => curr_sql += &format!("'{}'", row.value),
-                            MemberType::NonText => curr_sql += &format!("cast({} as Int32)", row.value)
+                            MemberType::NonText => match &col_def.key_column_type {
+                                Some(t) => curr_sql += &format!("cast({} as {})", row.value, t),
+                                None => curr_sql += &format!("{}", row.value)
+                            }
                         }
                         break
                     }
@@ -364,6 +365,7 @@ impl From<InlineTableJson> for InlineTable {
 pub struct InlineTableColumnDefinition {
     pub name: String,
     pub key_type: MemberType,
+    pub key_column_type: Option<String>,
 }
 
 impl From<InlineTableColumnDefinitionJson> for InlineTableColumnDefinition {
@@ -371,6 +373,7 @@ impl From<InlineTableColumnDefinitionJson> for InlineTableColumnDefinition {
         InlineTableColumnDefinition {
             name: column_definition_config.name,
             key_type: column_definition_config.key_type,
+            key_column_type: column_definition_config.key_column_type,
         }
     }
 }
