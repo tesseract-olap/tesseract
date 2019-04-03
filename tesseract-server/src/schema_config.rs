@@ -19,13 +19,27 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
         return Err(format_err!("Schema format not supported"))
     }
 
-    // Check each cube for unique level and property names
     for cube in schema.cubes.clone() {
         let mut levels = HashSet::new();
         let mut properties = HashSet::new();
 
         for dimension in cube.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
+                let has_table = match hierarchy.table {
+                    Some(_) => true,
+                    None => false
+                };
+
+                let has_inline_table = match hierarchy.inline_table {
+                    Some(_) => true,
+                    None => false
+                };
+
+                if has_table && has_inline_table {
+                    return Err(format_err!("Can't have table and inline table definitions in the same hierarchy"))
+                }
+
+                // Check each cube for unique level and property names
                 for level in hierarchy.levels.clone() {
                     if !levels.insert(level.name) {
                         return Err(format_err!("Make sure the {} cube has unique level names", cube.name))
