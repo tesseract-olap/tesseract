@@ -41,7 +41,13 @@ pub fn primary_agg(
     // So just swap the primary key DimSubquery to the head
 
     let mut ext_drills: Vec<_> = drills.iter()
-        .filter(|d| d.table.name != table.name)
+        .filter(|d| {
+            if let Some(it) = &d.inline_table {
+                d.table.name == table.name && it.alias != table.name
+            } else {
+                d.table.name != table.name
+            }
+        })
         .collect();
 
     let ext_cuts: Vec<_> = cuts.iter()
@@ -50,7 +56,13 @@ pub fn primary_agg(
     let ext_cuts_for_inline = ext_cuts.clone();
 
     let inline_drills: Vec<_> = drills.iter()
-        .filter(|d| d.table.name == table.name)
+        .filter(|d| {
+            if let Some(it) = &d.inline_table {
+                it.alias == table.name
+            } else {
+                d.table.name == table.name
+            }
+        })
         .collect();
 
     let inline_cuts: Vec<_> = cuts.iter()
@@ -83,6 +95,7 @@ pub fn primary_agg(
 //        );
 //    }
 
+    // TODO: What is this doing?
     if let Some(ref primary_key) = table.primary_key {
         if let Some(idx) = dim_subqueries.iter().position(|d| d.foreign_key == *primary_key) {
             dim_subqueries.swap(0, idx);
@@ -93,7 +106,7 @@ pub fn primary_agg(
     // Group by is hardcoded in because there's an assumption that at least one
     // dim exists
     //
-    // This is also the section wher inline dims and cuts get put
+    // This is also the section where inline dims and cuts get put
 
     let mea_cols = meas
         .iter()
@@ -127,10 +140,18 @@ pub fn primary_agg(
         let ext_cut_clause = ext_cuts_for_inline
             .iter()
             .map(|c| {
+                let cut_table = match &c.inline_table {
+                    Some(it) => {
+                        let inline_table_sql = it.sql_string();
+                        format!("({}) as {}", inline_table_sql, c.table.full_name())
+                    },
+                    None => c.table.full_name()
+                };
+
                 format!("{} in (select {} from {} where {})",
                     c.foreign_key,
                     c.primary_key,
-                    c.table.full_name(),
+                    cut_table,
                     cut_sql_string(&c),
                     )
             });

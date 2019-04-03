@@ -422,14 +422,6 @@ impl Schema {
             [&drill_headers[..], &mea_headers[..]].concat()
         };
 
-//        let inline_tables_res = self.get_inline_tables(
-//            &cube, &query.drilldowns, &query.cuts
-//        );
-//        let inline_tables = match inline_tables_res {
-//            Ok(it) => it,
-//            Err(_) => None
-//        };
-
         Ok((
             QueryIr {
                 table,
@@ -450,63 +442,6 @@ impl Schema {
 }
 
 impl Schema {
-    fn get_inline_tables(&self, cube_name: &str, drills: &[Drilldown], cuts: &[Cut]) -> Result<Option<Vec<InlineTable>>, Error> {
-        let mut inline_tables: Vec<InlineTable> = vec![];
-        let mut inline_table_aliases: Vec<String> = vec![];
-
-        let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
-
-        for drill in drills {
-            let dim = cube.dimensions.iter()
-                .find(|dim| dim.name == drill.0.dimension)
-                .ok_or(format_err!("could not find dimension for drill {}", drill.0))?;
-            let hier = dim.hierarchies.iter()
-                .find(|hier| hier.name == drill.0.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for drill {}", drill.0))?;
-
-            match &hier.inline_table {
-                Some(it) => {
-                    if inline_table_aliases.contains(&it.alias) {
-                        continue
-                    } else {
-                        inline_tables.push(it.clone());
-                        inline_table_aliases.push(it.alias.clone());
-                    }
-                }
-                None => continue
-            };
-        }
-
-        for cut in cuts {
-            let dim = cube.dimensions.iter()
-                .find(|dim| dim.name == cut.level_name.dimension)
-                .ok_or(format_err!("could not find dimension for cut {}", cut.level_name))?;
-            let hier = dim.hierarchies.iter()
-                .find(|hier| hier.name == cut.level_name.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for cut {}", cut.level_name))?;
-
-            match &hier.inline_table {
-                Some(it) => {
-                    if inline_table_aliases.contains(&it.alias) {
-                        continue
-                    } else {
-                        inline_tables.push(it.clone());
-                        inline_table_aliases.push(it.alias.clone());
-                    }
-                }
-                None => continue
-            };
-        }
-
-        if inline_tables.len() >= 1 {
-            Ok(Some(inline_tables))
-        } else {
-            Ok(None)
-        }
-    }
-
     fn cube_table(&self, cube_name: &str) -> Option<TableSql> {
         self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
