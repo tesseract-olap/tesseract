@@ -95,7 +95,6 @@ pub fn primary_agg(
 //        );
 //    }
 
-    // TODO: What is this doing?
     if let Some(ref primary_key) = table.primary_key {
         if let Some(idx) = dim_subqueries.iter().position(|d| d.foreign_key == *primary_key) {
             dim_subqueries.swap(0, idx);
