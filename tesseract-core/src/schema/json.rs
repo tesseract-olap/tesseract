@@ -3,6 +3,7 @@ use serde_derive::Deserialize;
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
 
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct SchemaConfigJson {
     pub name: String,
@@ -50,6 +51,32 @@ pub struct HierarchyConfigJson {
     pub primary_key: Option<String>,
     pub levels: Vec<LevelConfigJson>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
+    pub inline_table: Option<InlineTableJson>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct InlineTableJson {
+    pub alias: String,
+    pub column_definitions: Vec<InlineTableColumnDefinitionJson>,
+    pub rows: Vec<InlineTableRowJson>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct InlineTableColumnDefinitionJson {
+    pub name: String,
+    pub key_type: MemberType,
+    pub key_column_type: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct InlineTableRowJson {
+    pub row_values: Vec<InlineTableRowValueJson>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct InlineTableRowValueJson {
+    pub column: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -90,4 +117,3 @@ pub struct AnnotationConfigJson {
     pub name: String,
     pub text: String,
 }
-

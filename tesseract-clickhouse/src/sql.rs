@@ -22,6 +22,7 @@ use tesseract_core::query_ir::{
 use self::options::wrap_options;
 use self::primary_agg::primary_agg;
 
+
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 pub fn clickhouse_sql(

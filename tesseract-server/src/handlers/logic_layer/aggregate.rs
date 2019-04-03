@@ -140,7 +140,7 @@ pub fn logic_layer_aggregation(
         None => (),
     }
 
-    info!("aggregate query: {:?}", agg_query);
+    info!("Aggregate query: {:?}", agg_query);
 
     // Turn AggregateQueryOpt into TsQuery
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
@@ -149,17 +149,18 @@ pub fn logic_layer_aggregation(
         Err(err) => return boxed_error(err.to_string())
     };
 
-    info!("tesseract query: {:?}", ts_query);
+    info!("Tesseract query: {:?}", ts_query);
 
     let query_ir_headers = req
         .state()
         .schema.read().unwrap()
         .sql_query(&cube_name, &ts_query);
-
     let (query_ir, headers) = match query_ir_headers {
         Ok(x) => x,
         Err(err) => return boxed_error(err.to_string())
     };
+
+    info!("Query IR: {:?}", query_ir);
 
     let sql = req.state()
         .backend

@@ -325,6 +325,24 @@ pub struct RcaQuery {
     pub mea: Measure,
 }
 
+impl RcaQuery {
+    pub fn new<S: Into<String>>(
+        dim_1: S, hier_1: S, level_1: S,
+        dim_2: S, hier_2: S, level_2: S,
+        measure: S
+    ) -> Self {
+        let drill_1 = Drilldown::new(dim_1, hier_1, level_1);
+        let drill_2 = Drilldown::new(dim_2, hier_2, level_2);
+        let mea = Measure::new(measure);
+
+        RcaQuery {
+            drill_1,
+            drill_2,
+            mea,
+        }
+    }
+}
+
 impl FromStr for RcaQuery {
     type Err = Error;
 
@@ -351,6 +369,18 @@ impl FromStr for RcaQuery {
 pub struct GrowthQuery {
     pub time_drill: Drilldown,
     pub mea: Measure,
+}
+
+impl GrowthQuery {
+    pub fn new<S: Into<String>>(dimension: S, hierarchy: S, level: S, measure: S) -> Self {
+        let time_drill = Drilldown::new(dimension, hierarchy, level);
+        let mea = Measure::new(measure);
+
+        GrowthQuery {
+            time_drill,
+            mea,
+        }
+    }
 }
 
 impl FromStr for GrowthQuery {

@@ -3,9 +3,11 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::names::Mask;
 use crate::query::{LimitQuery, SortDirection, Constraint};
-use crate::schema::Table;
+use crate::schema::{Table, InlineTable};
 use crate::schema::aggregator::Aggregator;
 
+
+#[derive(Debug)]
 pub struct QueryIr {
     pub table: TableSql,
     pub cuts: Vec<CutSql>,
@@ -35,6 +37,7 @@ pub struct DrilldownSql {
     pub foreign_key: String,
     pub level_columns: Vec<LevelColumn>,
     pub property_columns: Vec<String>,
+    pub inline_table: Option<InlineTable>,
 }
 
 impl DrilldownSql {
@@ -162,6 +165,7 @@ pub struct CutSql {
     pub mask: Mask,
     // if for_match, then use LIKE syntax
     pub for_match: bool,
+    pub inline_table: Option<InlineTable>,
 }
 
 impl CutSql {
@@ -309,6 +313,7 @@ pub struct DimSubquery {
     pub dim_cols: Option<String>,
 }
 
+
 // TODO can this be removed, and all cuts put into the fact table scan using `IN`?
 /// Collects a drilldown and cut together to create a subquery for the dimension table
 /// Does not check for matching name, because that had to have been done
@@ -316,6 +321,14 @@ pub struct DimSubquery {
 pub fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSubquery {
     match drill {
         Some(drill) => {
+            let drill_table = match &drill.inline_table {
+                Some(it) => {
+                    let inline_table_sql = it.sql_string();
+                    format!("({}) as {}", inline_table_sql, it.alias)
+                },
+                None => drill.table.full_name()
+            };
+
             // TODO
             // - oops, primary key is mandatory in schema, if not in
             // schema-config, then it takes the lowest level's key_column
@@ -329,7 +342,7 @@ pub fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSu
                 drill.col_alias_string(),
                 drill.primary_key.clone(),
                 drill.foreign_key.clone(),
-                drill.table.full_name(),
+                drill_table,
             );
             // TODO can I delete this cut?
 //            if let Some(cut) = cut {

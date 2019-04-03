@@ -11,10 +11,7 @@ use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 
-use crate::schema::{
-    SchemaConfigJson,
-    SchemaConfigXML
-};
+use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTable};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -272,7 +269,7 @@ impl Schema {
             None
         };
 
-        // Filter, from Query to Query IR. SHould be exactly the same as TopWhere
+        // Filter, from Query to Query IR. Should be exactly the same as TopWhere
         let filters = query.filters.iter()
             .map(|filter| {
                 let by_column = match &filter.by_mea_or_calc {
@@ -425,7 +422,6 @@ impl Schema {
             [&drill_headers[..], &mea_headers[..]].concat()
         };
 
-
         Ok((
             QueryIr {
                 table,
@@ -509,6 +505,7 @@ impl Schema {
                 members: cut.members.clone(),
                 mask: cut.mask.clone(),
                 for_match: cut.for_match,
+                inline_table: hier.inline_table.clone(),
             });
         }
 
@@ -648,6 +645,7 @@ impl Schema {
                 foreign_key,
                 level_columns,
                 property_columns,
+                inline_table: hier.inline_table.clone()
             });
         }
 
