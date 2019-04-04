@@ -1,5 +1,5 @@
 use failure::Error;
-use futures::future::Future;
+use futures::{Future, Stream};
 
 use crate::dataframe::DataFrame;
 use crate::query_ir::QueryIr;
@@ -10,6 +10,14 @@ pub trait Backend {
     /// Takes in a SQL string, outputs a DataFrame, which will go on to be formatted into the
     /// desired query output format.
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>>;
+
+    /// Takes in a SQL string, outputs a stream of
+    /// DataFrames, which will go on to be formatted into the
+    /// desired query output format.
+    fn exec_sql_stream(&self, sql: String) -> Box<Stream<Item=Result<DataFrame, Error>, Error=Error>> {
+        unimplemented!()
+    }
+
     fn box_clone(&self) -> Box<dyn Backend + Send + Sync>;
 
     /// Receives an intermediate representation of the Query

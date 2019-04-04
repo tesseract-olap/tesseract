@@ -1,7 +1,7 @@
 use clickhouse_rs::Pool;
 use clickhouse_rs::types::Options;
-use failure::Error;
-use futures::future::Future;
+use failure::{Error, format_err};
+use futures::{future, Future, Stream};
 use log::*;
 use std::time::{Duration, Instant};
 use tesseract_core::{Backend, DataFrame, QueryIr};
@@ -56,6 +56,23 @@ impl Backend for Clickhouse {
             });
 
         Box::new(fut)
+    }
+
+    fn exec_sql_stream(&self, sql: String) -> Box<Stream<Item=Result<DataFrame, Error>, Error=Error>> {
+        let time_start = Instant::now();
+
+        let fut_stream = self.pool
+            .get_handle()
+            .and_then(move |c| future::ok(c.query(&sql[..]).stream_blocks()))
+            .flatten_stream()
+            .map(move |block_res| {
+                block_res
+                    .map(|b| block_to_df(b).unwrap())
+                    .map_err(|err| format_err!("{}", err))
+            })
+            .map_err(|err| format_err!("{}", err));
+
+        Box::new(fut_stream)
     }
 
     fn generate_sql(&self, query_ir: QueryIr) -> String {

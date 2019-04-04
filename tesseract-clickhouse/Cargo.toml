@@ -5,7 +5,8 @@ name = "tesseract-clickhouse"
 version = "0.1.0"
 
 [dependencies]
-clickhouse-rs = "0.1.9"
+#clickhouse-rs = "0.1.9"
+clickhouse-rs = { git = "https://github.com/hwchen/clickhouse-rs", branch = "feature/stream-blocks" }
 failure = "0.1.2"
 futures = "0.1.25"
 itertools = "0.8.0"

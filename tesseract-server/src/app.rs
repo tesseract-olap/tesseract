@@ -9,6 +9,8 @@ use crate::db_config::Database;
 use crate::handlers::{
     aggregate_handler,
     aggregate_default_handler,
+    aggregate_stream_handler,
+    aggregate_stream_default_handler,
     logic_layer_default_handler,
     logic_layer_handler,
     flush_handler,
@@ -61,8 +63,9 @@ pub fn create_app(
         schema: Arc<RwLock<Schema>>,
         cache: Arc<RwLock<Cache>>,
         logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>
-    ) -> App<AppState> {
-    App::with_state(AppState { debug, backend, db_type, env_vars, schema, cache, logic_layer_config })
+    ) -> App<AppState>
+{
+    let app = App::with_state(AppState { debug, backend, db_type, env_vars, schema, cache, logic_layer_config })
         .middleware(middleware::Logger::default())
 
         // Metadata
@@ -74,14 +77,6 @@ pub fn create_app(
         })
         .resource("/cubes/{cube}", |r| {
             r.method(Method::GET).with(metadata_handler)
-        })
-
-        // Aggregation
-        .resource("/cubes/{cube}/aggregate", |r| {
-            r.method(Method::GET).with(aggregate_default_handler)
-        })
-        .resource("/cubes/{cube}/aggregate.{format}", |r| {
-            r.method(Method::GET).with(aggregate_handler)
         })
 
         // Logic Layer
@@ -102,5 +97,26 @@ pub fn create_app(
 
         .resource("/flush", |r| {
             r.method(Method::POST).with(flush_handler)
-        })
+        });
+
+    let stream_results = true;
+
+    if stream_results {
+        app
+            .resource("/cubes/{cube}/aggregate", |r| {
+                r.method(Method::GET).with(aggregate_stream_default_handler)
+            })
+            .resource("/cubes/{cube}/aggregate.{format}", |r| {
+                r.method(Method::GET).with(aggregate_stream_handler)
+            })
+    } else {
+        // Aggregation
+        app
+            .resource("/cubes/{cube}/aggregate", |r| {
+                r.method(Method::GET).with(aggregate_default_handler)
+            })
+            .resource("/cubes/{cube}/aggregate.{format}", |r| {
+                r.method(Method::GET).with(aggregate_handler)
+            })
+    }
 }
