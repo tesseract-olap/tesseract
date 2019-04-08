@@ -63,13 +63,16 @@ impl Backend for Clickhouse {
 
         let fut_stream = self.pool
             .get_handle()
-            .and_then(move |c| future::ok(c.query(&sql[..]).stream_blocks()))
-            .flatten_stream()
-            .map(move |block_res| {
-                block_res
-                    .map(|b| block_to_df(b).unwrap())
-                    .map_err(|err| format_err!("{}", err))
+            .and_then(move |c| {
+                future::ok(
+                    c.query(&sql[..])
+                        .stream_blocks()
+                        .map(move |block| {
+                            block_to_df(block)
+                        })
+                )
             })
+            .flatten_stream()
             .map_err(|err| format_err!("{}", err));
 
         Box::new(fut_stream)
