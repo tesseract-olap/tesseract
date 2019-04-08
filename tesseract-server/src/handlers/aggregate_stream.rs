@@ -7,16 +7,19 @@ use actix_web::{
 };
 use failure::Error;
 use futures::future::{self, Future};
+use futures::Stream;
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
-use tesseract_core::format::{format_records, FormatType};
+use tesseract_core::format::FormatType;
+use tesseract_core::format_stream::format_records_stream;
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
+use super::aggregate::AggregateQueryOpt;
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
@@ -111,134 +114,26 @@ pub fn do_aggregate(
     info!("Sql query: {}", sql);
     info!("Headers: {:?}", headers);
 
-    req.state()
+    let df_stream = req.state()
         .backend
-        .exec_sql(sql)
-        .and_then(move |df| {
-            match format_records(&headers, df, format) {
-                Ok(res) => Ok(HttpResponse::Ok().body(res)),
-                Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
-            }
-        })
-        .map_err(move |e| {
-            if req.state().debug {
-                ServerError::Db { cause: e.to_string() }.into()
-            } else {
-                ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
-            }
-        })
-        .responder()
-}
+        .exec_sql_stream(sql);
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AggregateQueryOpt {
-    drilldowns: Option<Vec<String>>,
-    cuts: Option<Vec<String>>,
-    measures: Option<Vec<String>>,
-    properties: Option<Vec<String>>,
-    filters: Option<Vec<String>>,
-    captions: Option<Vec<String>>,
-    parents: Option<bool>,
-    top: Option<String>,
-    top_where: Option<String>,
-    sort: Option<String>,
-    limit: Option<String>,
-    growth: Option<String>,
-    rca: Option<String>,
-    debug: Option<bool>,
-//    distinct: Option<bool>,
-//    nonempty: Option<bool>,
-//    sparse: Option<bool>,
-}
 
-impl TryFrom<AggregateQueryOpt> for TsQuery {
-    type Error = Error;
-
-    fn try_from(agg_query_opt: AggregateQueryOpt) -> Result<Self, Self::Error> {
-        let drilldowns: Result<Vec<_>, _> = agg_query_opt.drilldowns
-            .map(|ds| {
-                ds.iter().map(|d| d.parse()).collect()
-            })
-            .unwrap_or(Ok(vec![]));
-
-        let cuts: Result<Vec<_>, _> = agg_query_opt.cuts
-            .map(|cs| {
-                cs.iter().map(|c| c.parse()).collect()
-            })
-            .unwrap_or(Ok(vec![]));
-
-        let measures: Result<Vec<_>, _> = agg_query_opt.measures
-            .map(|ms| {
-                ms.iter().map(|m| m.parse()).collect()
-            })
-            .unwrap_or(Ok(vec![]));
-
-        let properties: Result<Vec<_>, _> = agg_query_opt.properties
-            .map(|ms| {
-                ms.iter().map(|m| m.parse()).collect()
-            })
-            .unwrap_or(Ok(vec![]));
-
-        let filters: Result<Vec<_>, _> = agg_query_opt.filters
-            .map(|fs| {
-                fs.iter().map(|f| f.parse()).collect()
-            })
-            .unwrap_or(Ok(vec![]));
-
-        let captions: Result<Vec<_>, _> = agg_query_opt.captions
-            .map(|cs| {
-                cs.iter().map(|c| c.parse()).collect()
-            })
-            .unwrap_or(Ok(vec![]));
-
-        let drilldowns = drilldowns?;
-        let cuts = cuts?;
-        let measures = measures?;
-        let properties = properties?;
-        let filters = filters?;
-        let captions = captions?;
-
-        let parents = agg_query_opt.parents.unwrap_or(false);
-
-        let top = agg_query_opt.top
-            .map(|t| t.parse())
-            .transpose()?;
-        let top_where = agg_query_opt.top_where
-            .map(|t| t.parse())
-            .transpose()?;
-        let sort = agg_query_opt.sort
-            .map(|s| s.parse())
-            .transpose()?;
-        let limit = agg_query_opt.limit
-            .map(|l| l.parse())
-            .transpose()?;
-
-        let growth = agg_query_opt.growth
-            .map(|g| g.parse())
-            .transpose()?;
-
-        let rca = agg_query_opt.rca
-            .map(|r| r.parse())
-            .transpose()?;
-
-        let debug = agg_query_opt.debug.unwrap_or(false);
-
-        Ok(TsQuery {
-            drilldowns,
-            cuts,
-            measures,
-            parents,
-            properties,
-            filters,
-            captions,
-            top,
-            top_where,
-            sort,
-            limit,
-            rca,
-            growth,
-            debug,
-        })
-    }
+    Box::new(
+        futures::future::ok(HttpResponse::Ok().streaming(format_records_stream(headers, df_stream, format)))
+    )
+    //    .and_then(move |df_stream_res| {
+    //        match df_stream_res {
+    //            Ok(df_stream) => Ok(HttpResponse::Ok().streaming(format_records_stream(headers, df_stream, format))),
+    //            Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+    //    })
+    //    .map_err(move |e| {
+    //        if req.state().debug {
+    //            ServerError::Db { cause: e.to_string() }.into()
+    //        } else {
+    //            ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
+    //        }
+    //    })
+    //    .responder()
 }
 

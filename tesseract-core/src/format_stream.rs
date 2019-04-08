@@ -1,6 +1,7 @@
+use bytes::Bytes;
 use csv;
 use failure::{Error, format_err};
-use futures::{stream, Stream};
+use futures::{Stream, Async, Poll};
 use indexmap::IndexMap;
 use serde::Serializer;
 use serde::ser::{SerializeSeq};
@@ -10,91 +11,141 @@ use crate::dataframe::{DataFrame, ColumnData};
 use super::format::FormatType;
 
 /// Wrapper to format `DataFrame` to the desired output format.
-pub fn format_records_stream<S>(headers: &[String], df_stream: S, format_type: FormatType) -> Box<Stream<Item=Result<String, Error>,Error=Error>>
+pub fn format_records_stream<S>(headers: Vec<String>, df_stream: S, format_type: FormatType) -> RecordBlockStream<S>
     where
     S: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
 {
-    match format_type {
-        FormatType::Csv => format_csv(headers, df_stream),
-        FormatType::JsonRecords => format_csv(headers, df_stream),
-        FormatType::JsonArrays => format_csv(headers, df_stream),
+    RecordBlockStream::new(df_stream, headers, format_type)
+}
+
+pub struct RecordBlockStream<S>
+    where S: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
+{
+    inner: S,
+    sent_header: bool,
+    sent_footer: bool,
+    format_type: FormatType,
+    headers: Vec<String>,
+}
+
+impl<S> RecordBlockStream<S>
+    where S: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
+{
+    pub fn new(stream: S, headers: Vec<String>, format_type: FormatType) -> Self {
+        RecordBlockStream {
+            inner: stream,
+            sent_header: false,
+            sent_footer: false,
+            format_type,
+            headers,
+        }
     }
 }
 
-/// Formats response `DataFrame` to CSV.
-fn format_csv<SD>(headers: &[String], df_stream: SD) -> Box<Stream<Item=Result<String, Error>,Error=Error>>
-    where
-    SD: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
+impl<S> Stream for RecordBlockStream<S>
+    where S: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
 {
-    // write header
-    let header_stream = stream::once({
-        let mut wtr = csv::WriterBuilder::new()
-            .from_writer(vec![]);
+    type Item = Bytes;
+    type Error = Error;
 
-        wtr.write_record(headers);
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        // first look at header
+        if !self.sent_header {
+            match self.format_type {
+                FormatType::Csv => {
+                    let mut wtr = csv::WriterBuilder::new()
+                        .from_writer(vec![]);
 
-        Ok(wtr.into_inner()
-            .map_err(|err| format_err!("{}", err))
-            .and_then(|buf| {
-                String::from_utf8(buf)
-                .map_err(|err| format_err!("{}", err))
-            })
-        )
-    });
+                    wtr.write_record(&self.headers)?;
 
-    let rows_stream = {
-        df_stream.map(|df_result| {
-            df_result.and_then(|df| {
-                let mut wtr = csv::WriterBuilder::new()
-                    .from_writer(vec![]);
-                let mut row_buf = vec![];
+                    let buf = wtr.into_inner()?;
+                    let bytes: Bytes = buf.into();
 
-                // write data
-                for row_idx in 0..df.len() {
-                    for col_idx in 0..df.columns.len() {
-                        let val = match df.columns[col_idx].column_data {
-                            ColumnData::Int8(ref ns) =>    ns[row_idx].to_string(),
-                            ColumnData::Int16(ref ns) =>   ns[row_idx].to_string(),
-                            ColumnData::Int32(ref ns) =>   ns[row_idx].to_string(),
-                            ColumnData::Int64(ref ns) =>   ns[row_idx].to_string(),
-                            ColumnData::UInt8(ref ns) =>   ns[row_idx].to_string(),
-                            ColumnData::UInt16(ref ns) =>  ns[row_idx].to_string(),
-                            ColumnData::UInt32(ref ns) =>  ns[row_idx].to_string(),
-                            ColumnData::UInt64(ref ns) =>  ns[row_idx].to_string(),
-                            ColumnData::Float32(ref ns) => ns[row_idx].to_string(),
-                            ColumnData::Float64(ref ns) => ns[row_idx].to_string(),
-                            ColumnData::Text(ref ss) =>    ss[row_idx].to_string(),
-                            ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                            ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().unwrap_or("".into()),
-                        };
+                    self.sent_header = true;
 
-                        row_buf.push(val);
-                    }
-                    wtr.write_record(&row_buf);
+                    return Ok(Async::Ready(Some(bytes)));
+                },
+                _ => return Err(format_err!("just csv first")),
+                //FormatType::JsonRecords => format_csv(headers, df_stream),
+                //FormatType::JsonArrays => format_csv(headers, df_stream),
+            }
+        }
 
-                    row_buf.clear();
-                }
+        loop {
+            let df_res = match self.inner.poll() {
+                Err(err) => return Err(err),
+                Ok(Async::NotReady) => return Ok(Async::NotReady),
+                Ok(Async::Ready(None)) => return Ok(Async::Ready(None)),
+                Ok(Async::Ready(Some(df_res))) => df_res,
+            };
 
-                wtr.into_inner()
-                    .map_err(|err| format_err!("{}", err))
-                    .and_then(|buf| {
-                        String::from_utf8(buf)
-                        .map_err(|err| format_err!("{}", err))
-                    })
-            })
-        })
-    };
+            match df_res {
+                Ok(df) => {
+                    let formatted = match self.format_type {
+                        FormatType::Csv => {
+                            format_csv_body(df)?
+                        },
+                        //FormatType::JsonRecords => format_csv(headers, df_stream),
+                        //FormatType::JsonArrays => format_csv(headers, df_stream),
+                        _ => return Err(format_err!("just csv first")),
+                    };
 
-    Box::new(header_stream.chain(rows_stream))
+                    return Ok(Async::Ready(Some(formatted)));
+                },
+                Err(err) => return Err(err),
+
+            }
+        }
+    }
+}
+
+
+/// Formats response `DataFrame` to CSV.
+fn format_csv_body(df: DataFrame) -> Result<Bytes, Error>
+{
+    let mut wtr = csv::WriterBuilder::new()
+        .from_writer(vec![]);
+    let mut row_buf = vec![];
+
+    // write data
+    for row_idx in 0..df.len() {
+        for col_idx in 0..df.columns.len() {
+            let val = match df.columns[col_idx].column_data {
+                ColumnData::Int8(ref ns) =>    ns[row_idx].to_string(),
+                ColumnData::Int16(ref ns) =>   ns[row_idx].to_string(),
+                ColumnData::Int32(ref ns) =>   ns[row_idx].to_string(),
+                ColumnData::Int64(ref ns) =>   ns[row_idx].to_string(),
+                ColumnData::UInt8(ref ns) =>   ns[row_idx].to_string(),
+                ColumnData::UInt16(ref ns) =>  ns[row_idx].to_string(),
+                ColumnData::UInt32(ref ns) =>  ns[row_idx].to_string(),
+                ColumnData::UInt64(ref ns) =>  ns[row_idx].to_string(),
+                ColumnData::Float32(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Float64(ref ns) => ns[row_idx].to_string(),
+                ColumnData::Text(ref ss) =>    ss[row_idx].to_string(),
+                ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
+                ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().unwrap_or("".into()),
+            };
+
+            row_buf.push(val);
+        }
+        wtr.write_record(&row_buf);
+
+        row_buf.clear();
+    }
+
+    let buf = wtr.into_inner()?;
+    let bytes = buf.into();
+
+    Ok(bytes)
 }
 
 /// Formats response `DataFrame` to JSON records.
