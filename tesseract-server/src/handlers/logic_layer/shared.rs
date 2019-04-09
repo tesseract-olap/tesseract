@@ -189,17 +189,40 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => vec![]
         };
 
+        // Moving this out of the cut resolution because drills will need to
+        // insert to this hashmap in case it receives a named set value.
+        let mut agg_query_opt_cuts = match agg_query_opt.cuts {
+            Some(c) => c.clone(),
+            None => HashMap::new()
+        };
+
+        let ll_config = agg_query_opt.config.clone();
+
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
 
                 for l in LogicLayerQueryOpt::deserialize_args(ds) {
-                    let (dimension, hierarchy, level) = match cube.identify_level(l.clone()) {
+                    // Check logic layer config for any drill substitutions
+                    let drill_value = match ll_config.clone() {
+                        Some(llc) => {
+                            match llc.substitute_drill_value(l.clone()) {
+                                Some(ln) => {
+                                    agg_query_opt_cuts.entry(ln.clone()).or_insert(l.clone());
+                                    ln
+                                },
+                                None => l.clone()
+                            }
+                        },
+                        None => l.clone()
+                    };
+
+                    let (dimension, hierarchy, level) = match cube.identify_level(drill_value.clone()) {
                         Ok(dhl) => dhl,
                         Err(_) => break
                     };
                     let d = Drilldown::new(
-                        dimension.clone(), hierarchy.clone(), l.clone()
+                        dimension.clone(), hierarchy.clone(), drill_value.clone()
                     );
                     drilldowns.push(d);
 
@@ -231,42 +254,34 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             })
             .unwrap_or(vec![]);
 
-        let cuts: Vec<_> = match agg_query_opt.cuts {
-            Some(cs) => {
-                let mut cuts: Vec<Cut> = vec![];
+        let mut cuts: Vec<Cut > = vec![];
+        for (level_name, cut) in agg_query_opt_cuts.iter() {
+            if cut.is_empty() {
+                continue;
+            }
 
-                for (level_name, cut) in cs.iter() {
-                    if cut.is_empty() {
-                        continue;
-                    }
+            // Check logic layer config for any cut substitutions
+            let cut_value = match ll_config.clone() {
+                Some(llc) => {
+                    llc.substitute_cut(level_name.clone(), cut.clone())
+                },
+                None => cut.clone()
+            };
 
-                    // Check logic layer config for any cut substitutions
-                    let cut_value = match agg_query_opt.config.clone() {
-                        Some(llc) => {
-                            llc.substitute_cut(level_name.clone(), cut.clone())
-                        },
-                        None => cut.clone()
-                    };
+            let (dimension, hierarchy, level) = match cube.identify_level(level_name.to_string()) {
+                Ok(dh) => dh,
+                Err(_) => continue
+            };
 
-                    let (dimension, hierarchy, level) = match cube.identify_level(level_name.to_string()) {
-                        Ok(dh) => dh,
-                        Err(_) => continue
-                    };
+            let c = Cut::new(
+                dimension.clone(), hierarchy.clone(),
+                level_name.clone(),
+                cut_value.split(",").map(|s| s.to_string()).collect(),
+                Mask::Include, false
+            );
 
-                    let c = Cut::new(
-                        dimension.clone(), hierarchy.clone(),
-                        level_name.clone(),
-                        cut_value.split(",").map(|s| s.to_string()).collect(),
-                        Mask::Include, false
-                    );
-
-                    cuts.push(c);
-                }
-
-                cuts
-            },
-            None => vec![]
-        };
+            cuts.push(c);
+        }
 
         let measures: Vec<_> = agg_query_opt.measures
             .map(|ms| {
