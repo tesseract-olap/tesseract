@@ -248,6 +248,10 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         None => cut.clone()
                     };
 
+                    println!(" ");
+                    println!("{:?}", cut_value);
+                    println!(" ");
+
                     let (dimension, hierarchy, level) = match cube.identify_level(level_name.to_string()) {
                         Ok(dh) => dh,
                         Err(_) => continue
