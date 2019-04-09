@@ -62,7 +62,8 @@ pub fn create_app(
         env_vars: EnvVars,
         schema: Arc<RwLock<Schema>>,
         cache: Arc<RwLock<Cache>>,
-        logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>
+        logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
+        streaming_response: bool,
     ) -> App<AppState>
 {
     let app = App::with_state(AppState { debug, backend, db_type, env_vars, schema, cache, logic_layer_config })
@@ -99,9 +100,7 @@ pub fn create_app(
             r.method(Method::POST).with(flush_handler)
         });
 
-    let stream_results = true;
-
-    if stream_results {
+    if streaming_response {
         app
             .resource("/cubes/{cube}/aggregate", |r| {
                 r.method(Method::GET).with(aggregate_stream_default_handler)
@@ -110,7 +109,6 @@ pub fn create_app(
                 r.method(Method::GET).with(aggregate_stream_handler)
             })
     } else {
-        // Aggregation
         app
             .resource("/cubes/{cube}/aggregate", |r| {
                 r.method(Method::GET).with(aggregate_default_handler)
