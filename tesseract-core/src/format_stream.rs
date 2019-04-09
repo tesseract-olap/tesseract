@@ -23,7 +23,8 @@ pub struct RecordBlockStream<S>
 {
     inner: S,
     sent_header: bool,
-    sent_footer: bool,
+    eof: bool,
+    sent_first_chunk: bool, // for not setting a leading comma
     format_type: FormatType,
     headers: Vec<String>,
 }
@@ -35,7 +36,8 @@ impl<S> RecordBlockStream<S>
         RecordBlockStream {
             inner: stream,
             sent_header: false,
-            sent_footer: false,
+            eof: false,
+            sent_first_chunk: false,
             format_type,
             headers,
         }
@@ -49,7 +51,18 @@ impl<S> Stream for RecordBlockStream<S>
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        // first check eof
+        // this is separate from matchin on Asyn::Ready(None),
+        // because the json formats need to have a trailing `]}`
+        // after all the blocks for the body have been sent
+        if self.eof {
+            return Ok(Async::Ready(None));
+        }
+
+
         // first look at header
+        // send all the front matter
+        // (before the body of data)
         if !self.sent_header {
             match self.format_type {
                 FormatType::Csv => {
@@ -62,12 +75,40 @@ impl<S> Stream for RecordBlockStream<S>
                     let bytes: Bytes = buf.into();
 
                     self.sent_header = true;
+                    // csv doesn't require leading comma, so
+                    // don't let any chunks have leading comma
+                    self.sent_first_chunk = true;
 
                     return Ok(Async::Ready(Some(bytes)));
                 },
+                FormatType::JsonRecords => {
+                    let buf = b"{\"data\":[".to_vec();
+                    let bytes: Bytes = buf.into();
+
+                    self.sent_header = true;
+                    return Ok(Async::Ready(Some(bytes)));
+                },
+                FormatType::JsonArrays => {
+                    let mut ser = serde_json::Serializer::new(
+                        b"{\"headers\":".to_vec()
+                    );
+                    let mut seq_headers = ser.serialize_seq(Some(self.headers.len()))?;
+
+                    for header in &self.headers {
+                        seq_headers.serialize_element(header)?;
+                    }
+                    seq_headers.end()?;
+
+                    // now data prefix
+                    let mut buf = ser.into_inner();
+                    buf.extend(b",\"data\":[");
+
+                    let bytes: Bytes = buf.into();
+
+                    self.sent_header = true;
+                    return Ok(Async::Ready(Some(bytes)));
+                },
                 _ => return Err(format_err!("just csv first")),
-                //FormatType::JsonRecords => format_csv(headers, df_stream),
-                //FormatType::JsonArrays => format_csv(headers, df_stream),
             }
         }
 
@@ -75,8 +116,31 @@ impl<S> Stream for RecordBlockStream<S>
             let df_res = match self.inner.poll() {
                 Err(err) => return Err(err),
                 Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Ok(Async::Ready(None)) => return Ok(Async::Ready(None)),
                 Ok(Async::Ready(Some(df_res))) => df_res,
+                Ok(Async::Ready(None)) => {
+                    // instead of passing the "eof" straight through to stream,
+                    // the json formats need to do a last bit of formatting.
+                    // And then they can set the eof state to true,
+                    // and that check will end the stream.
+                    self.eof = true;
+                    match self.format_type {
+                        FormatType::Csv => {
+                            // this could also send Async::Ready(None),
+                            // but I want to end all streams in the same
+                            // place, at the eof check
+                            return Ok(Async::NotReady);
+                        },
+                        FormatType::JsonRecords => {
+                            let res = b"]}".to_vec().into();
+                            return Ok(Async::Ready(Some(res)));
+                        },
+                        FormatType::JsonArrays => {
+                            let res = b"]}".to_vec().into();
+                            return Ok(Async::Ready(Some(res)));
+                        },
+                        _ => return Err(format_err!("just csv first")),
+                    }
+                },
             };
 
             match df_res {
@@ -85,7 +149,25 @@ impl<S> Stream for RecordBlockStream<S>
                         FormatType::Csv => {
                             format_csv_body(df)?
                         },
-                        //FormatType::JsonRecords => format_csv(headers, df_stream),
+                        FormatType::JsonRecords => {
+                            // body should come back clean;
+                            // - no trailing comma
+                            // - no surrounding brackets
+                            //
+                            // lead_byte is set to `,` if it's not the first
+                            // block, otherwise it's set to ` `
+
+                            let lead_byte = if !self.sent_first_chunk {
+                                self.sent_first_chunk = true;
+                                ' ' as u8
+                            } else {
+                                ',' as u8
+                            };
+
+                            let body = format_jsonrecords_body(&self.headers, df, lead_byte)?;
+
+                            return Ok(Async::Ready(Some(body)));
+                        },
                         //FormatType::JsonArrays => format_csv(headers, df_stream),
                         _ => return Err(format_err!("just csv first")),
                     };
@@ -149,26 +231,13 @@ fn format_csv_body(df: DataFrame) -> Result<Bytes, Error>
 }
 
 /// Formats response `DataFrame` to JSON records.
-fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error> {
+fn format_jsonrecords_body(headers: &[String], df: DataFrame, lead_byte: u8) -> Result<Bytes, Error> {
     // use streaming serializer
     // Necessary because this way we don't create a huge vec of rows containing Value
     // (very expensive)
 
-    // I've ended up doing this a bit more manually than I want; but I don't know how
-    // to easily move between manually calling serializing methods, and having some
-    // done more automatically. For example, the rows have to be serialized using
-    // seq, but I can't easily call serialize_data including those rows, since I'm using
-    // a manual method different from the serialize_data.
-
-    // I had a hard time figuring out how to serialize the struct before the data.
-    // So I just wrote the bytes in and put a '}' at the end, and serialized
-    // the values in between.
-    let mut ser = serde_json::Serializer::new(
-        b"{\"data\":".to_vec()
-    );
-
+    let mut ser = serde_json::Serializer::new(vec![]);
     let mut seq = ser.serialize_seq(Some(df.len()))?;
-
 
     // write data
     for row_idx in 0..df.len() {
@@ -206,49 +275,28 @@ fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error
     }
 
     seq.end()?;
-    let mut res = String::from_utf8(ser.into_inner())?;
-    res.push('}');
-    Ok(res)
+    let mut res = ser.into_inner();
 
-//    let res = json!({
-//        "data": rows,
-//    });
-//
-//    Ok(res.to_string())
+    // because this is intermediate block, can't have `[` or `]`.
+    // To prevent reallocation, just replace those with ` `.
+    if let Some(v) = res.first_mut() {
+        *v = lead_byte;
+    }
+    if let Some(v) = res.last_mut() {
+        *v = lead_byte;
+    }
+
+    Ok(res.into())
 }
 
 /// Formats response `DataFrame` to JSON arrays.
-fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error> {
+fn format_jsonarrays(headers: &[String], df: DataFrame, lead_byte: u8) -> Result<Bytes, Error> {
     // use streaming serializer
     // Necessary because this way we don't create a huge vec of rows containing Value
     // (very expensive)
 
-    // I've ended up doing this a bit more manually than I want; but I don't know how
-    // to easily move between manually calling serializing methods, and having some
-    // done more automatically. For example, the rows have to be serialized using
-    // seq, but I can't easily call serialize_data including those rows, since I'm using
-    // a manual method different from the serialize_data.
-
-    // serialize headers
-    let mut ser = serde_json::Serializer::new(
-        b"{\"headers\":".to_vec()
-    );
-    let mut seq_headers = ser.serialize_seq(Some(headers.len()))?;
-
-    for header in headers {
-        seq_headers.serialize_element(&header)?;
-    }
-    seq_headers.end()?;
-
-
-    // now the data
-    let mut intermediate = ser.into_inner();
-    intermediate.extend(b",\"data\":");
-
-
-    let mut ser = serde_json::Serializer::new(intermediate);
+    let mut ser = serde_json::Serializer::new(vec![]);
     let mut seq_data = ser.serialize_seq(Some(df.len()))?;
-
 
     // then write data
     for row_idx in 0..df.len() {
@@ -282,19 +330,21 @@ fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error>
             row.push(val);
         }
 
-        seq_data.serialize_element(&row)?;;
+        seq_data.serialize_element(&row)?;
     }
 
     seq_data.end()?;
+    let mut res = ser.into_inner();
 
-    // now take out vec, convert to string, and return
-    let mut res = String::from_utf8(ser.into_inner())?;
-    res.push('}');
-    Ok(res)
+    // because this is intermediate block, can't have `[` or `]`.
+    // To prevent reallocation, just replace those with ` `.
+    if let Some(v) = res.first_mut() {
+        *v = lead_byte;
+    }
+    if let Some(v) = res.last_mut() {
+        *v = lead_byte;
+    }
 
-//    let res = json!({
-//        "headers": headers,
-//        "data": rows,
-//    });
+    Ok(res.into())
 }
 
