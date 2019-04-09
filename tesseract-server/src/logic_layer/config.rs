@@ -1,4 +1,5 @@
 use failure::{Error, format_err};
+use std::collections::HashSet;
 
 use serde_derive::Deserialize;
 use serde_json;
@@ -47,9 +48,13 @@ pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
     };
 
     if let Some(named_sets) = &config.named_sets {
+        let mut set_names = HashSet::new();
+
         for named_set in named_sets.iter() {
             for set in named_set.sets.iter() {
-                println!("{:?}", set.set_name);
+                if !set_names.insert(set.set_name.clone()) {
+                    return Err(format_err!("Make sure the logic layer config has unique set names"))
+                }
             }
         }
         return Ok(config)
