@@ -87,6 +87,19 @@ impl LogicLayerConfig {
         };
     }
 
+    pub fn substitute_drill(self, level_name: String) -> String {
+        if let Some(named_sets) = &self.named_sets {
+            for named_set in named_sets.iter() {
+                for set in named_set.sets.iter() {
+                    if set.set_name == level_name {
+                        return named_set.level_name.clone()
+                    }
+                }
+            }
+        }
+        level_name
+    }
+
     /// Given a cut string, find if that matches any of the substitutions
     /// defined in `named_sets`. If so, substitute the cut value.
     pub fn substitute_cut(self, level_name: String, cut: String) -> String {
