@@ -168,7 +168,26 @@ impl<S> Stream for RecordBlockStream<S>
 
                             return Ok(Async::Ready(Some(body)));
                         },
-                        //FormatType::JsonArrays => format_csv(headers, df_stream),
+                        FormatType::JsonArrays => {
+                            // same as for jsonrecords
+                            // body should come back clean;
+                            // - no trailing comma
+                            // - no surrounding brackets
+                            //
+                            // lead_byte is set to `,` if it's not the first
+                            // block, otherwise it's set to ` `
+
+                            let lead_byte = if !self.sent_first_chunk {
+                                self.sent_first_chunk = true;
+                                ' ' as u8
+                            } else {
+                                ',' as u8
+                            };
+
+                            let body = format_jsonarrays_body(&self.headers, df, lead_byte)?;
+
+                            return Ok(Async::Ready(Some(body)));
+                        }
                         _ => return Err(format_err!("just csv first")),
                     };
 
@@ -290,7 +309,7 @@ fn format_jsonrecords_body(headers: &[String], df: DataFrame, lead_byte: u8) -> 
 }
 
 /// Formats response `DataFrame` to JSON arrays.
-fn format_jsonarrays(headers: &[String], df: DataFrame, lead_byte: u8) -> Result<Bytes, Error> {
+fn format_jsonarrays_body(headers: &[String], df: DataFrame, lead_byte: u8) -> Result<Bytes, Error> {
     // use streaming serializer
     // Necessary because this way we don't create a huge vec of rows containing Value
     // (very expensive)
