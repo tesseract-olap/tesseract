@@ -2,6 +2,7 @@ mod backend;
 mod dataframe;
 mod sql;
 pub mod format;
+pub mod format_stream;
 pub mod names;
 pub mod schema;
 pub mod query;

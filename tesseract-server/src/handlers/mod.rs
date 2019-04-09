@@ -1,4 +1,5 @@
 mod aggregate;
+mod aggregate_stream;
 mod flush;
 mod index;
 mod metadata;
@@ -6,6 +7,8 @@ pub mod logic_layer;
 
 pub use self::aggregate::aggregate_handler;
 pub use self::aggregate::aggregate_default_handler;
+pub use self::aggregate_stream::aggregate_handler as aggregate_stream_handler;
+pub use self::aggregate_stream::aggregate_default_handler as aggregate_stream_default_handler;
 pub use self::logic_layer::logic_layer_handler;
 pub use self::logic_layer::logic_layer_default_handler;
 pub use self::flush::flush_handler;

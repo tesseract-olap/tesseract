@@ -5,13 +5,14 @@ name = "tesseract-core"
 version = "0.1.0"
 
 [dependencies]
+bytes = "0.4.12"
 csv = "1.0.2"
 failure = "0.1.3"
 futures = "0.1.25"
 itertools = "0.7.11"
 serde = "1.0.71"
-serde_derive = "1.0.71"
 serde-xml-rs = "0.3.1"
+serde_derive = "1.0.71"
 
 [dependencies.indexmap]
 features = ["serde-1"]

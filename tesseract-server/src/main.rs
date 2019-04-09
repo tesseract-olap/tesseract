@@ -64,8 +64,30 @@ fn main() -> Result<(), Error> {
         opt.debug // true
     };
 
+    // streaming http response (transfer encoding chunked)
+    // cli is boolean, but env var is Result.
+    // cli opt overrides env var if env_var is false
+    // TODO this has the same logic as for debug. make util fn?
+    let env_var_streaming_response = env::var("TESSERACT_STREAMING_RESPONSE")
+        .map_err(|_| format_err!(""))
+        .and_then(|d| {
+             d.parse::<bool>()
+            .map_err(|_| format_err!("could not parse bool from env_var TESSERACT_STREAMING_RESPONSE"))
+        });
+    let streaming_response = if !opt.streaming_response {
+        if let Ok(d) = env_var_streaming_response {
+            d
+        } else {
+            opt.streaming_response // false
+        }
+    } else {
+        opt.streaming_response // true
+    };
+
+    // address
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
 
+    // flush
     let flush_secret = env::var("TESSERACT_FLUSH_SECRET").ok();
 
     // Database
@@ -116,14 +138,17 @@ fn main() -> Result<(), Error> {
     };
 
     // Initialize Server
-    server::new(move|| create_app(
-            debug,
-            db.clone(),
-            db_type.clone(),
-            env_vars.clone(),
-            schema_arc.clone(),
-            cache_arc.clone(),
-            logic_layer_config.clone()),
+    server::new(
+        move|| create_app(
+                debug,
+                db.clone(),
+                db_type.clone(),
+                env_vars.clone(),
+                schema_arc.clone(),
+                cache_arc.clone(),
+                logic_layer_config.clone(),
+                streaming_response,
+            )
         )
         .bind(&server_addr)
         .expect(&format!("cannot bind to {}", server_addr))
@@ -134,6 +159,9 @@ fn main() -> Result<(), Error> {
     println!("Tesseract schema path:  {}", schema_path);
     if debug {
         println!("Tesseract debug mode: ON");
+    }
+    if streaming_response {
+        println!("Tesseract streaming mode: ON");
     }
 
     sys.run();
@@ -153,4 +181,7 @@ struct Opt {
 
     #[structopt(long="debug")]
     debug: bool,
+
+    #[structopt(long="streaming")]
+    streaming_response: bool,
 }
