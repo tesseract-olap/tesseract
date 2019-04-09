@@ -189,17 +189,29 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => vec![]
         };
 
+        let mut agg_query_opt_cuts = match agg_query_opt.cuts {
+            Some(c) => c.clone(),
+            None => HashMap::new()
+        };
+
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
 
                 for l in LogicLayerQueryOpt::deserialize_args(ds) {
-                    let (dimension, hierarchy, level) = match cube.identify_level(l.clone()) {
+                    let mut final_level = l.clone();
+
+                    if l == "Set 1".to_string() {
+                        final_level = "Category".to_string();
+                        agg_query_opt_cuts.entry("Category".to_string()).or_insert("Set 1".to_string());
+                    }
+
+                    let (dimension, hierarchy, level) = match cube.identify_level(final_level.clone()) {
                         Ok(dhl) => dhl,
                         Err(_) => break
                     };
                     let d = Drilldown::new(
-                        dimension.clone(), hierarchy.clone(), l.clone()
+                        dimension.clone(), hierarchy.clone(), final_level.clone()
                     );
                     drilldowns.push(d);
 
@@ -231,46 +243,34 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             })
             .unwrap_or(vec![]);
 
-        let cuts: Vec<_> = match agg_query_opt.cuts {
-            Some(cs) => {
-                let mut cuts: Vec<Cut> = vec![];
+        let mut cuts: Vec<Cut > = vec![];
+        for (level_name, cut) in agg_query_opt_cuts.iter() {
+            if cut.is_empty() {
+                continue;
+            }
 
-                for (level_name, cut) in cs.iter() {
-                    if cut.is_empty() {
-                        continue;
-                    }
+            // Check logic layer config for any cut substitutions
+            let cut_value = match agg_query_opt.config.clone() {
+                Some(llc) => {
+                    llc.substitute_cut(level_name.clone(), cut.clone())
+                },
+                None => cut.clone()
+            };
 
-                    // Check logic layer config for any cut substitutions
-                    let cut_value = match agg_query_opt.config.clone() {
-                        Some(llc) => {
-                            llc.substitute_cut(level_name.clone(), cut.clone())
-                        },
-                        None => cut.clone()
-                    };
+            let (dimension, hierarchy, level) = match cube.identify_level(level_name.to_string()) {
+                Ok(dh) => dh,
+                Err(_) => continue
+            };
 
-//                    println!(" ");
-//                    println!("{:?}", cut_value);
-//                    println!(" ");
+            let c = Cut::new(
+                dimension.clone(), hierarchy.clone(),
+                level_name.clone(),
+                cut_value.split(",").map(|s| s.to_string()).collect(),
+                Mask::Include, false
+            );
 
-                    let (dimension, hierarchy, level) = match cube.identify_level(level_name.to_string()) {
-                        Ok(dh) => dh,
-                        Err(_) => continue
-                    };
-
-                    let c = Cut::new(
-                        dimension.clone(), hierarchy.clone(),
-                        level_name.clone(),
-                        cut_value.split(",").map(|s| s.to_string()).collect(),
-                        Mask::Include, false
-                    );
-
-                    cuts.push(c);
-                }
-
-                cuts
-            },
-            None => vec![]
-        };
+            cuts.push(c);
+        }
 
         let measures: Vec<_> = agg_query_opt.measures
             .map(|ms| {

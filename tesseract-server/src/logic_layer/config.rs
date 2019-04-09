@@ -88,10 +88,10 @@ impl LogicLayerConfig {
     }
 
     /// Given a cut string, find if that matches any of the substitutions
-    /// defined in `name_sets`. If so, substitute the cut value.
+    /// defined in `named_sets`. If so, substitute the cut value.
     pub fn substitute_cut(self, level_name: String, cut: String) -> String {
         match self.named_sets {
-            Some(name_sets) => {
+            Some(named_sets) => {
                 let cuts: Vec<String> = cut.split(",").map(|s| s.to_string()).collect();
 
                 let mut final_cuts: Vec<String> = vec![];
@@ -99,9 +99,9 @@ impl LogicLayerConfig {
                 for c in cuts.clone() {
                     let mut found = false;
 
-                    for name_set in name_sets.clone() {
-                        if name_set.level_name == level_name {
-                            for set in name_set.sets.clone() {
+                    for named_set in named_sets.clone() {
+                        if named_set.level_name == level_name {
+                            for set in named_set.sets.clone() {
                                 if c == set.set_name {
                                     final_cuts.extend(set.values);
                                     found = true;
