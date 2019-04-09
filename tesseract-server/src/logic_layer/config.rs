@@ -87,17 +87,20 @@ impl LogicLayerConfig {
         };
     }
 
-    pub fn substitute_drill(self, level_name: String) -> String {
+    /// Given a drilldown level name, try to match that to one of the config
+    /// named set names. If there is a match, return the associated level name
+    /// for that named set.
+    pub fn substitute_drill_value(self, level_name: String) -> Option<String> {
         if let Some(named_sets) = &self.named_sets {
             for named_set in named_sets.iter() {
                 for set in named_set.sets.iter() {
                     if set.set_name == level_name {
-                        return named_set.level_name.clone()
+                        return Some(named_set.level_name.clone())
                     }
                 }
             }
         }
-        level_name
+        None
     }
 
     /// Given a cut string, find if that matches any of the substitutions

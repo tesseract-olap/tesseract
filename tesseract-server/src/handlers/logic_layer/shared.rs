@@ -189,6 +189,8 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => vec![]
         };
 
+        // Moving this out of the cut resolution because drills will need to
+        // insert to this hashmap in case it receives a named set value.
         let mut agg_query_opt_cuts = match agg_query_opt.cuts {
             Some(c) => c.clone(),
             None => HashMap::new()
@@ -202,29 +204,25 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
                 for l in LogicLayerQueryOpt::deserialize_args(ds) {
                     // Check logic layer config for any drill substitutions
-                    let mut final_level = match ll_config.clone() {
+                    let drill_value = match ll_config.clone() {
                         Some(llc) => {
-                            let ln = llc.substitute_drill(l.clone());
-                            if ln == l {
-                                l.clone()
-                            } else {
-                                agg_query_opt_cuts.entry(ln.clone()).or_insert(l.clone());
-                                ln
+                            match llc.substitute_drill_value(l.clone()) {
+                                Some(ln) => {
+                                    agg_query_opt_cuts.entry(ln.clone()).or_insert(l.clone());
+                                    ln
+                                },
+                                None => l.clone()
                             }
                         },
                         None => l.clone()
                     };
 
-//                    println!(" ");
-//                    println!("{:?}", final_level);
-//                    println!(" ");
-
-                    let (dimension, hierarchy, level) = match cube.identify_level(final_level.clone()) {
+                    let (dimension, hierarchy, level) = match cube.identify_level(drill_value.clone()) {
                         Ok(dhl) => dhl,
                         Err(_) => break
                     };
                     let d = Drilldown::new(
-                        dimension.clone(), hierarchy.clone(), final_level.clone()
+                        dimension.clone(), hierarchy.clone(), drill_value.clone()
                     );
                     drilldowns.push(d);
 
