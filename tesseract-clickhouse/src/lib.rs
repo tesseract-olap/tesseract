@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use clickhouse_rs::Pool;
 use clickhouse_rs::types::Options;
 use failure::{Error, format_err};
@@ -28,7 +30,27 @@ impl Clickhouse {
 
         let options = options
             // Ping timeout is necessary, because under heavy load (100 requests
-            // simultenously, each one taking 5s ordinarily) the client will timeout.
+            // simultaneously, each one taking 5s ordinarily) the client will timeout.
+            .ping_timeout(Duration::from_millis(PING_TIMEOUT));
+
+        let pool = Pool::new(options);
+
+        Ok(Clickhouse {
+            pool,
+        })
+    }
+
+    pub fn from_url(url: &str) -> Result<Self, Error> {
+        let options = match Options::from_str(
+            &format!("tcp://{}", url)
+        ) {
+            Ok(o) => o,
+            Err(err) => return Err(format_err!("{}", err))
+        };
+
+        let options = options
+            // Ping timeout is necessary, because under heavy load (100 requests
+            // simultaneously, each one taking 5s ordinarily) the client will timeout.
             .ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
         let pool = Pool::new(options);
