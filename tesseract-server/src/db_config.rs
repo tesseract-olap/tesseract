@@ -43,7 +43,7 @@ pub fn get_db(db_url_full: &str) -> Result<(Box<dyn Backend + Send + Sync>, Stri
 
     let db = match db_type {
         Database::Clickhouse => {
-            Box::new(Clickhouse::from_addr(&db_url)?) as
+            Box::new(Clickhouse::from_url(&db_url)?) as
                 Box<dyn Backend + Send + Sync>
         },
         Database::MySql => {
@@ -69,7 +69,6 @@ pub fn get_db(db_url_full: &str) -> Result<(Box<dyn Backend + Send + Sync>, Stri
         },
         _ => db_url.to_owned(),
     };
-
 
     Ok((db, db_url, db_type))
 }

@@ -21,14 +21,12 @@ pub struct Clickhouse {
 }
 
 impl Clickhouse {
-    pub fn from_addr(address: &str) -> Result<Self, Error> {
-        let options = Options::new(
-            address
-        );
+    pub fn from_url(url: &str) -> Result<Self, Error> {
+        let options = format!("tcp://{}", url).parse::<Options>()?;
 
         let options = options
             // Ping timeout is necessary, because under heavy load (100 requests
-            // simultenously, each one taking 5s ordinarily) the client will timeout.
+            // simultaneously, each one taking 5s ordinarily) the client will timeout.
             .ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
         let pool = Pool::new(options);
