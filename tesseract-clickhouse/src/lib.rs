@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use clickhouse_rs::Pool;
 use clickhouse_rs::types::Options;
 use failure::{Error, format_err};

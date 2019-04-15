@@ -7,7 +7,7 @@ use failure::{Error, format_err, bail};
 use std::convert::{TryFrom};
 use std::collections::HashMap;
 
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::Deserialize;
 
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, Mask};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
@@ -268,7 +268,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 None => cut.clone()
             };
 
-            let (dimension, hierarchy, level) = match cube.identify_level(level_name.to_string()) {
+            let (dimension, hierarchy, _level) = match cube.identify_level(level_name.to_string()) {
                 Ok(dh) => dh,
                 Err(_) => continue
             };
