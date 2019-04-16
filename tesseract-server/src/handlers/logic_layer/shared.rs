@@ -273,11 +273,34 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 Err(_) => continue
             };
 
+            // Check for mask
+            let is_exclude = cut_value.chars().nth(0).unwrap() == '~';
+            let mask = if is_exclude {
+                Mask::Exclude
+            } else {
+                Mask::Include
+            };
+            let cut_value = if is_exclude {
+                // ok to slice string, because '~' is definitely one char
+                cut_value[1..].to_string().to_owned()
+            } else {
+                cut_value
+            };
+
+            // Then check for match (*)
+            let for_match = cut_value.chars().nth(0).unwrap() == '*';
+            let cut_value = if for_match {
+                // ok to slice string, because '*' is definitely one char
+                cut_value[1..].to_string().to_owned()
+            } else {
+                cut_value
+            };
+
             let c = Cut::new(
                 dimension.clone(), hierarchy.clone(),
                 level_name.clone(),
                 cut_value.split(",").map(|s| s.to_string()).collect(),
-                Mask::Include, false
+                mask, for_match
             );
 
             cuts.push(c);
