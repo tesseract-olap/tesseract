@@ -17,11 +17,9 @@ pub use crate::schema::{
     json::PropertyConfigJson,
     json::AnnotationConfigJson,
     json::InlineTableJson,
-
     json::InlineTableColumnDefinitionJson,
     json::InlineTableRowJson,
     json::InlineTableRowValueJson,
-
     xml::SchemaConfigXML,
     xml::DimensionConfigXML,
     xml::HierarchyConfigXML,

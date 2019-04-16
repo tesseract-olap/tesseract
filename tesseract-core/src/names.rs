@@ -226,6 +226,35 @@ impl Cut {
                 ))
             })?)
     }
+
+    /// Parses a cut string and returns a boolean containing a Mask, for_match
+    /// bool and the final cut string.
+    pub fn parse_cut(cut: &str) -> (Mask, bool, String) {
+        // Check for mask
+        let is_exclude = cut.chars().nth(0).unwrap() == '~';
+        let mask = if is_exclude {
+            Mask::Exclude
+        } else {
+            Mask::Include
+        };
+        let cut = if is_exclude {
+            // ok to slice string, because '~' is definitely one char
+            &cut[1..]
+        } else {
+            cut
+        };
+
+        // Then check for match (*)
+        let for_match = cut.chars().nth(0).unwrap() == '*';
+        let cut = if for_match {
+            // ok to slice string, because '*' is definitely one char
+            &cut[1..]
+        } else {
+            cut
+        };
+
+        (mask, for_match, cut.to_owned())
+    }
 }
 
 // TODO fix this, it only displays "keys" and not "labels"

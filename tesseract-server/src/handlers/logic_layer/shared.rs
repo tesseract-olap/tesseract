@@ -273,11 +273,13 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 Err(_) => continue
             };
 
+            let (mask, for_match, cut_value) = Cut::parse_cut(&cut_value);
+
             let c = Cut::new(
                 dimension.clone(), hierarchy.clone(),
                 level_name.clone(),
                 cut_value.split(",").map(|s| s.to_string()).collect(),
-                Mask::Include, false
+                mask, for_match
             );
 
             cuts.push(c);
