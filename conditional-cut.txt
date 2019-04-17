@@ -1,0 +1,237 @@
+alpaca :) create table test_2 (manager_id UInt8, security_id UInt8, volume UInt32) ENGINE = Log
+
+CREATE TABLE test_2
+(
+    manager_id UInt8, 
+    security_id UInt8, 
+    volume UInt32
+)
+ENGINE = Log
+
+Ok.
+
+0 rows in set. Elapsed: 0.004 sec. 
+
+alpaca :) insert into test_2 values (1,1,100), (1,2,500), (1,3,700), (2,1,900),(2,4,1100)
+
+INSERT INTO test_2 VALUES
+
+Ok.
+
+5 rows in set. Elapsed: 0.004 sec. 
+
+alpaca :) select * from test_2
+
+SELECT *
+FROM test_2 
+
+┌─manager_id─┬─security_id─┬─volume─┐
+│          1 │           1 │    100 │
+│          1 │           2 │    500 │
+│          1 │           3 │    700 │
+│          2 │           1 │    900 │
+│          2 │           4 │   1100 │
+└────────────┴─────────────┴────────┘
+
+5 rows in set. Elapsed: 0.005 sec. 
+
+alpaca :) select manager_id, groupArray(security_id) as securities, groupArray(volume) as volumes from test_2 group by manager_id
+
+SELECT 
+    manager_id, 
+    groupArray(security_id) AS securities, 
+    groupArray(volume) AS volumes
+FROM test_2 
+GROUP BY manager_id
+
+┌─manager_id─┬─securities─┬─volumes───────┐
+│          1 │ [1,2,3]    │ [100,500,700] │
+│          2 │ [1,4]      │ [900,1100]    │
+└────────────┴────────────┴───────────────┘
+
+2 rows in set. Elapsed: 0.007 sec. 
+
+alpaca :) select manager_id, securities, volumes from (select manager_id, groupArray(security_id) as securities, groupArray(volume) as volumes from test_2 group by manager_id) where has(securities, 2)
+
+SELECT 
+    manager_id, 
+    securities, 
+    volumes
+FROM 
+(
+    SELECT 
+        manager_id, 
+        groupArray(security_id) AS securities, 
+        groupArray(volume) AS volumes
+    FROM test_2 
+    GROUP BY manager_id
+) 
+WHERE has(securities, 2)
+
+┌─manager_id─┬─securities─┬─volumes───────┐
+│          1 │ [1,2,3]    │ [100,500,700] │
+└────────────┴────────────┴───────────────┘
+
+1 rows in set. Elapsed: 0.010 sec. 
+
+alpaca :) select manager_id, securities_final, volumes_final from (select manager_id, securities, volumes from (select manager_id, groupArray(security_id) as securities, groupArray(volume) as volumes from test_2 group by manager_id) where has(securities, 2)) array join securities as securities_final, volumes as volumes_final
+
+SELECT 
+    manager_id, 
+    securities_final, 
+    volumes_final
+FROM 
+(
+    SELECT 
+        manager_id, 
+        securities, 
+        volumes
+    FROM 
+    (
+        SELECT 
+            manager_id, 
+            groupArray(security_id) AS securities, 
+            groupArray(volume) AS volumes
+        FROM test_2 
+        GROUP BY manager_id
+    ) 
+    WHERE has(securities, 2)
+) 
+ARRAY JOIN 
+    securities AS securities_final, 
+    volumes AS volumes_final
+
+┌─manager_id─┬─securities_final─┬─volumes_final─┐
+│          1 │                1 │           100 │
+│          1 │                2 │           500 │
+│          1 │                3 │           700 │
+└────────────┴──────────────────┴───────────────┘
+
+3 rows in set. Elapsed: 0.012 sec. 
+
+-- now with dim table with hierarchy
+
+
+alpaca :) create table test_2_dim_security (security_id UInt8, security_label String, security_group_id UInt8, security_group_label String) ENGINE = Log
+
+CREATE TABLE test_2_dim_security
+(
+    security_id UInt8, 
+    security_label String, 
+    security_group_id UInt8, 
+    security_group_label String
+)
+ENGINE = Log
+
+Ok.
+
+0 rows in set. Elapsed: 0.005 sec. 
+
+alpaca :) insert into test_2_dim_security values (1, 'Apple', 1, 'Tech'), (2, 'Nike', 2, 'Shoes'), (3, 'Amazon', 1, 'Tech'), (4, 'Netflix', 1, 'Tech')
+
+INSERT INTO test_2_dim_security VALUES
+
+Ok.
+
+4 rows in set. Elapsed: 0.006 sec. 
+
+alpaca :) select manager_id, securities_final, volumes_final from (select manager_id, securities, volumes from (select manager_id, groupArray(security_id) as securities, groupArray(volume) as volumes from test_2 group by manager_id) where hasAny(securities, (select groupArray(security_id) from test_2_dim_security where security_group_id = 2) )) array join securities as securities_final, volumes as volumes_final
+
+SELECT 
+    manager_id, 
+    securities_final, 
+    volumes_final
+FROM 
+(
+    SELECT 
+        manager_id, 
+        securities, 
+        volumes
+    FROM 
+    (
+        SELECT 
+            manager_id, 
+            groupArray(security_id) AS securities, 
+            groupArray(volume) AS volumes
+        FROM test_2 
+        GROUP BY manager_id
+    ) 
+    WHERE hasAny(securities, 
+    (
+        SELECT groupArray(security_id)
+        FROM test_2_dim_security 
+        WHERE security_group_id = 2
+    ))
+) 
+ARRAY JOIN 
+    securities AS securities_final, 
+    volumes AS volumes_final
+
+┌─manager_id─┬─securities_final─┬─volumes_final─┐
+│          1 │                1 │           100 │
+│          1 │                2 │           500 │
+│          1 │                3 │           700 │
+└────────────┴──────────────────┴───────────────┘
+
+3 rows in set. Elapsed: 0.019 sec. 
+
+alpaca :) select groupArray(security_id) from test_2_dim_security where security_group_id = 2
+
+SELECT groupArray(security_id)
+FROM test_2_dim_security 
+WHERE security_group_id = 2
+
+┌─groupArray(security_id)─┐
+│ [2]                     │
+└─────────────────────────┘
+
+1 rows in set. Elapsed: 0.006 sec. 
+
+-- now with hierarchy and multiple conditions on multiple levels, cutting on one level.
+
+alpaca :) insert into test_2 values (3, 2, 1500)
+
+INSERT INTO test_2 VALUES
+
+Ok.
+
+1 rows in set. Elapsed: 0.004 sec. 
+
+alpaca :) select manager_id, securities_final, volumes_final from (select manager_id, securities, volumes from (select manager_id, groupArray(security_id) as securities, groupArray(volume) as volumes from test_2 group by manager_id) where hasAny(securities, (select groupArray(security_id) from test_2_dim_security where security_group_id = 2) ) and not hasAny(securities, [1])) array join securities as securities_final, volumes as volumes_final
+
+SELECT 
+    manager_id, 
+    securities_final, 
+    volumes_final
+FROM 
+(
+    SELECT 
+        manager_id, 
+        securities, 
+        volumes
+    FROM 
+    (
+        SELECT 
+            manager_id, 
+            groupArray(security_id) AS securities, 
+            groupArray(volume) AS volumes
+        FROM test_2 
+        GROUP BY manager_id
+    ) 
+    WHERE hasAny(securities, 
+    (
+        SELECT groupArray(security_id)
+        FROM test_2_dim_security 
+        WHERE security_group_id = 2
+    )) AND NOT hasAny(securities, [1])
+) 
+ARRAY JOIN 
+    securities AS securities_final, 
+    volumes AS volumes_final
+
+┌─manager_id─┬─securities_final─┬─volumes_final─┐
+│          3 │                3 │          1300 │
+│          3 │                2 │          1500 │
+└────────────┴──────────────────┴───────────────┘
+
+2 rows in set. Elapsed: 0.023 sec. 
