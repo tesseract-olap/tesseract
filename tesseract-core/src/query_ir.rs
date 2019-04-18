@@ -191,7 +191,7 @@ impl CutSql {
                     .map(|m| format!("{} {} {}", self.column, self.mask_sql_like_string(), m));
 
                 match self.mask {
-                    Mask::Include => format!("{}", join(unquoted, " or ")),
+                    Mask::Include => format!("({})", join(unquoted, " or ")),
                     Mask::Exclude => format!("{}", join(unquoted, " and ")),
                 }
             },
@@ -200,7 +200,7 @@ impl CutSql {
                     .map(|m| format!("{} {} '%{}%'", self.column, self.mask_sql_like_string(), m));
 
                 match self.mask {
-                    Mask::Include => format!("{}", join(quoted, " or ")),
+                    Mask::Include => format!("({})", join(quoted, " or ")),
                     Mask::Exclude => format!("{}", join(quoted, " and ")),
                 }
             }
