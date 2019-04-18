@@ -11,7 +11,7 @@ pub mod query_ir;
 use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
@@ -593,13 +593,13 @@ impl Schema {
                 .collect();
             let property_columns = property_columns?;
 
-            // for this drill, get caption. For now, only allow on
-            // an explicitly specified drilldown
+            // for this drill, get caption.
+            // each caption must be specified, but can refer
+            // either to an explicit drilldown or parent
             // - filter by properties for this drilldown
             // - for each property, get the level
-            // - check there's only <= 1.
-            let caption_col: Result<Vec<_>, _>= captions.iter()
-                .filter(|p| p.level_name == drill.0)
+            let caption_cols: Result<HashMap<_, _>, _>= captions.iter()
+                .filter(|p| p.level_name.dimension == drill.0.dimension)
                 .map(|p| {
                     levels.iter()
                         .find(|lvl| lvl.name == p.level_name.level)
@@ -607,17 +607,20 @@ impl Schema {
                             if let Some(ref properties) = lvl.properties {
                                 properties.iter()
                                     .find(|schema_p| schema_p.name == p.property)
+                                    .map(|p| (lvl, p))
 
                             } else {
                                 None
                             }
                         })
-                        .map(|p| p.column.clone())
+                        .map(|(lvl, p)| (lvl.name.clone(), p.column.clone()) )
                         .ok_or(format_err!("cannot find property-caption for {}", p))
                 })
                 .collect();
-            let caption_col = caption_col?;
-            assert!(caption_col.len() <= 1);
+            let caption_cols = caption_cols?;
+            if !parents {
+                assert!(caption_cols.len() <= 1);
+            }
 
             // No table (means inline table) will replace with fact table
             let table = hier.table
@@ -644,8 +647,8 @@ impl Schema {
             if parents {
                 for i in 0..=level_idx {
                     // caption replaces name_column with the col from property.
-                    let caption = if !caption_col.is_empty() && i == level_idx {
-                        Some(caption_col[0].clone()) // assertion that caption_col <= 1 above
+                    let caption = if let Some(caption_col) = caption_cols.get(&levels[i].name) {
+                        Some(caption_col.clone())
                     } else {
                         levels[i].name_column.clone()
                     };
@@ -656,8 +659,9 @@ impl Schema {
                 }
             } else {
                 // caption replaces name_column with the col from property.
-                let caption = if !caption_col.is_empty() {
-                    Some(caption_col[0].clone()) // assertion that caption_col <= 1 above
+                // assertion that caption_col <= 1 above
+                let caption = if let Some(caption_col) = caption_cols.get(&levels[level_idx].name) {
+                    Some(caption_col.clone())
                 } else {
                     levels[level_idx].name_column.clone()
                 };
