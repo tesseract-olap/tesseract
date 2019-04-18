@@ -1,24 +1,19 @@
 use actix_web::{
-    AsyncResponder,
     FutureResponse,
     HttpRequest,
     HttpResponse,
     Path,
 };
-use failure::Error;
-use futures::future::{self, Future};
-use futures::Stream;
+use futures::future;
 use lazy_static::lazy_static;
 use log::*;
-use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use tesseract_core::format::FormatType;
 use tesseract_core::format_stream::format_records_stream;
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
-use crate::errors::ServerError;
 use super::aggregate::AggregateQueryOpt;
 
 /// Handles default aggregation when a format is not specified.
