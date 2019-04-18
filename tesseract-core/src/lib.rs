@@ -11,8 +11,9 @@ pub mod query_ir;
 use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
+use std::collections::HashSet;
 
-use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTable};
+use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData};
@@ -71,6 +72,35 @@ impl Schema {
 
     pub fn metadata(&self) -> SchemaMetadata {
         self.into()
+    }
+
+    pub fn has_unique_levels_properties(&self) -> bool {
+        for cube in &self.cubes {
+            let mut levels = HashSet::new();
+            let mut properties = HashSet::new();
+
+            for dimension in &cube.dimensions {
+                for hierarchy in &dimension.hierarchies {
+
+                    // Check each cube for unique level and property names
+                    for level in &hierarchy.levels {
+                        if !levels.insert(&level.name) {
+                            return false
+                        }
+
+                        if let Some(ref props) = level.properties {
+                            for property in props {
+                                if !properties.insert(&property.name) {
+                                    return false
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        true
     }
 
     pub fn members_sql(

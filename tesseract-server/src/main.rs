@@ -106,6 +106,7 @@ fn main() -> Result<(), Error> {
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
     let schema = schema_config::read_schema(&schema_path)?;
+    let has_unique_levels_properties = schema.has_unique_levels_properties();
     let schema_arc = Arc::new(RwLock::new(schema.clone()));
 
     // Env
@@ -148,6 +149,7 @@ fn main() -> Result<(), Error> {
                 cache_arc.clone(),
                 logic_layer_config.clone(),
                 streaming_response,
+                has_unique_levels_properties,
             )
         )
         .bind(&server_addr)

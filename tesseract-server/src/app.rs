@@ -13,6 +13,8 @@ use crate::handlers::{
     aggregate_stream_default_handler,
     logic_layer_default_handler,
     logic_layer_handler,
+    logic_layer_non_unique_levels_handler,
+    logic_layer_non_unique_levels_default_handler,
     flush_handler,
     index_handler,
     metadata_handler,
@@ -64,6 +66,7 @@ pub fn create_app(
         cache: Arc<RwLock<Cache>>,
         logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
         streaming_response: bool,
+        has_unique_levels_properties: bool,
     ) -> App<AppState>
 {
     let app = App::with_state(AppState { debug, backend, db_type, env_vars, schema, cache, logic_layer_config })
@@ -80,14 +83,6 @@ pub fn create_app(
             r.method(Method::GET).with(metadata_handler)
         })
 
-        // Logic Layer
-        .resource("/data", |r| {
-            r.method(Method::GET).with(logic_layer_default_handler)
-        })
-        .resource("/data.{format}", |r| {
-            r.method(Method::GET).with(logic_layer_handler)
-        })
-
         // Helpers
         .resource("/cubes/{cube}/members", |r| {
             r.method(Method::GET).with(members_default_handler)
@@ -100,7 +95,7 @@ pub fn create_app(
             r.method(Method::POST).with(flush_handler)
         });
 
-    if streaming_response {
+    let app = if streaming_response {
         app
             .resource("/cubes/{cube}/aggregate", |r| {
                 r.method(Method::GET).with(aggregate_stream_default_handler)
@@ -116,5 +111,26 @@ pub fn create_app(
             .resource("/cubes/{cube}/aggregate.{format}", |r| {
                 r.method(Method::GET).with(aggregate_handler)
             })
+    };
+
+    if has_unique_levels_properties {
+        // Logic Layer
+        app
+            .resource("/data", |r| {
+                r.method(Method::GET).with(logic_layer_default_handler)
+            })
+            .resource("/data.{format}", |r| {
+                r.method(Method::GET).with(logic_layer_handler)
+            })
+
+    } else {
+        app
+            .resource("/data", |r| {
+                r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
+            })
+            .resource("/data.{format}", |r| {
+                r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
+            })
     }
+
 }
