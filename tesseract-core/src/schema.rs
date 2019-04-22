@@ -185,12 +185,31 @@ impl Cube {
 
     /// Finds the dimension and hierarchy names for a given level.
     /// Also returns the Level object matched.
+    /// (it's the first level matched; for logic layer,
+    /// it's assumed that all levels are unique)
     pub fn identify_level(&self, level_name: String) -> Result<(String, String, Level), Error> {
         for dimension in self.dimensions.clone() {
             for hierarchy in dimension.hierarchies.clone() {
                 for level in hierarchy.levels.clone() {
                     if level.name == level_name {
                         return Ok((dimension.name, hierarchy.name, level))
+                    }
+                }
+            }
+        }
+
+        Err(format_err!("'{}' not found", level_name))
+    }
+
+    /// gets parents levels (not including the level itself)
+    /// (it's the first level matched; for logic layer,
+    /// it's assumed that all levels are unique)
+    pub fn get_level_parents(&self, level_name: &str) -> Result<Vec<Level>, Error> {
+        for dimension in &self.dimensions {
+            for hierarchy in &dimension.hierarchies {
+                for (level_idx, level) in hierarchy.levels.iter().enumerate() {
+                    if level.name == level_name {
+                        return Ok(hierarchy.levels.clone().into_iter().take(level_idx).collect())
                     }
                 }
             }

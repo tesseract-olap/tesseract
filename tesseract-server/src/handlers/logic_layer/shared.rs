@@ -248,6 +248,29 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     } else {
                         continue
                     }
+
+                    // if parents, check captions for parent levels
+                    // Same logic as above, for checking captions for a level
+                    let parents = cube.get_level_parents(&drill_value).unwrap_or(vec![]);
+                    for level in parents {
+                        if let Some(ref props) = level.properties {
+                            for prop in props {
+                                if let Some(ref cap) = prop.caption_set {
+                                    for locale in &locales {
+                                        if locale == cap {
+                                            captions.push(
+                                                Property::new(
+                                                    dimension.clone(),
+                                                    hierarchy.clone(),
+                                                    l.clone(), prop.name.clone()
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 drilldowns
