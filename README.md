@@ -2,15 +2,47 @@
 
 More documentation is coming soon!
 
-For some information on the http API, see `tesseract-server/README.md`.
+## For Users
 
-## Getting started
+### Getting started
 
-### Prerequisites
+Tesseract serves an api which allows the user to drill-down, cut, filter, and otherwise examine a [cube](https://en.wikipedia.org/wiki/OLAP_cube) of data.
 
-#### Packages
+The logical construct of the "cube" allows for powerful, flexible, and fast data analysis while keeping the data in the most efficient physical format (in-db).
 
-Make sure you have just and watchexec installed. If not you can install them via `cargo`:
+1) Get `tesseract`: Check the [releases](https://github.com/hwchen/tesseract/releases) page for a binary download.
+2) Get data into "cube" format: [star schema](https://en.wikipedia.org/wiki/Star_schema)-like is simplest.
+3) Write a schema, which shows how the logical representation of the cube maps to the data in the database.
+4) Set options as environment variables and/or cli flags.
+5) (Optional) Set up a process monitor like systemd.
+6) Run tesseract! For some examples of cli invocations, see the [justfile](https://github.com/hwchen/tesseract/blob/master/justfile)
+
+Then once environment variables are set.
+
+### Environment Variables
+- `TESSERACT_DATABASE_URL`: required, is the address of the database; make sure to include the user, password, and database name.
+- `TESSERACT_SCHEMA_FILEPATH`: required, should point to the location on disk for the tesseract schema file.
+- `TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH`: optional, should point to the location on path for the logic layer configuration.
+- `TESSERACT_FLUSH_SECRET`: optional, but required for flush; is the secret key for the flush endpoint.
+- `TESSERACT_STREAMING_RESPONSE`: `boolean, true` streams rows/blocks as database streaming allows.
+- `TESSERACT_DEBUG`: boolean, `true` is a debug mode for data/calculations. As of now, the only feature is the `rca` calculation will show `a b c d` sub-aggregations for the calculation`(a/b)/(c/d)`.
+- `RUST_LOG`: optional, sets logging level. I generally set to `info`.
+
+### API documentation
+
+For more details on the api, please check the server [readme](https://github.com/hwchen/tesseract/blob/master/tesseract-server/README.md). This will soon be updated and easier to follow on a separate documentation site.
+
+For more details on the logic layer api, check [here](https://github.com/hwchen/tesseract/blob/master/tesseract-server/src/logic_layer/README.md). This will als be updated and easier to follow on a separate documentation site.
+
+## For Developers
+
+### Dev Environment
+
+To make life easier for developers, I've set up a simple dev environment using:
+- [just](https://github.com/casey/just) (a command runner)
+- [watchexec](https://github.com/watchexec/watchexec) (executes command on file changes)
+
+You can install them via `cargo` or check their webpage:
 ```
 cargo install just
 cargo install watchexec
@@ -18,11 +50,13 @@ cargo install watchexec
 
 Make sure your `~/.cargo/bin` is in your `PATH`.
 
-#### Environment Variables
-`TESSERACT_SCHEMA_FILEPATH` should point to the location on disk for the tesseract schema file.
+I also highly recommended using something like [direnv](https://github.com/direnv/direnv) to manage environment variables.
 
-### Run
-`just serve`
+### Dev commands
+From the repo root:
+- `just serve`: serves from debug build, using env vars for options
+- `just deploy {{target}}`: builds `--release` and will scp to target of your choice
+- `just check`: an alias for `watchexec cargo check`
 
 ## Contributors
 
@@ -32,5 +66,5 @@ Also thanks to @MarcioPorto and @jspeis for contributing.
 
 ## License
 
-MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
+MIT license (LICENSE.md or http://opensource.org/licenses/MIT)
 
