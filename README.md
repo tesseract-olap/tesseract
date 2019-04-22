@@ -1,5 +1,9 @@
 # Tesseract
 
+More documentation is coming soon!
+
+For some information on the http API, see `tesseract-server/README.md`.
+
 ## Getting started
 
 ### Prerequisites
@@ -19,3 +23,14 @@ Make sure your `~/.cargo/bin` is in your `PATH`.
 
 ### Run
 `just serve`
+
+## Contributors
+
+Thanks to @Datawheel for supporting this work.
+
+Also thanks to @MarcioPorto and @jspeis for contributing.
+
+## License
+
+MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
+
