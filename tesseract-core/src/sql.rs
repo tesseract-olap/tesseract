@@ -31,6 +31,7 @@ pub(crate) fn standard_sql(
     ) -> String
 {
     // hack for now... remove later
+    // it's unneeded, except for standard_sql
     fn agg_sql_string(m: &MeasureSql) -> String {
         match &m.aggregator {
             Aggregator::Sum => format!("sum({})", &m.column),
@@ -39,6 +40,7 @@ pub(crate) fn standard_sql(
             // median doesn't work like this
             Aggregator::Median => format!("median"),
             Aggregator::WeightedAverage {..} => format!("avg"),
+            Aggregator::WeightedSum {..} => format!(""),
             Aggregator::Moe {..} => format!(""),
             Aggregator::WeightedAverageMoe {..} => format!(""),
             Aggregator::Custom(s) => format!("{}", s),
