@@ -77,6 +77,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn parse_custom() {
         let sum = r#"{ "col": "testcol", "aggregator": { "custom": "{}*{}" } }"#;
         let parsed: Measure = serde_json::from_str(sum).unwrap();

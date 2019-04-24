@@ -123,6 +123,7 @@ mod test {
             CutSql {
                 foreign_key: "project_id".into(),
                 primary_key: "id".into(),
+                inline_table: None,
                 table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
                 column: "id".into(),
                 members: vec!["3".into()],
@@ -138,6 +139,7 @@ mod test {
                 alias_postfix: "".into(),
                 foreign_key: "project_id".into(),
                 primary_key: "id".into(),
+                inline_table: None,
                 table: Table { name: "valid_projects".into(), schema: None, primary_key: None },
                 level_columns: vec![
                     LevelColumn {

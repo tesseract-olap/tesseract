@@ -540,3 +540,108 @@ impl From<AnnotationConfigJson> for Annotation {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::schema::{
+        json::SchemaConfigJson,
+        json::SharedDimensionConfigJson,
+        json::DimensionUsageJson,
+        json::HierarchyConfigJson,
+        json::LevelConfigJson,
+        json::TableConfigJson,
+        json::CubeConfigJson,
+    };
+
+    #[test]
+    fn test_dimension_usage() {
+        let schema_config = SchemaConfigJson {
+            name: "test".into(),
+            shared_dimensions: Some(vec![
+                SharedDimensionConfigJson {
+                    name: "geo".into(),
+                    hierarchies: vec![
+                        HierarchyConfigJson {
+                            name: "geo".into(),
+                            table: Some(TableConfigJson {
+                                name: "geo_table".into(),
+                                schema: None,
+                                primary_key: None,
+                            }),
+                            primary_key: Some("geoid".into()),
+                            levels: vec![
+                                LevelConfigJson {
+                                    name: "tract".into(),
+                                    key_column: "geoid".into(),
+                                    name_column: None,
+                                    properties: None,
+                                    key_type: None,
+                                    annotations: None,
+                                },
+                            ],
+                            annotations: None,
+                            inline_table: None,
+                        },
+                    ],
+                    annotations: None,
+                }
+            ]),
+            cubes: vec![
+                CubeConfigJson {
+                    name: "test_cube".into(),
+                    table: TableConfigJson {
+                        name: "fact_table".into(),
+                        schema: None,
+                        primary_key: None,
+                    },
+                    dimensions: vec![],
+                    dimension_usages: Some(vec![
+                        DimensionUsageJson {
+                            name: "geo".into(),
+                            foreign_key: "fact_geoid".into(),
+                            annotations: None,
+                        }
+                    ]),
+                    measures: vec![],
+                    annotations: None,
+                }
+            ],
+            annotations: None,
+        };
+
+        let schema: Schema = schema_config.into();
+        println!("{:#?}", schema);
+        assert_eq!(schema.cubes[0].dimensions.len(), 1);
+    }
+
+    // End to end, from xml
+    use serde_xml_rs::from_reader;
+
+    #[test]
+    fn xml_to_config() {
+        let s = r##"
+            <Schema name="my_schema">
+                <SharedDimension name="Geo">
+                    <Hierarchy name="Geo">
+                        <Level name="Tract" key_column="geoid" />
+                    </Hierarchy>
+                </SharedDimension>
+                <Cube name="my_cube">
+                    <Table name="my_table" />
+                    <Dimension name="my_dim">
+                        <Hierarchy name="my_hier">
+                            <Level name="my_level" key_column="key" />
+                        </Hierarchy>
+                    </Dimension>
+                    <Measure name="my_mea" column="mea" aggregator="sum" />
+                </Cube>
+            </Schema>
+        "##;
+        let xml_schema_config: SchemaConfigXML = from_reader(s.as_bytes()).unwrap();
+        let json_str = serde_json::to_string(&xml_schema_config).unwrap();
+        let json_schema_config: SchemaConfigJson = serde_json::from_str(&json_str).unwrap();
+        println!("{:#?}", json_schema_config);
+        panic!()
+    }
+}
