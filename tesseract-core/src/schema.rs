@@ -642,6 +642,5 @@ mod test {
         let json_str = serde_json::to_string(&xml_schema_config).unwrap();
         let json_schema_config: SchemaConfigJson = serde_json::from_str(&json_str).unwrap();
         println!("{:#?}", json_schema_config);
-        panic!()
     }
 }
