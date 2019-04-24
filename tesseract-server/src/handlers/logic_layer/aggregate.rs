@@ -72,6 +72,8 @@ pub fn logic_layer_aggregation(
 
     let mut agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
         Ok(mut q) => {
+            // Check to see if the logic layer config has a alias with the
+            // provided cube name
             cube_name = match logic_layer_config.clone() {
                 Some(llc) => {
                     match llc.sub_cube_name(q.cube.clone()) {
@@ -86,6 +88,8 @@ pub fn logic_layer_aggregation(
                 Ok(c) => c.clone(),
                 Err(err) => return boxed_error(err.to_string())
             };
+
+            // TODO: Check for level and property aliases
 
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());

@@ -12,12 +12,13 @@ use futures::future::Err;
 pub struct LogicLayerConfig {
     pub aliases: Option<AliasConfig>,
     pub named_sets: Option<Vec<NamedSetsConfig>>,
-    pub name_substitutions: Option<NameSubstitutionsConfig>
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AliasConfig {
     pub cubes: Option<Vec<CubeAliasConfig>>,
+    pub levels: Option<Vec<LevelPropertyConfig>>,
+    pub properties: Option<Vec<LevelPropertyConfig>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -38,21 +39,10 @@ pub struct NamedSetConfig {
     pub values: Vec<String>
 }
 
+// TODO: Might want to consider eventually sharing the same structure as the current CubeAliasConfig
 #[derive(Debug, Clone, Deserialize)]
-pub struct NameSubstitutionsConfig {
-    levels: Option<Vec<NameSubstitutionsLevelConfig>>,
-    properties: Option<Vec<NameSubstitutionsPropertyConfig>>
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct NameSubstitutionsLevelConfig {
-    level: String,
-    unique_name: String
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct NameSubstitutionsPropertyConfig {
-    property: String,
+pub struct LevelPropertyConfig {
+    current_name: String,
     unique_name: String
 }
 
@@ -163,10 +153,10 @@ impl LogicLayerConfig {
 
     /// Returns a unique name definition for a given level if there is one.
     pub fn find_unique_level_name(&self, level_name: &LevelName) -> Result<Option<&str>, Error> {
-        if let Some(name_substitutions) = &self.name_substitutions {
-            if let Some(levels) = &name_substitutions.levels {
+        if let Some(aliases) = &self.aliases {
+            if let Some(levels) = &aliases.levels {
                 for level in levels {
-                    let ll_level_name: LevelName = level.level.parse()?;
+                    let ll_level_name: LevelName = level.current_name.parse()?;
 
                     if &ll_level_name == level_name {
                         return Ok(Some(&level.unique_name))
@@ -179,10 +169,10 @@ impl LogicLayerConfig {
 
     /// Returns a unique name definition for a given property if there is one.
     pub fn find_unique_property_name(&self, property_name: &Property) -> Result<Option<&str>, Error> {
-        if let Some(name_substitutions) = &self.name_substitutions {
-            if let Some(properties) = &name_substitutions.properties {
+        if let Some(aliases) = &self.aliases {
+            if let Some(properties) = &aliases.properties {
                 for property in properties {
-                    let ll_property_name: Property = property.property.parse()?;
+                    let ll_property_name: Property = property.current_name.parse()?;
 
                     if &ll_property_name == property_name {
                         return Ok(Some(&property.unique_name))
