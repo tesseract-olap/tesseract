@@ -131,7 +131,7 @@ fn main() -> Result<(), Error> {
         Ok(config_path) => {
             let logic_layer_config = match logic_layer::read_config(&config_path) {
                 Ok(config_obj) => {
-                    has_unique_levels_properties = config_obj.has_unique_levels_properties(&schema);
+                    has_unique_levels_properties = config_obj.has_unique_levels_properties(&schema)?;
                     config_obj
                 },
                 Err(err) => return Err(err)

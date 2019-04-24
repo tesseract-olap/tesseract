@@ -162,44 +162,40 @@ impl LogicLayerConfig {
     }
 
     /// Returns a unique name definition for a given level if there is one.
-    pub fn find_unique_level_name(&self, level_name: &LevelName) -> Option<&str> {
+    pub fn find_unique_level_name(&self, level_name: &LevelName) -> Result<Option<&str>, Error> {
         if let Some(name_substitutions) = &self.name_substitutions {
             if let Some(levels) = &name_substitutions.levels {
                 for level in levels {
-                    let ll_level_name: Result<LevelName, Error> = level.level.parse();
+                    let ll_level_name: LevelName = level.level.parse()?;
 
-                    if let Ok(ll_level_name) = ll_level_name {
-                        if &ll_level_name == level_name {
-                            return Some(&level.unique_name)
-                        }
+                    if &ll_level_name == level_name {
+                        return Ok(Some(&level.unique_name))
                     }
                 }
             }
         }
-        None
+        Ok(None)
     }
 
     /// Returns a unique name definition for a given property if there is one.
-    pub fn find_unique_property_name(&self, property_name: &Property) -> Option<&str> {
+    pub fn find_unique_property_name(&self, property_name: &Property) -> Result<Option<&str>, Error> {
         if let Some(name_substitutions) = &self.name_substitutions {
             if let Some(properties) = &name_substitutions.properties {
                 for property in properties {
-                    let ll_property_name: Result<Property, Error> = property.property.parse();
+                    let ll_property_name: Property = property.property.parse()?;
 
-                    if let Ok(ll_property_name) = ll_property_name {
-                        if &ll_property_name == property_name {
-                            return Some(&property.unique_name)
-                        }
+                    if &ll_property_name == property_name {
+                        return Ok(Some(&property.unique_name))
                     }
                 }
             }
         }
-        None
+        Ok(None)
     }
 
     /// Ensures level and property names are unique inside each cube based on
     /// name substitutions from a logic layer configuration.
-    pub fn has_unique_levels_properties(&self, schema: &Schema) -> bool {
+    pub fn has_unique_levels_properties(&self, schema: &Schema) -> Result<bool, Error> {
         for cube in &schema.cubes {
             let mut levels = HashSet::new();
             let mut properties = HashSet::new();
@@ -215,13 +211,13 @@ impl LogicLayerConfig {
                             level.name.clone()
                         );
 
-                        let unique_level_name = match self.find_unique_level_name(&level_name) {
+                        let unique_level_name = match self.find_unique_level_name(&level_name)? {
                             Some(unique_level_name) => unique_level_name,
                             None => &level.name
                         };
 
                         if !levels.insert(unique_level_name) {
-                            return false
+                            return Ok(false)
                         }
 
                         if let Some(ref props) = level.properties {
@@ -233,13 +229,13 @@ impl LogicLayerConfig {
                                     property.name.clone()
                                 );
 
-                                let unique_property_name = match self.find_unique_property_name(&property_name) {
+                                let unique_property_name = match self.find_unique_property_name(&property_name)? {
                                     Some(unique_property_name) => unique_property_name,
                                     None => &property.name
                                 };
 
                                 if !properties.insert(unique_property_name) {
-                                    return false
+                                    return Ok(false)
                                 }
                             }
                         }
@@ -248,6 +244,6 @@ impl LogicLayerConfig {
             }
         }
 
-        true
+        Ok(true)
     }
 }
