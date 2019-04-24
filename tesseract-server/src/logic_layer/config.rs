@@ -4,6 +4,8 @@ use std::collections::HashSet;
 use serde_derive::Deserialize;
 use serde_json;
 use tesseract_core::Schema;
+use tesseract_core::names::{LevelName, Property};
+use futures::future::Err;
 
 
 #[derive(Debug, Clone, Deserialize)]
@@ -160,12 +162,16 @@ impl LogicLayerConfig {
     }
 
     /// Returns a unique name definition for a given level if there is one.
-    pub fn find_unique_level_name(&self, level_name: String) -> Option<&str> {
+    pub fn find_unique_level_name(&self, level_name: &LevelName) -> Option<&str> {
         if let Some(name_substitutions) = &self.name_substitutions {
             if let Some(levels) = &name_substitutions.levels {
                 for level in levels {
-                    if level.level == level_name {
-                        return Some(&level.unique_name)
+                    let ll_level_name: Result<LevelName, Error> = level.level.parse();
+
+                    if let Ok(ll_level_name) = ll_level_name {
+                        if &ll_level_name == level_name {
+                            return Some(&level.unique_name)
+                        }
                     }
                 }
             }
@@ -174,12 +180,16 @@ impl LogicLayerConfig {
     }
 
     /// Returns a unique name definition for a given property if there is one.
-    pub fn find_unique_property_name(&self, property_name: String) -> Option<&str> {
+    pub fn find_unique_property_name(&self, property_name: &Property) -> Option<&str> {
         if let Some(name_substitutions) = &self.name_substitutions {
             if let Some(properties) = &name_substitutions.properties {
                 for property in properties {
-                    if property.property == property_name {
-                        return Some(&property.unique_name)
+                    let ll_property_name: Result<Property, Error> = property.property.parse();
+
+                    if let Ok(ll_property_name) = ll_property_name {
+                        if &ll_property_name == property_name {
+                            return Some(&property.unique_name)
+                        }
                     }
                 }
             }
@@ -199,11 +209,13 @@ impl LogicLayerConfig {
 
                     // Check each cube for unique level and property names
                     for level in &hierarchy.levels {
-                        let level_name = format!(
-                            "[{}].[{}].[{}]", &dimension.name, &hierarchy.name, &level.name
+                        let level_name = LevelName::new(
+                            dimension.name.clone(),
+                            hierarchy.name.clone(),
+                            level.name.clone()
                         );
 
-                        let unique_level_name = match self.find_unique_level_name(level_name) {
+                        let unique_level_name = match self.find_unique_level_name(&level_name) {
                             Some(unique_level_name) => unique_level_name,
                             None => &level.name
                         };
@@ -214,12 +226,14 @@ impl LogicLayerConfig {
 
                         if let Some(ref props) = level.properties {
                             for property in props {
-                                let property_name = format!(
-                                    "[{}].[{}].[{}].[{}]", &dimension.name,
-                                    &hierarchy.name, &level.name, &property.name
+                                let property_name = Property::new(
+                                    dimension.name.clone(),
+                                    hierarchy.name.clone(),
+                                    level.name.clone(),
+                                    property.name.clone()
                                 );
 
-                                let unique_property_name = match self.find_unique_property_name(property_name) {
+                                let unique_property_name = match self.find_unique_property_name(&property_name) {
                                     Some(unique_property_name) => unique_property_name,
                                     None => &property.name
                                 };
