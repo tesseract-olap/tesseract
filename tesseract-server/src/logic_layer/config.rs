@@ -3,12 +3,14 @@ use std::collections::HashSet;
 
 use serde_derive::Deserialize;
 use serde_json;
+use tesseract_core::Schema;
 
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerConfig {
     pub aliases: Option<AliasConfig>,
     pub named_sets: Option<Vec<NamedSetsConfig>>,
+    pub name_substitutions: Option<NameSubstitutionsConfig>
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -32,6 +34,24 @@ pub struct NamedSetsConfig {
 pub struct NamedSetConfig {
     pub set_name: String,
     pub values: Vec<String>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NameSubstitutionsConfig {
+    levels: Option<Vec<NameSubstitutionsLevelConfig>>,
+    properties: Option<Vec<NameSubstitutionsPropertyConfig>>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NameSubstitutionsLevelConfig {
+    level: String,
+    unique_name: String
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NameSubstitutionsPropertyConfig {
+    property: String,
+    unique_name: String
 }
 
 
@@ -137,5 +157,83 @@ impl LogicLayerConfig {
             },
             None => cut
         }
+    }
+
+    /// Returns a unique name definition for a given level if there is one.
+    pub fn find_unique_level_name(&self, level_name: String) -> Option<&str> {
+        if let Some(name_substitutions) = &self.name_substitutions {
+            if let Some(levels) = &name_substitutions.levels {
+                for level in levels {
+                    if level.level == level_name {
+                        return Some(&level.unique_name)
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns a unique name definition for a given property if there is one.
+    pub fn find_unique_property_name(&self, property_name: String) -> Option<&str> {
+        if let Some(name_substitutions) = &self.name_substitutions {
+            if let Some(properties) = &name_substitutions.properties {
+                for property in properties {
+                    if property.property == property_name {
+                        return Some(&property.unique_name)
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Ensures level and property names are unique inside each cube based on
+    /// name substitutions from a logic layer configuration.
+    pub fn has_unique_levels_properties(&self, schema: &Schema) -> bool {
+        for cube in &schema.cubes {
+            let mut levels = HashSet::new();
+            let mut properties = HashSet::new();
+
+            for dimension in &cube.dimensions {
+                for hierarchy in &dimension.hierarchies {
+
+                    // Check each cube for unique level and property names
+                    for level in &hierarchy.levels {
+                        let level_name = format!(
+                            "[{}].[{}].[{}]", &dimension.name, &hierarchy.name, &level.name
+                        );
+
+                        let unique_level_name = match self.find_unique_level_name(level_name) {
+                            Some(unique_level_name) => unique_level_name,
+                            None => &level.name
+                        };
+
+                        if !levels.insert(unique_level_name) {
+                            return false
+                        }
+
+                        if let Some(ref props) = level.properties {
+                            for property in props {
+                                let property_name = format!(
+                                    "[{}].[{}].[{}].[{}]", &dimension.name,
+                                    &hierarchy.name, &level.name, &property.name
+                                );
+
+                                let unique_property_name = match self.find_unique_property_name(property_name) {
+                                    Some(unique_property_name) => unique_property_name,
+                                    None => &property.name
+                                };
+
+                                if !properties.insert(unique_property_name) {
+                                    return false
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        true
     }
 }

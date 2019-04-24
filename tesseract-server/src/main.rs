@@ -106,7 +106,7 @@ fn main() -> Result<(), Error> {
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
     let schema = schema_config::read_schema(&schema_path)?;
-    let has_unique_levels_properties = schema.has_unique_levels_properties();
+    let mut has_unique_levels_properties = schema.has_unique_levels_properties();
     let schema_arc = Arc::new(RwLock::new(schema.clone()));
 
     // Env
@@ -130,7 +130,10 @@ fn main() -> Result<(), Error> {
     let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
         Ok(config_path) => {
             let logic_layer_config = match logic_layer::read_config(&config_path) {
-                Ok(config_obj) => config_obj,
+                Ok(config_obj) => {
+                    has_unique_levels_properties = config_obj.has_unique_levels_properties(&schema);
+                    config_obj
+                },
                 Err(err) => return Err(err)
             };
             Some(Arc::new(RwLock::new(logic_layer_config)))
