@@ -17,14 +17,14 @@ pub struct LogicLayerConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AliasConfig {
     pub cubes: Option<Vec<CubeAliasConfig>>,
-    pub levels: Option<Vec<LevelPropertyConfig>>,
-    pub properties: Option<Vec<LevelPropertyConfig>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CubeAliasConfig {
     pub name: String,
-    pub alternatives: Vec<String>
+    pub alternatives: Vec<String>,
+    pub levels: Option<Vec<LevelPropertyConfig>>,
+    pub properties: Option<Vec<LevelPropertyConfig>>
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -152,14 +152,22 @@ impl LogicLayerConfig {
     }
 
     /// Returns a unique name definition for a given level if there is one.
-    pub fn find_unique_level_name(&self, level_name: &LevelName) -> Result<Option<&str>, Error> {
+    pub fn find_unique_level_name(
+        &self, cube_name: &String, level_name: &LevelName
+    ) -> Result<Option<&str>, Error> {
         if let Some(aliases) = &self.aliases {
-            if let Some(levels) = &aliases.levels {
-                for level in levels {
-                    let ll_level_name: LevelName = level.current_name.parse()?;
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        if let Some(levels) = &cube.levels {
+                            for level in levels {
+                                let ll_level_name: LevelName = level.current_name.parse()?;
 
-                    if &ll_level_name == level_name {
-                        return Ok(Some(&level.unique_name))
+                                if &ll_level_name == level_name {
+                                    return Ok(Some(&level.unique_name))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -168,14 +176,22 @@ impl LogicLayerConfig {
     }
 
     /// Returns a unique name definition for a given property if there is one.
-    pub fn find_unique_property_name(&self, property_name: &Property) -> Result<Option<&str>, Error> {
+    pub fn find_unique_property_name(
+        &self, cube_name: &String, property_name: &Property
+    ) -> Result<Option<&str>, Error> {
         if let Some(aliases) = &self.aliases {
-            if let Some(properties) = &aliases.properties {
-                for property in properties {
-                    let ll_property_name: Property = property.current_name.parse()?;
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        if let Some(properties) = &cube.properties {
+                            for property in properties {
+                                let ll_property_name: Property = property.current_name.parse()?;
 
-                    if &ll_property_name == property_name {
-                        return Ok(Some(&property.unique_name))
+                                if &ll_property_name == property_name {
+                                    return Ok(Some(&property.unique_name))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -190,6 +206,8 @@ impl LogicLayerConfig {
             let mut levels = HashSet::new();
             let mut properties = HashSet::new();
 
+            // TODO: Populate these hashsets with any shared dimension information
+
             for dimension in &cube.dimensions {
                 for hierarchy in &dimension.hierarchies {
 
@@ -201,7 +219,7 @@ impl LogicLayerConfig {
                             level.name.clone()
                         );
 
-                        let unique_level_name = match self.find_unique_level_name(&level_name)? {
+                        let unique_level_name = match self.find_unique_level_name(&cube.name, &level_name)? {
                             Some(unique_level_name) => unique_level_name,
                             None => &level.name
                         };
@@ -219,7 +237,7 @@ impl LogicLayerConfig {
                                     property.name.clone()
                                 );
 
-                                let unique_property_name = match self.find_unique_property_name(&property_name)? {
+                                let unique_property_name = match self.find_unique_property_name(&cube.name, &property_name)? {
                                     Some(unique_property_name) => unique_property_name,
                                     None => &property.name
                                 };

@@ -89,7 +89,12 @@ pub fn logic_layer_aggregation(
                 Err(err) => return boxed_error(err.to_string())
             };
 
-            // TODO: Check for level and property aliases
+//            // TODO: Check for level and property aliases
+//            if let Some(drills) = q.drilldowns {
+//                for drill in drills {
+//
+//                }
+//            }
 
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());
