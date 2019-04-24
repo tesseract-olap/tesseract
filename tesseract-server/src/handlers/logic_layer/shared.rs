@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::names::{Cut, Drilldown, Property, Measure, Mask};
+use tesseract_core::names::{Cut, Drilldown, Property, Measure};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
 use tesseract_core::Query as TsQuery;
 use tesseract_core::schema::{Cube};
@@ -247,6 +247,34 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         }
                     } else {
                         continue
+                    }
+
+                    // if parents, check captions for parent levels
+                    // Same logic as above, for checking captions for a level
+                    let parents = cube.get_level_parents(&drill_value).unwrap_or(vec![]);
+                    for parent_level in parents {
+                        if let Some(ref props) = parent_level.properties {
+                            for prop in props {
+                                if let Some(ref cap) = prop.caption_set {
+                                    for locale in &locales {
+                                        if locale == cap {
+                                            captions.push(
+                                                Property::new(
+                                                    dimension.clone(),
+                                                    hierarchy.clone(),
+                                                    parent_level.name.clone(),
+                                                    prop.name.clone(),
+                                                )
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    continue
+                                }
+                            }
+                        } else {
+                            continue
+                        }
                     }
                 }
 
