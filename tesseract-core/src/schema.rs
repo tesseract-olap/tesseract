@@ -101,6 +101,7 @@ impl From<SchemaConfigJson> for Schema {
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
                                     hierarchies,
                                     annotations: dim_annotations,
+                                    is_shared: true
                                 });
                             }
                         }
@@ -229,6 +230,7 @@ pub struct Dimension {
     pub foreign_key: Option<String>,
     pub hierarchies: Vec<Hierarchy>,
     pub annotations: Option<Vec<Annotation>>,
+    pub is_shared: bool
 }
 
 impl From<DimensionConfigJson> for Dimension {
@@ -248,6 +250,7 @@ impl From<DimensionConfigJson> for Dimension {
             foreign_key: dimension_config.foreign_key,
             hierarchies,
             annotations,
+            is_shared: false
         }
     }
 }
