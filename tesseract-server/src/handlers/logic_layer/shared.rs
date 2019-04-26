@@ -454,45 +454,14 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             .map(|ps| {
                 let mut properties: Vec<Property> = vec![];
 
-                for property_name in LogicLayerQueryOpt::deserialize_args(ps) {
-                    // Check if there is an alias defined with this name
-                    let prop = match &ll_config {
-                        Some(ll_conf) => {
-                            ll_conf.deconstruct_property_alias(
-                                &cube.name,
-                                &property_name,
-                                &schema
-                            )
-                        },
-                        None => None
+                for property_value in LogicLayerQueryOpt::deserialize_args(ps) {
+                    // TODO: Break or bail?
+                    let property = match property_map.get(&property_value) {
+                        Some(p) => p,
+                        None => break
                     };
 
-                    let property = match prop {
-                        Some(p) => {
-                            let prop_split: Vec<String> = p.split(".").map(|s| s.to_string()).collect();
-                            Property::new(
-                                prop_split[0].clone(),
-                                prop_split[1].clone(),
-                                prop_split[2].clone(),
-                                prop_split[3].clone()
-                            )
-                        },
-                        None => {
-                            let (dimension, hierarchy, level) = match cube.identify_property(property_name.clone()) {
-                                Ok(dhl) => dhl,
-                                Err(_) => break
-                            };
-
-                            Property::new(
-                                dimension.clone(),
-                                hierarchy.clone(),
-                                level.clone(),
-                                property_name.clone()
-                            )
-                        }
-                    };
-
-                    properties.push(property);
+                    properties.push(property.clone());
                 }
 
                 properties

@@ -221,6 +221,24 @@ impl Cube {
 
         Err(format_err!("'{}' not found", property_name))
     }
+
+    /// Returns a Level object corresponding to a provided LevelName.
+    pub fn get_level(&self, level_name: &LevelName) -> Option<Level> {
+        for dimension in &self.dimensions {
+            if dimension.name == level_name.dimension {
+                for hierarchy in &dimension.hierarchies {
+                    if hierarchy.name == level_name.hierarchy {
+                        for level in &hierarchy.levels {
+                            if level.name == level_name.level {
+                                return Some(level.clone())
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 
