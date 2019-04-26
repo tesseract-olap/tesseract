@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::names::{Cut, Drilldown, Property, Measure, Mask};
+use tesseract_core::names::{Cut, Drilldown, Property, Measure, Mask, LevelName};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
 use tesseract_core::{Query as TsQuery, Schema};
 use tesseract_core::schema::{Cube};
@@ -174,16 +174,144 @@ impl LogicLayerQueryOpt {
 
         arg_vec
     }
+
+//    pub fn resolve_level(&self, level_name: &str) {
+//        let schema = match agg_query_opt.schema {
+//            Some(s) => s,
+//            None => bail!("Error setting schema")
+//        };
+//
+//        // Check if there is an alias defined with this name
+//        let aliased_level = match &self.config {
+//            Some(ll_config) => {
+//                ll_config.deconstruct_level_alias(
+//                    &self.cube,
+//                    &level_value,
+//                    &schema
+//                )
+//            },
+//            None => None
+//        };
+//    }
+
+    pub fn get_level_map(&self, cube: &Cube) -> Result<HashMap<String, LevelName>, Error> {
+        let mut level_name_map = HashMap::new();
+
+        for dimension in &cube.dimensions {
+            for hierarchy in &dimension.hierarchies {
+                for level in &hierarchy.levels {
+                    let level_name = LevelName::new(
+                        dimension.name.clone(),
+                        hierarchy.name.clone(),
+                        level.name.clone()
+                    );
+
+                    let unique_level_name = match &self.config {
+                        Some(ll_config) => {
+                            let unique_level_name_opt = if dimension.is_shared {
+                                ll_config.find_unique_shared_dimension_level_name(
+                                    &dimension.name, &level_name
+                                )?
+                            } else {
+                                ll_config.find_unique_cube_level_name(
+                                    &cube.name, &level_name
+                                )?
+                            };
+
+                            match unique_level_name_opt {
+                                Some(unique_level_name) => unique_level_name,
+                                None => &level.name
+                            }
+                        },
+                        None => &level.name
+                    };
+
+                    level_name_map.insert(
+                        unique_level_name.to_string(),
+                        level_name
+                    );
+                }
+            }
+        }
+
+        Ok(level_name_map)
+    }
+
+    pub fn get_property_map(&self, cube: &Cube) -> Result<HashMap<String, Property>, Error> {
+        let mut property_map = HashMap::new();
+
+        for dimension in &cube.dimensions {
+            for hierarchy in &dimension.hierarchies {
+                for level in &hierarchy.levels {
+                    if let Some(ref props) = level.properties {
+                        for prop in props {
+                            let property = Property::new(
+                                dimension.name.clone(),
+                                hierarchy.name.clone(),
+                                level.name.clone(),
+                                prop.name.clone()
+                            );
+
+                            let unique_property_name = match &self.config {
+                                Some(ll_config) => {
+                                    let unique_property_name_opt = if dimension.is_shared {
+                                        ll_config.find_unique_shared_dimension_property_name(
+                                            &dimension.name, &property
+                                        )?
+                                    } else {
+                                        ll_config.find_unique_cube_property_name(
+                                            &cube.name, &property
+                                        )?
+                                    };
+
+                                    match unique_property_name_opt {
+                                        Some(unique_property_name) => unique_property_name,
+                                        None => &prop.name
+                                    }
+                                },
+                                None => &prop.name
+                            };
+
+                            property_map.insert(
+                                unique_property_name.to_string(),
+                                property
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(property_map)
+    }
 }
 
 impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
 
     fn try_from(agg_query_opt: LogicLayerQueryOpt) -> Result<Self, Self::Error> {
-        let cube = match agg_query_opt.cube_obj {
+        let cube = match agg_query_opt.clone().cube_obj {
             Some(c) => c,
             None => bail!("No cubes found with the given name")
         };
+
+        let level_map_res = agg_query_opt.clone().get_level_map(&cube);
+        let level_map = match level_map_res {
+            Ok(m) => m,
+            Err(err) => bail!("Unable to construct unique level name map")
+        };
+
+        let property_map = match agg_query_opt.clone().get_property_map(&cube) {
+            Ok(m) => m,
+            Err(err) => bail!("Unable to construct unique level name map")
+        };
+
+
+        println!(" ");
+        println!("{:?}", level_map);
+        println!("{:?}", property_map);
+        println!(" ");
+
 
         let schema = match agg_query_opt.schema {
             Some(s) => s,
@@ -205,35 +333,46 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
         let ll_config = agg_query_opt.config.clone();
 
-        // TODO: Check for level and property aliases (in drilldowns, cuts, properties)
-
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
 
-                for l in LogicLayerQueryOpt::deserialize_args(ds) {
-                    // Check logic layer config for any drill substitutions
-                    let drill_value = match ll_config.clone() {
-                        Some(llc) => {
-                            match llc.substitute_drill_value(l.clone()) {
+                for level_value in LogicLayerQueryOpt::deserialize_args(ds) {
+                    // Check logic layer config for any named set substitutions
+                    let level_key = match ll_config.clone() {
+                        Some(ll_conf) => {
+                            match ll_conf.substitute_drill_value(level_value.clone()) {
                                 Some(ln) => {
-                                    agg_query_opt_cuts.entry(ln.clone()).or_insert(l.clone());
+                                    agg_query_opt_cuts
+                                        .entry(ln.clone())
+                                        .or_insert(level_value.clone());
                                     ln
                                 },
-                                None => l.clone()
+                                None => level_value.clone()
                             }
                         },
-                        None => l.clone()
+                        None => level_value.clone()
                     };
 
-                    let (dimension, hierarchy, level) = match cube.identify_level(drill_value.clone()) {
-                        Ok(dhl) => dhl,
-                        Err(_) => break
+                    // TODO: Break or bail?
+                    let level_name = match level_map.get(&level_key) {
+                        Some(l) => l,
+                        None => break
                     };
-                    let d = Drilldown::new(
-                        dimension.clone(), hierarchy.clone(), drill_value.clone()
+
+                    // TODO: Break or bail?
+                    let level = match cube.get_level(level_name) {
+                        Some(l) => l,
+                        None => break
+                    };
+
+                    let drilldown = Drilldown::new(
+                        level_name.dimension.clone(),
+                        level_name.hierarchy.clone(),
+                        level_name.level.clone()
                     );
-                    drilldowns.push(d);
+
+                    drilldowns.push(drilldown);
 
                     // Check for captions for this level
                     if let Some(props) = level.properties {
@@ -243,9 +382,10 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                                     if locale == cap {
                                         captions.push(
                                             Property::new(
-                                                dimension.clone(),
-                                                hierarchy.clone(),
-                                                l.clone(), prop.name.clone()
+                                                level_name.dimension.clone(),
+                                                level_name.hierarchy.clone(),
+                                                level_name.level.clone(),
+                                                prop.name.clone()
                                             )
                                         )
                                     }
