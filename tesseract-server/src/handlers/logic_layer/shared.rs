@@ -498,15 +498,20 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     return Err(format_err!("Bad formatting for growth param."));
                 }
 
-                let level = gro_split[0].clone();
+                let level_key = gro_split[0].clone();
                 let measure = gro_split[1].clone();
 
-                let (dimension, hierarchy, _) = match cube.identify_level(level.clone()) {
-                    Ok(dh) => dh,
-                    Err(_) => return Err(format_err!("Unable to identify growth level."))
+                let level_name = match level_map.get(&level_key) {
+                    Some(l) => l,
+                    None => bail!("Unable to find growth level")
                 };
 
-                let growth = GrowthQuery::new(dimension, hierarchy, level, measure);
+                let growth = GrowthQuery::new(
+                    level_name.dimension.clone(),
+                    level_name.hierarchy.clone(),
+                    level_name.level.clone(),
+                    measure
+                );
 
                 Some(growth)
             },
@@ -521,23 +526,27 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     return Err(format_err!("Bad formatting for RCA param."));
                 }
 
-                let drill1_l = rca_split[0].clone();
-                let drill2_l = rca_split[1].clone();
+                let drill1_level_key = rca_split[0].clone();
+                let drill2_level_key = rca_split[1].clone();
                 let measure = rca_split[2].clone();
 
-                let (drill1_d, drill1_h, _) = match cube.identify_level(drill1_l.clone()) {
-                    Ok(dh) => dh,
-                    Err(_) => return Err(format_err!("Unable to identify RCA drilldown #1 level."))
+                let level_name_1 = match level_map.get(&drill1_level_key) {
+                    Some(l) => l,
+                    None => bail!("Unable to find drill 1 level")
                 };
 
-                let (drill2_d, drill2_h, _) = match cube.identify_level(drill2_l.clone()) {
-                    Ok(dh) => dh,
-                    Err(_) => return Err(format_err!("Unable to identify RCA drilldown #2 level."))
+                let level_name_2 = match level_map.get(&drill2_level_key) {
+                    Some(l) => l,
+                    None => bail!("Unable to find drill 2 level")
                 };
 
                 let rca = RcaQuery::new(
-                    drill1_d, drill1_h, drill1_l,
-                    drill2_d, drill2_h, drill2_l,
+                    level_name_1.dimension.clone(),
+                    level_name_1.hierarchy.clone(),
+                    level_name_1.level.clone(),
+                    level_name_2.dimension.clone(),
+                    level_name_2.hierarchy.clone(),
+                    level_name_2.level.clone(),
                     measure
                 );
 
