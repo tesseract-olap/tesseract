@@ -145,6 +145,60 @@ impl FindUnique for SharedDimensionAliasConfig {
 }
 
 
+trait DeconstructAlias {
+    fn find_level_name(&self, level_name: &str) -> Option<&str>;
+    fn find_property_name(&self, level_name: &str) -> Option<&str>;
+}
+
+impl DeconstructAlias for CubeAliasConfig {
+    fn find_level_name(&self, level_name: &str) -> Option<&str> {
+        if let Some(levels) = &self.levels {
+            for level in levels {
+                if &level.unique_name == level_name {
+                    return Some(&level.current_name)
+                }
+            }
+        }
+        None
+    }
+
+    fn find_property_name(&self, property_name: &str) -> Option<&str> {
+        if let Some(properties) = &self.properties {
+            for property in properties {
+                if &property.unique_name == property_name {
+                    return Some(&property.current_name)
+                }
+            }
+        }
+        None
+    }
+}
+
+impl DeconstructAlias for SharedDimensionAliasConfig {
+    fn find_level_name(&self, level_name: &str) -> Option<&str> {
+        if let Some(levels) = &self.levels {
+            for level in levels {
+                if &level.unique_name == level_name {
+                    return Some(&level.current_name)
+                }
+            }
+        }
+        None
+    }
+
+    fn find_property_name(&self, property_name: &str) -> Option<&str> {
+        if let Some(properties) = &self.properties {
+            for property in properties {
+                if &property.unique_name == property_name {
+                    return Some(&property.current_name)
+                }
+            }
+        }
+        None
+    }
+}
+
+
 /// Reads Logic Layer Config JSON file.
 pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
     let config_str = std::fs::read_to_string(&config_path)
@@ -333,8 +387,8 @@ impl LogicLayerConfig {
             let mut properties = HashSet::new();
 
             for dimension in &cube.dimensions {
-                println!("{:?}", dimension.name);
-                println!("{:?}", dimension.is_shared);
+//                println!("{:?}", dimension.name);
+//                println!("{:?}", dimension.is_shared);
 
                 for hierarchy in &dimension.hierarchies {
 
@@ -400,5 +454,67 @@ impl LogicLayerConfig {
         }
 
         Ok(true)
+    }
+
+    pub fn find_cube_property_name(&self, cube_name: &String, property_name: &str) -> Option<&str> {
+        if let Some(aliases) = &self.aliases {
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        let res = cube.find_level_name(&property_name);
+                        if let Some(res) = res {
+                            return Some(res)
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn find_shared_dimension_property_name(
+        &self, shared_dimension_name: &String, property_name: &str
+    ) -> Option<&str> {
+        if let Some(aliases) = &self.aliases {
+            if let Some(shared_dimensions) = &aliases.shared_dimensions {
+                for shared_dimension in shared_dimensions {
+                    if &shared_dimension.name == shared_dimension_name {
+                        let res = shared_dimension.find_level_name(&property_name);
+                        if let Some(res) = res {
+                            return Some(res)
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn deconstruct_property_alias(
+        &self, cube_name: &str, property_name: &str, schema: &Schema
+    ) -> Option<&str> {
+        for cube in &schema.cubes {
+            if &cube.name == cube_name {
+                for dimension in &cube.dimensions {
+
+                    let property_name_opt = if dimension.is_shared {
+                        self.find_shared_dimension_property_name(
+                            &dimension.name, &property_name
+                        )
+                    } else {
+                        self.find_cube_property_name(
+                            &cube.name, &property_name
+                        )
+                    };
+
+                    if let Some(property_name) = property_name_opt {
+                        return Some(property_name)
+                    }
+
+                }
+            }
+        }
+
+        None
     }
 }

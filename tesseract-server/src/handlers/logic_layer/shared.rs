@@ -11,10 +11,11 @@ use serde_derive::Deserialize;
 
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, Mask};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
-use tesseract_core::Query as TsQuery;
+use tesseract_core::{Query as TsQuery, Schema};
 use tesseract_core::schema::{Cube};
 
 use crate::logic_layer::LogicLayerConfig;
+use crate::Opt;
 
 
 #[derive(Debug, Clone)]
@@ -118,6 +119,7 @@ pub fn boxed_error(message: String) -> FutureResponse<HttpResponse> {
 pub struct LogicLayerQueryOpt {
     pub cube_obj: Option<Cube>,
     pub config: Option<LogicLayerConfig>,
+    pub schema: Option<Schema>,
 
     pub cube: String,
     pub drilldowns: Option<String>,
@@ -183,6 +185,11 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => bail!("No cubes found with the given name")
         };
 
+        let schema = match agg_query_opt.schema {
+            Some(s) => s,
+            None => bail!("Error setting schema")
+        };
+
         let mut captions: Vec<Property> = vec![];
         let locales: Vec<String> = match agg_query_opt.locale {
             Some(l) => l.split(",").map(|s| s.to_string()).collect(),
@@ -197,6 +204,8 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
         };
 
         let ll_config = agg_query_opt.config.clone();
+
+        // TODO: Check for level and property aliases (in drilldowns, cuts, properties)
 
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
@@ -305,16 +314,45 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             .map(|ps| {
                 let mut properties: Vec<Property> = vec![];
 
-                for property in LogicLayerQueryOpt::deserialize_args(ps) {
-                    let (dimension, hierarchy, level) = match cube.identify_property(property.clone()) {
-                        Ok(dhl) => dhl,
-                        Err(_) => break
+                for property_name in LogicLayerQueryOpt::deserialize_args(ps) {
+                    // Check if there is an alias defined with this name
+                    let prop = match &ll_config {
+                        Some(ll_conf) => {
+                            ll_conf.deconstruct_property_alias(
+                                &cube.name,
+                                &property_name,
+                                &schema
+                            )
+                        },
+                        None => None
                     };
-                    let p = Property::new(
-                        dimension.clone(), hierarchy.clone(),
-                        level.clone(), property.clone()
-                    );
-                    properties.push(p);
+
+                    let property = match prop {
+                        Some(p) => {
+                            let prop_split: Vec<String> = p.split(".").map(|s| s.to_string()).collect();
+                            Property::new(
+                                prop_split[0].clone(),
+                                prop_split[1].clone(),
+                                prop_split[2].clone(),
+                                prop_split[3].clone()
+                            )
+                        },
+                        None => {
+                            let (dimension, hierarchy, level) = match cube.identify_property(property_name.clone()) {
+                                Ok(dhl) => dhl,
+                                Err(_) => break
+                            };
+
+                            Property::new(
+                                dimension.clone(),
+                                hierarchy.clone(),
+                                level.clone(),
+                                property_name.clone()
+                            )
+                        }
+                    };
+
+                    properties.push(property);
                 }
 
                 properties
