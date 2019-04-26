@@ -200,10 +200,10 @@ impl LogicLayerQueryOpt {
 
                             match unique_level_name_opt {
                                 Some(unique_level_name) => unique_level_name,
-                                None => &level.name
+                                None => level.name.clone()
                             }
                         },
-                        None => &level.name
+                        None => level.name.clone()
                     };
 
                     level_name_map.insert(
@@ -246,10 +246,10 @@ impl LogicLayerQueryOpt {
 
                                     match unique_property_name_opt {
                                         Some(unique_property_name) => unique_property_name,
-                                        None => &prop.name
+                                        None => prop.name.clone()
                                     }
                                 },
-                                None => &prop.name
+                                None => prop.name.clone()
                             };
 
                             property_map.insert(

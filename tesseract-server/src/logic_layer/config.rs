@@ -54,95 +54,76 @@ pub struct LevelPropertyConfig {
 }
 
 
-trait FindUnique {
-    fn find_unique_level_name(&self, level_name: &LevelName) -> Result<Option<&str>, Error>;
-    fn find_unique_property_name(&self, level_name: &Property) -> Result<Option<&str>, Error>;
 
-//    fn find_unique_level_name(&self, level_name: &LevelName) -> Result<Option<&str>, Error> {
-//        let levels_opt: Option<Vec<LevelPropertyConfig>> = &self.levels;
-//        if let Some(levels) = levels_opt {
-//            for level in levels {
-//                let ll_level_name: LevelName = level.current_name.parse()?;
-//
-//                if &ll_level_name == level_name {
-//                    return Ok(Some(&level.unique_name))
-//                }
-//            }
-//        }
-//        Ok(None)
-//    }
-//
-//    fn find_unique_property_name(&self, property_name: &Property) -> Result<Option<&str>, Error> {
-//        let properties_opt: Option<Vec<LevelPropertyConfig>> = &self.properties;
-//        if let Some(properties) = properties_opt {
-//            for property in properties {
-//                let ll_property_name: Property = property.current_name.parse()?;
-//
-//                if &ll_property_name == property_name {
-//                    return Ok(Some(&property.unique_name))
-//                }
-//            }
-//        }
-//        Ok(None)
-//    }
+pub trait GetLevels {
+    fn get_levels(&self) -> Option<Vec<LevelPropertyConfig>>;
 }
 
-impl FindUnique for CubeAliasConfig {
-    fn find_unique_level_name(&self, level_name: &LevelName) -> Result<Option<&str>, Error> {
-        if let Some(levels) = &self.levels {
-            for level in levels {
-                let ll_level_name: LevelName = level.current_name.parse()?;
-
-                if &ll_level_name == level_name {
-                    return Ok(Some(&level.unique_name))
-                }
-            }
-        }
-        Ok(None)
-    }
-
-    fn find_unique_property_name(&self, property_name: &Property) -> Result<Option<&str>, Error> {
-        if let Some(properties) = &self.properties {
-            for property in properties {
-                let ll_property_name: Property = property.current_name.parse()?;
-
-                if &ll_property_name == property_name {
-                    return Ok(Some(&property.unique_name))
-                }
-            }
-        }
-        Ok(None)
+impl GetLevels for CubeAliasConfig {
+    fn get_levels(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.levels.clone()
     }
 }
 
-impl FindUnique for SharedDimensionAliasConfig {
-    fn find_unique_level_name(&self, level_name: &LevelName) -> Result<Option<&str>, Error> {
-        if let Some(levels) = &self.levels {
-            for level in levels {
-                let ll_level_name: LevelName = level.current_name.parse()?;
-
-                if &ll_level_name == level_name {
-                    return Ok(Some(&level.unique_name))
-                }
-            }
-        }
-        Ok(None)
-    }
-
-    fn find_unique_property_name(&self, property_name: &Property) -> Result<Option<&str>, Error> {
-        if let Some(properties) = &self.properties {
-            for property in properties {
-                let ll_property_name: Property = property.current_name.parse()?;
-
-                if &ll_property_name == property_name {
-                    return Ok(Some(&property.unique_name))
-                }
-            }
-        }
-        Ok(None)
+impl GetLevels for SharedDimensionAliasConfig {
+    fn get_levels(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.levels.clone()
     }
 }
 
+pub trait GetProperties {
+    fn get_properties(&self) -> Option<Vec<LevelPropertyConfig>>;
+}
+
+impl GetProperties for CubeAliasConfig {
+    fn get_properties(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.properties.clone()
+    }
+}
+
+impl GetProperties for SharedDimensionAliasConfig {
+    fn get_properties(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.properties.clone()
+    }
+}
+
+pub fn find_unique_level_name<T>(
+        level_name: &LevelName, levels_obj: &T
+    ) -> Result<Option<String>, Error> where T: GetLevels
+{
+    let levels = levels_obj.get_levels();
+
+    if let Some(levels) = &levels {
+        for level in levels {
+            let ll_level_name: LevelName = level.current_name.parse()?;
+
+            if &ll_level_name == level_name {
+                return Ok(Some(level.unique_name.clone()))
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+pub fn find_unique_property_name<T>(
+    property_name: &Property, properties_obj: &T
+) -> Result<Option<String>, Error> where T: GetProperties
+{
+    let properties = properties_obj.get_properties();
+
+    if let Some(properties) = &properties {
+        for property in properties {
+            let ll_property_name: Property = property.current_name.parse()?;
+
+            if &ll_property_name == property_name {
+                return Ok(Some(property.unique_name.clone()))
+            }
+        }
+    }
+
+    Ok(None)
+}
 
 /// Reads Logic Layer Config JSON file.
 pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
@@ -251,12 +232,12 @@ impl LogicLayerConfig {
     /// Returns a unique name definition for a given cube level if there is one.
     pub fn find_unique_cube_level_name(
         &self, cube_name: &String, level_name: &LevelName
-    ) -> Result<Option<&str>, Error> {
+    ) -> Result<Option<String>, Error> {
         if let Some(aliases) = &self.aliases {
             if let Some(cubes) = &aliases.cubes {
                 for cube in cubes {
                     if &cube.name == cube_name {
-                        let res = cube.find_unique_level_name(&level_name)?;
+                        let res = find_unique_level_name(&level_name, cube)?;
                         if let Some(res) = res {
                             return Ok(Some(res))
                         }
@@ -270,12 +251,12 @@ impl LogicLayerConfig {
     /// Returns a unique name definition for a given shared dimension level if there is one.
     pub fn find_unique_shared_dimension_level_name(
         &self, shared_dimension_name: &String, level_name: &LevelName
-    ) -> Result<Option<&str>, Error> {
+    ) -> Result<Option<String>, Error> {
         if let Some(aliases) = &self.aliases {
             if let Some(shared_dimensions) = &aliases.shared_dimensions {
                 for shared_dimension in shared_dimensions {
                     if &shared_dimension.name == shared_dimension_name {
-                        let res = shared_dimension.find_unique_level_name(&level_name)?;
+                        let res = find_unique_level_name(&level_name, shared_dimension)?;
                         if let Some(res) = res {
                             return Ok(Some(res))
                         }
@@ -289,12 +270,12 @@ impl LogicLayerConfig {
     /// Returns a unique name definition for a given cube property if there is one.
     pub fn find_unique_cube_property_name(
         &self, cube_name: &String, property_name: &Property
-    ) -> Result<Option<&str>, Error> {
+    ) -> Result<Option<String>, Error> {
         if let Some(aliases) = &self.aliases {
             if let Some(cubes) = &aliases.cubes {
                 for cube in cubes {
                     if &cube.name == cube_name {
-                        let res = cube.find_unique_property_name(&property_name)?;
+                        let res = find_unique_property_name(&property_name, cube)?;
                         if let Some(res) = res {
                             return Ok(Some(res))
                         }
@@ -308,12 +289,12 @@ impl LogicLayerConfig {
     /// Returns a unique name definition for a given shared dimension property if there is one.
     pub fn find_unique_shared_dimension_property_name(
         &self, shared_dimension_name: &String, property_name: &Property
-    ) -> Result<Option<&str>, Error> {
+    ) -> Result<Option<String>, Error> {
         if let Some(aliases) = &self.aliases {
             if let Some(shared_dimensions) = &aliases.shared_dimensions {
                 for shared_dimension in shared_dimensions {
                     if &shared_dimension.name == shared_dimension_name {
-                        let res = shared_dimension.find_unique_property_name(&property_name)?;
+                        let res = find_unique_property_name(&property_name, shared_dimension)?;
                         if let Some(res) = res {
                             return Ok(Some(res))
                         }
@@ -354,7 +335,7 @@ impl LogicLayerConfig {
 
                         let unique_level_name = match unique_level_name_opt {
                             Some(unique_level_name) => unique_level_name,
-                            None => &level.name
+                            None => level.name.clone()
                         };
 
                         if !levels.insert(unique_level_name) {
@@ -382,7 +363,7 @@ impl LogicLayerConfig {
 
                                 let unique_property_name = match unique_property_name_opt {
                                     Some(unique_property_name) => unique_property_name,
-                                    None => &property.name
+                                    None => property.name.clone()
                                 };
 
                                 if !properties.insert(unique_property_name) {
