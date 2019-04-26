@@ -75,6 +75,7 @@ mod test {
             CutSql {
                 foreign_key: "".into(),
                 primary_key: "".into(),
+                inline_table: None,
                 table: Table { name: "".into(), schema: None, primary_key: None },
                 column: "geo".into(),
                 members: vec!["1".into(), "2".into()],
@@ -85,6 +86,7 @@ mod test {
             CutSql {
                 foreign_key: "".into(),
                 primary_key: "".into(),
+                inline_table: None,
                 table: Table { name: "".into(), schema: None, primary_key: None },
                 column: "age".into(),
                 members: vec!["3".into()],
@@ -112,6 +114,7 @@ mod test {
             alias_postfix: "".into(),
             foreign_key: "product_id".into(),
             primary_key: "product_id".into(),
+            inline_table: None,
             table: Table { name: "dim_products".into(), schema: None, primary_key: None },
             level_columns: vec![
                 LevelColumn {

@@ -180,6 +180,7 @@ impl From<&Aggregator> for AggregatorMetadata {
             Aggregator::Average => "avg".into(),
             Aggregator::Median => "median".into(),
             Aggregator::WeightedAverage { ..} => "weighted_average".into(),
+            Aggregator::WeightedSum { ..} => "weighted_sum".into(),
             Aggregator::Moe { .. } => "MOE".into(),
             Aggregator::WeightedAverageMoe { .. } => "weighted_average_moe".into(),
             Aggregator::Custom(_) => "custom".into(),

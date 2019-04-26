@@ -16,9 +16,22 @@ pub enum Aggregator {
     Count,
     #[serde(rename="avg")]
     Average,
-    // Not yet allowed; needs to be able to roll-up across two times
+    /// Median
+    ///
+    /// Needs two steps. It's slow because there won't be aggregation on the first step, only
+    /// median on the second
     #[serde(rename="median")]
     Median,
+    /// Weighted Sum is calculated against the measure's value column.
+    /// sum(column * weight_column)
+    ///
+    /// First roll-up is sum(column * weight_column) as weighted_sum_first
+    /// Second roll-up is sum(weighted_sum_first) as weighted_sum_final
+    #[serde(rename="weighted_sum")]
+    WeightedSum {
+        weight_column: String,
+
+    },
     /// Weighted Average is calculated against the measure's value column.
     /// sum(column * weight_column) / sum(weight_column)
     #[serde(rename="weighted_avg")]
@@ -77,6 +90,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn parse_custom() {
         let sum = r#"{ "col": "testcol", "aggregator": { "custom": "{}*{}" } }"#;
         let parsed: Measure = serde_json::from_str(sum).unwrap();

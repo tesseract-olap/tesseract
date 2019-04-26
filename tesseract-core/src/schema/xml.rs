@@ -165,6 +165,11 @@ mod test {
     fn xml_schema_config() {
         let s = r##"
             <Schema name="my_schema">
+                <SharedDimension name="Geo">
+                    <Hierarchy name="Geo">
+                        <Level name="Tract" key_column="geoid" />
+                    </Hierarchy>
+                </SharedDimension>
                 <Cube name="my_cube">
                     <Table name="my_table" />
                     <Dimension name="my_dim">
@@ -176,6 +181,6 @@ mod test {
                 </Cube>
             </Schema>
         "##;
-        let _schema_config: SchemaConfigXML = from_reader(s.as_bytes()).unwrap();
+        let xml_schema_config: SchemaConfigXML = from_reader(s.as_bytes()).unwrap();
     }
 }

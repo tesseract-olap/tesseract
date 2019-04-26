@@ -32,7 +32,7 @@ Then once environment variables are set.
 
 For more details on the api, please check the server [readme](https://github.com/hwchen/tesseract/blob/master/tesseract-server/README.md). This will soon be updated and easier to follow on a separate documentation site.
 
-For more details on the logic layer api, check [here](https://github.com/hwchen/tesseract/blob/master/tesseract-server/src/logic_layer/README.md). This will als be updated and easier to follow on a separate documentation site.
+For more details on the logic layer api, check [here](https://github.com/hwchen/tesseract/blob/master/tesseract-server/src/logic_layer/README.md). This will also be updated and easier to follow on a separate documentation site.
 
 ## For Developers
 

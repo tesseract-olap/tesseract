@@ -126,8 +126,6 @@ fn main() -> Result<(), Error> {
     };
     let cache_arc = Arc::new(RwLock::new(cache));
 
-    println!("{:?}", has_unique_levels_properties);
-
     // Logic Layer Config
     let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
         Ok(config_path) => {
@@ -142,8 +140,6 @@ fn main() -> Result<(), Error> {
         },
         Err(_) => None
     };
-
-    println!("{:?}", has_unique_levels_properties);
 
     // Initialize Server
     server::new(
