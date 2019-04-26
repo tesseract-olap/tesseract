@@ -5,7 +5,6 @@ use serde_derive::Deserialize;
 use serde_json;
 use tesseract_core::Schema;
 use tesseract_core::names::{LevelName, Property};
-use futures::future::Err;
 
 
 #[derive(Debug, Clone, Deserialize)]
@@ -333,9 +332,6 @@ impl LogicLayerConfig {
             let mut properties = HashSet::new();
 
             for dimension in &cube.dimensions {
-//                println!("{:?}", dimension.name);
-//                println!("{:?}", dimension.is_shared);
-
                 for hierarchy in &dimension.hierarchies {
 
                     // Check each cube for unique level and property names

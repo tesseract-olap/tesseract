@@ -61,6 +61,20 @@ pub struct TopQuery {
     pub sort_direction: SortDirection,
 }
 
+impl TopQuery  {
+    pub fn new(
+        n: u64, by_dimension: LevelName, sort_mea_or_calc: Vec<MeaOrCalc>,
+        sort_direction: SortDirection
+    ) -> Self {
+        TopQuery {
+            n,
+            by_dimension,
+            sort_mea_or_calc,
+            sort_direction
+        }
+    }
+}
+
 // Currently only allows one sort_measure
 impl FromStr for TopQuery {
     type Err = Error;

@@ -9,13 +9,12 @@ use std::collections::HashMap;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::names::{Cut, Drilldown, Property, Measure, Mask, LevelName};
-use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
-use tesseract_core::{Query as TsQuery, Schema};
+use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName};
+use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery};
+use tesseract_core::{Query as TsQuery, Schema, MeaOrCalc};
 use tesseract_core::schema::{Cube};
 
 use crate::logic_layer::LogicLayerConfig;
-use crate::Opt;
 
 
 #[derive(Debug, Clone)]
@@ -175,25 +174,6 @@ impl LogicLayerQueryOpt {
         arg_vec
     }
 
-//    pub fn resolve_level(&self, level_name: &str) {
-//        let schema = match agg_query_opt.schema {
-//            Some(s) => s,
-//            None => bail!("Error setting schema")
-//        };
-//
-//        // Check if there is an alias defined with this name
-//        let aliased_level = match &self.config {
-//            Some(ll_config) => {
-//                ll_config.deconstruct_level_alias(
-//                    &self.cube,
-//                    &level_value,
-//                    &schema
-//                )
-//            },
-//            None => None
-//        };
-//    }
-
     pub fn get_level_map(&self, cube: &Cube) -> Result<HashMap<String, LevelName>, Error> {
         let mut level_name_map = HashMap::new();
 
@@ -298,24 +278,12 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
         let level_map_res = agg_query_opt.clone().get_level_map(&cube);
         let level_map = match level_map_res {
             Ok(m) => m,
-            Err(err) => bail!("Unable to construct unique level name map")
+            Err(_) => bail!("Unable to construct unique level name map")
         };
 
         let property_map = match agg_query_opt.clone().get_property_map(&cube) {
             Ok(m) => m,
-            Err(err) => bail!("Unable to construct unique level name map")
-        };
-
-
-        println!(" ");
-        println!("{:?}", level_map);
-        println!("{:?}", property_map);
-        println!(" ");
-
-
-        let schema = match agg_query_opt.schema {
-            Some(s) => s,
-            None => bail!("Error setting schema")
+            Err(_) => bail!("Unable to construct unique level name map")
         };
 
         let mut captions: Vec<Property> = vec![];
@@ -403,7 +371,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             })
             .unwrap_or(vec![]);
 
-        let mut cuts: Vec<Cut > = vec![];
+        let mut cuts: Vec<Cut> = vec![];
         for (level_key, cut_value) in agg_query_opt_cuts.iter() {
             if cut_value.is_empty() {
                 continue;
@@ -475,8 +443,24 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 
-        let top = agg_query_opt.top
-            .map(|t| t.parse())
+        let top: Option<TopQuery> = agg_query_opt.top.clone()
+            .map(|t| {
+                let top_split: Vec<String> = t.split(",").map(|s| s.to_string()).collect();
+
+                let level_name = match level_map.get(&top_split[1]) {
+                    Some(l) => l,
+                    None => bail!("Unable to find top level")
+                };
+
+                let mea_or_calc: MeaOrCalc = top_split[2].parse()?;
+
+                Ok(TopQuery::new(
+                    top_split[0].parse()?,
+                    level_name.clone(),
+                    vec![mea_or_calc],
+                    top_split[3].parse()?
+                ))
+            })
             .transpose()?;
         let top_where = agg_query_opt.top_where
             .map(|t| t.parse())
