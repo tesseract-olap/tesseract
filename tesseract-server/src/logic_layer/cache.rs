@@ -1,11 +1,16 @@
+use std::collections::HashMap;
 use actix::SystemRunner;
 use failure::{Error, format_err};
 use log::info;
 
+use serde_derive::Deserialize;
+
 use tesseract_core::{Schema, Backend, ColumnData};
-use tesseract_core::schema::Level;
+use tesseract_core::names::{LevelName, Property};
+use tesseract_core::schema::{Level, Cube};
 
 use super::super::handlers::logic_layer::shared::{Time, TimePrecision, TimeValue};
+use crate::logic_layer::LogicLayerConfig;
 
 
 /// Holds cache information.
@@ -27,7 +32,7 @@ impl Cache {
 }
 
 /// Holds cache information for a given cube.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CubeCache {
     pub name: String,
 
@@ -45,6 +50,9 @@ pub struct CubeCache {
 
     pub day_level: Option<Level>,
     pub day_values: Option<Vec<String>>,
+
+    pub level_map: HashMap<String, LevelName>,
+    pub property_map: HashMap<String, Property>,
 }
 
 impl CubeCache {
@@ -125,6 +133,7 @@ impl CubeCache {
 /// Populates a `Cache` object that will be shared through `AppState`.
 pub fn populate_cache(
         schema: Schema,
+        ll_config: &Option<LogicLayerConfig>,
         backend: Box<dyn Backend + Sync + Send>,
         sys: &mut SystemRunner
 ) -> Result<Cache, Error> {
@@ -194,6 +203,9 @@ pub fn populate_cache(
             }
         }
 
+        let level_map = get_level_map(&cube, ll_config)?;
+        let property_map = get_property_map(&cube, ll_config)?;
+
         cubes.push(CubeCache {
             name: cube.name,
             year_level,
@@ -206,12 +218,106 @@ pub fn populate_cache(
             week_values,
             day_level,
             day_values,
+            level_map,
+            property_map
         })
     }
 
     info!("Cache ready!");
 
     Ok(Cache { cubes })
+}
+
+
+pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, LevelName>, Error> {
+    let mut level_name_map = HashMap::new();
+
+    for dimension in &cube.dimensions {
+        for hierarchy in &dimension.hierarchies {
+            for level in &hierarchy.levels {
+                let level_name = LevelName::new(
+                    dimension.name.clone(),
+                    hierarchy.name.clone(),
+                    level.name.clone()
+                );
+
+                let unique_level_name = match ll_config {
+                    Some(ll_config) => {
+                        let unique_level_name_opt = if dimension.is_shared {
+                            ll_config.find_unique_shared_dimension_level_name(
+                                &dimension.name, &level_name
+                            )?
+                        } else {
+                            ll_config.find_unique_cube_level_name(
+                                &cube.name, &level_name
+                            )?
+                        };
+
+                        match unique_level_name_opt {
+                            Some(unique_level_name) => unique_level_name,
+                            None => level.name.clone()
+                        }
+                    },
+                    None => level.name.clone()
+                };
+
+                level_name_map.insert(
+                    unique_level_name.to_string(),
+                    level_name
+                );
+            }
+        }
+    }
+
+    Ok(level_name_map)
+}
+
+pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, Property>, Error> {
+    let mut property_map = HashMap::new();
+
+    for dimension in &cube.dimensions {
+        for hierarchy in &dimension.hierarchies {
+            for level in &hierarchy.levels {
+                if let Some(ref props) = level.properties {
+                    for prop in props {
+                        let property = Property::new(
+                            dimension.name.clone(),
+                            hierarchy.name.clone(),
+                            level.name.clone(),
+                            prop.name.clone()
+                        );
+
+                        let unique_property_name = match ll_config {
+                            Some(ll_config) => {
+                                let unique_property_name_opt = if dimension.is_shared {
+                                    ll_config.find_unique_shared_dimension_property_name(
+                                        &dimension.name, &property
+                                    )?
+                                } else {
+                                    ll_config.find_unique_cube_property_name(
+                                        &cube.name, &property
+                                    )?
+                                };
+
+                                match unique_property_name_opt {
+                                    Some(unique_property_name) => unique_property_name,
+                                    None => prop.name.clone()
+                                }
+                            },
+                            None => prop.name.clone()
+                        };
+
+                        property_map.insert(
+                            unique_property_name.to_string(),
+                            property
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(property_map)
 }
 
 

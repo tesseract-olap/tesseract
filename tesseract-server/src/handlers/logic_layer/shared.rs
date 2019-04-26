@@ -14,7 +14,7 @@ use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery};
 use tesseract_core::{Query as TsQuery, Schema, MeaOrCalc};
 use tesseract_core::schema::{Cube};
 
-use crate::logic_layer::LogicLayerConfig;
+use crate::logic_layer::{LogicLayerConfig, CubeCache};
 
 
 #[derive(Debug, Clone)]
@@ -117,6 +117,7 @@ pub fn boxed_error(message: String) -> FutureResponse<HttpResponse> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerQueryOpt {
     pub cube_obj: Option<Cube>,
+    pub cube_cache: Option<CubeCache>,
     pub config: Option<LogicLayerConfig>,
     pub schema: Option<Schema>,
 
@@ -173,97 +174,6 @@ impl LogicLayerQueryOpt {
 
         arg_vec
     }
-
-    pub fn get_level_map(&self, cube: &Cube) -> Result<HashMap<String, LevelName>, Error> {
-        let mut level_name_map = HashMap::new();
-
-        for dimension in &cube.dimensions {
-            for hierarchy in &dimension.hierarchies {
-                for level in &hierarchy.levels {
-                    let level_name = LevelName::new(
-                        dimension.name.clone(),
-                        hierarchy.name.clone(),
-                        level.name.clone()
-                    );
-
-                    let unique_level_name = match &self.config {
-                        Some(ll_config) => {
-                            let unique_level_name_opt = if dimension.is_shared {
-                                ll_config.find_unique_shared_dimension_level_name(
-                                    &dimension.name, &level_name
-                                )?
-                            } else {
-                                ll_config.find_unique_cube_level_name(
-                                    &cube.name, &level_name
-                                )?
-                            };
-
-                            match unique_level_name_opt {
-                                Some(unique_level_name) => unique_level_name,
-                                None => level.name.clone()
-                            }
-                        },
-                        None => level.name.clone()
-                    };
-
-                    level_name_map.insert(
-                        unique_level_name.to_string(),
-                        level_name
-                    );
-                }
-            }
-        }
-
-        Ok(level_name_map)
-    }
-
-    pub fn get_property_map(&self, cube: &Cube) -> Result<HashMap<String, Property>, Error> {
-        let mut property_map = HashMap::new();
-
-        for dimension in &cube.dimensions {
-            for hierarchy in &dimension.hierarchies {
-                for level in &hierarchy.levels {
-                    if let Some(ref props) = level.properties {
-                        for prop in props {
-                            let property = Property::new(
-                                dimension.name.clone(),
-                                hierarchy.name.clone(),
-                                level.name.clone(),
-                                prop.name.clone()
-                            );
-
-                            let unique_property_name = match &self.config {
-                                Some(ll_config) => {
-                                    let unique_property_name_opt = if dimension.is_shared {
-                                        ll_config.find_unique_shared_dimension_property_name(
-                                            &dimension.name, &property
-                                        )?
-                                    } else {
-                                        ll_config.find_unique_cube_property_name(
-                                            &cube.name, &property
-                                        )?
-                                    };
-
-                                    match unique_property_name_opt {
-                                        Some(unique_property_name) => unique_property_name,
-                                        None => prop.name.clone()
-                                    }
-                                },
-                                None => prop.name.clone()
-                            };
-
-                            property_map.insert(
-                                unique_property_name.to_string(),
-                                property
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(property_map)
-    }
 }
 
 impl TryFrom<LogicLayerQueryOpt> for TsQuery {
@@ -275,15 +185,14 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => bail!("No cubes found with the given name")
         };
 
-        let level_map_res = agg_query_opt.clone().get_level_map(&cube);
-        let level_map = match level_map_res {
-            Ok(m) => m,
-            Err(_) => bail!("Unable to construct unique level name map")
+        let level_map = match agg_query_opt.clone().cube_cache {
+            Some(cc) => cc.level_map,
+            None => bail!("Unable to construct unique level name map")
         };
 
-        let property_map = match agg_query_opt.clone().get_property_map(&cube) {
-            Ok(m) => m,
-            Err(_) => bail!("Unable to construct unique level name map")
+        let property_map = match agg_query_opt.clone().cube_cache {
+            Some(cc) => cc.property_map,
+            None => bail!("Unable to construct unique property name map")
         };
 
         let mut captions: Vec<Property> = vec![];

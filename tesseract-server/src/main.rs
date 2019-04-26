@@ -116,34 +116,37 @@ fn main() -> Result<(), Error> {
         flush_secret,
     };
 
+    // Logic Layer Config
+    let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
+        Ok(config_path) => {
+            match logic_layer::read_config(&config_path) {
+                Ok(config_obj) => {
+                    has_unique_levels_properties = config_obj.has_unique_levels_properties(&schema)?;
+                    Some(config_obj)
+                },
+                Err(err) => return Err(err)
+            }
+        },
+        Err(_) => None
+    };
+
     // Initialize actix system
     let mut sys = actix::System::new("tesseract");
 
     // Populate internal cache
-    let cache = match logic_layer::populate_cache(schema.clone(), db.clone(), &mut sys) {
+    let cache = match logic_layer::populate_cache(
+        schema.clone(), &logic_layer_config, db.clone(), &mut sys
+    ) {
         Ok(cache) => cache,
         Err(_) => panic!("Cache population failed."),
     };
     let cache_arc = Arc::new(RwLock::new(cache));
 
-//    println!("{:?}", has_unique_levels_properties);
-
-    // Logic Layer Config
-    let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
-        Ok(config_path) => {
-            let logic_layer_config = match logic_layer::read_config(&config_path) {
-                Ok(config_obj) => {
-                    has_unique_levels_properties = config_obj.has_unique_levels_properties(&schema)?;
-                    config_obj
-                },
-                Err(err) => return Err(err)
-            };
-            Some(Arc::new(RwLock::new(logic_layer_config)))
-        },
-        Err(_) => None
+    // Create lock on logic layer config
+    let logic_layer_config = match logic_layer_config {
+        Some(ll_config) => Some(Arc::new(RwLock::new(ll_config))),
+        None => None
     };
-
-//    println!("{:?}", has_unique_levels_properties);
 
     // Initialize Server
     server::new(
