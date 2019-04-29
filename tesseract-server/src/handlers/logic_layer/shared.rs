@@ -210,6 +210,8 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
         let ll_config = agg_query_opt.config.clone();
 
+        let parents = agg_query_opt.parents.unwrap_or(false);
+
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
@@ -277,29 +279,31 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
                     // if parents, check captions for parent levels
                     // Same logic as above, for checking captions for a level
-                    let parents = cube.get_level_parents(level_name).unwrap_or(vec![]);
-                    for parent_level in parents {
-                        if let Some(ref props) = parent_level.properties {
-                            for prop in props {
-                                if let Some(ref cap) = prop.caption_set {
-                                    for locale in &locales {
-                                        if locale == cap {
-                                            captions.push(
-                                                Property::new(
-                                                    level_name.dimension.clone(),
-                                                    level_name.hierarchy.clone(),
-                                                    parent_level.name.clone(),
-                                                    prop.name.clone(),
+                    if parents {
+                        let level_parents = cube.get_level_parents(level_name).unwrap_or(vec![]);
+                        for parent_level in level_parents {
+                            if let Some(ref props) = parent_level.properties {
+                                for prop in props {
+                                    if let Some(ref cap) = prop.caption_set {
+                                        for locale in &locales {
+                                            if locale == cap {
+                                                captions.push(
+                                                    Property::new(
+                                                        level_name.dimension.clone(),
+                                                        level_name.hierarchy.clone(),
+                                                        parent_level.name.clone(),
+                                                        prop.name.clone(),
+                                                    )
                                                 )
-                                            )
+                                            }
                                         }
+                                    } else {
+                                        continue
                                     }
-                                } else {
-                                    continue
                                 }
+                            } else {
+                                continue
                             }
-                        } else {
-                            continue
                         }
                     }
                 }
@@ -378,7 +382,6 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
         // TODO: Implement
         let filters: Vec<FilterQuery>= vec![];
 
-        let parents = agg_query_opt.parents.unwrap_or(false);
 
         let top: Option<TopQuery> = agg_query_opt.top.clone()
             .map(|t| {
