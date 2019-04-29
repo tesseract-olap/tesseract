@@ -9,12 +9,12 @@ use std::collections::HashMap;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::names::{Cut, Drilldown, Property, Measure};
-use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery};
-use tesseract_core::Query as TsQuery;
+use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName};
+use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery};
+use tesseract_core::{Query as TsQuery, Schema, MeaOrCalc};
 use tesseract_core::schema::{Cube};
 
-use crate::logic_layer::LogicLayerConfig;
+use crate::logic_layer::{LogicLayerConfig, CubeCache};
 
 
 #[derive(Debug, Clone)]
@@ -117,7 +117,9 @@ pub fn boxed_error(message: String) -> FutureResponse<HttpResponse> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerQueryOpt {
     pub cube_obj: Option<Cube>,
+    pub cube_cache: Option<CubeCache>,
     pub config: Option<LogicLayerConfig>,
+    pub schema: Option<Schema>,
 
     pub cube: String,
     pub drilldowns: Option<String>,
@@ -178,9 +180,19 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
     type Error = Error;
 
     fn try_from(agg_query_opt: LogicLayerQueryOpt) -> Result<Self, Self::Error> {
-        let cube = match agg_query_opt.cube_obj {
+        let cube = match agg_query_opt.clone().cube_obj {
             Some(c) => c,
             None => bail!("No cubes found with the given name")
+        };
+
+        let level_map = match agg_query_opt.clone().cube_cache {
+            Some(cc) => cc.level_map,
+            None => bail!("Unable to construct unique level name map")
+        };
+
+        let property_map = match agg_query_opt.clone().cube_cache {
+            Some(cc) => cc.property_map,
+            None => bail!("Unable to construct unique property name map")
         };
 
         let mut captions: Vec<Property> = vec![];
@@ -202,29 +214,42 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
 
-                for l in LogicLayerQueryOpt::deserialize_args(ds) {
-                    // Check logic layer config for any drill substitutions
-                    let drill_value = match ll_config.clone() {
-                        Some(llc) => {
-                            match llc.substitute_drill_value(l.clone()) {
+                for level_value in LogicLayerQueryOpt::deserialize_args(ds) {
+                    // Check logic layer config for any named set substitutions
+                    let level_key = match ll_config.clone() {
+                        Some(ll_conf) => {
+                            match ll_conf.substitute_drill_value(level_value.clone()) {
                                 Some(ln) => {
-                                    agg_query_opt_cuts.entry(ln.clone()).or_insert(l.clone());
+                                    agg_query_opt_cuts
+                                        .entry(ln.clone())
+                                        .or_insert(level_value.clone());
                                     ln
                                 },
-                                None => l.clone()
+                                None => level_value.clone()
                             }
                         },
-                        None => l.clone()
+                        None => level_value.clone()
                     };
 
-                    let (dimension, hierarchy, level) = match cube.identify_level(drill_value.clone()) {
-                        Ok(dhl) => dhl,
-                        Err(_) => break
+                    // TODO: Break or bail?
+                    let level_name = match level_map.get(&level_key) {
+                        Some(l) => l,
+                        None => break
                     };
-                    let d = Drilldown::new(
-                        dimension.clone(), hierarchy.clone(), drill_value.clone()
+
+                    // TODO: Break or bail?
+                    let level = match cube.get_level(level_name) {
+                        Some(l) => l,
+                        None => break
+                    };
+
+                    let drilldown = Drilldown::new(
+                        level_name.dimension.clone(),
+                        level_name.hierarchy.clone(),
+                        level_name.level.clone()
                     );
-                    drilldowns.push(d);
+
+                    drilldowns.push(drilldown);
 
                     // Check for captions for this level
                     if let Some(props) = level.properties {
@@ -234,9 +259,10 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                                     if locale == cap {
                                         captions.push(
                                             Property::new(
-                                                dimension.clone(),
-                                                hierarchy.clone(),
-                                                l.clone(), prop.name.clone()
+                                                level_name.dimension.clone(),
+                                                level_name.hierarchy.clone(),
+                                                level_name.level.clone(),
+                                                prop.name.clone()
                                             )
                                         )
                                     }
@@ -251,7 +277,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
                     // if parents, check captions for parent levels
                     // Same logic as above, for checking captions for a level
-                    let parents = cube.get_level_parents(&drill_value).unwrap_or(vec![]);
+                    let parents = cube.get_level_parents(level_name).unwrap_or(vec![]);
                     for parent_level in parents {
                         if let Some(ref props) = parent_level.properties {
                             for prop in props {
@@ -260,8 +286,8 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                                         if locale == cap {
                                             captions.push(
                                                 Property::new(
-                                                    dimension.clone(),
-                                                    hierarchy.clone(),
+                                                    level_name.dimension.clone(),
+                                                    level_name.hierarchy.clone(),
                                                     parent_level.name.clone(),
                                                     prop.name.clone(),
                                                 )
@@ -282,35 +308,37 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             })
             .unwrap_or(vec![]);
 
-        let mut cuts: Vec<Cut > = vec![];
-        for (level_name, cut) in agg_query_opt_cuts.iter() {
-            if cut.is_empty() {
+        let mut cuts: Vec<Cut> = vec![];
+        for (level_key, cut_value) in agg_query_opt_cuts.iter() {
+            if cut_value.is_empty() {
                 continue;
             }
 
             // Check logic layer config for any cut substitutions
-            let cut_value = match ll_config.clone() {
-                Some(llc) => {
-                    llc.substitute_cut(level_name.clone(), cut.clone())
+            let cut_val = match ll_config.clone() {
+                Some(ll_conf) => {
+                    ll_conf.substitute_cut(level_key.clone(), cut_value.clone())
                 },
-                None => cut.clone()
+                None => cut_value.clone()
             };
 
-            let (dimension, hierarchy, _level) = match cube.identify_level(level_name.to_string()) {
-                Ok(dh) => dh,
-                Err(_) => continue
+            // TODO: Break or bail?
+            let level_name = match level_map.get(level_key) {
+                Some(l) => l,
+                None => break
             };
 
-            let (mask, for_match, cut_value) = Cut::parse_cut(&cut_value);
+            let (mask, for_match, cut_val) = Cut::parse_cut(&cut_val);
 
-            let c = Cut::new(
-                dimension.clone(), hierarchy.clone(),
-                level_name.clone(),
-                cut_value.split(",").map(|s| s.to_string()).collect(),
+            let cut = Cut::new(
+                level_name.dimension.clone(),
+                level_name.hierarchy.clone(),
+                level_name.level.clone(),
+                cut_val.split(",").map(|s| s.to_string()).collect(),
                 mask, for_match
             );
 
-            cuts.push(c);
+            cuts.push(cut);
         }
 
         let measures: Vec<_> = agg_query_opt.measures
@@ -333,16 +361,14 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             .map(|ps| {
                 let mut properties: Vec<Property> = vec![];
 
-                for property in LogicLayerQueryOpt::deserialize_args(ps) {
-                    let (dimension, hierarchy, level) = match cube.identify_property(property.clone()) {
-                        Ok(dhl) => dhl,
-                        Err(_) => break
+                for property_value in LogicLayerQueryOpt::deserialize_args(ps) {
+                    // TODO: Break or bail?
+                    let property = match property_map.get(&property_value) {
+                        Some(p) => p,
+                        None => break
                     };
-                    let p = Property::new(
-                        dimension.clone(), hierarchy.clone(),
-                        level.clone(), property.clone()
-                    );
-                    properties.push(p);
+
+                    properties.push(property.clone());
                 }
 
                 properties
@@ -354,8 +380,24 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 
-        let top = agg_query_opt.top
-            .map(|t| t.parse())
+        let top: Option<TopQuery> = agg_query_opt.top.clone()
+            .map(|t| {
+                let top_split: Vec<String> = t.split(",").map(|s| s.to_string()).collect();
+
+                let level_name = match level_map.get(&top_split[1]) {
+                    Some(l) => l,
+                    None => bail!("Unable to find top level")
+                };
+
+                let mea_or_calc: MeaOrCalc = top_split[2].parse()?;
+
+                Ok(TopQuery::new(
+                    top_split[0].parse()?,
+                    level_name.clone(),
+                    vec![mea_or_calc],
+                    top_split[3].parse()?
+                ))
+            })
             .transpose()?;
         let top_where = agg_query_opt.top_where
             .map(|t| t.parse())
@@ -377,15 +419,20 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     return Err(format_err!("Bad formatting for growth param."));
                 }
 
-                let level = gro_split[0].clone();
+                let level_key = gro_split[0].clone();
                 let measure = gro_split[1].clone();
 
-                let (dimension, hierarchy, _) = match cube.identify_level(level.clone()) {
-                    Ok(dh) => dh,
-                    Err(_) => return Err(format_err!("Unable to identify growth level."))
+                let level_name = match level_map.get(&level_key) {
+                    Some(l) => l,
+                    None => bail!("Unable to find growth level")
                 };
 
-                let growth = GrowthQuery::new(dimension, hierarchy, level, measure);
+                let growth = GrowthQuery::new(
+                    level_name.dimension.clone(),
+                    level_name.hierarchy.clone(),
+                    level_name.level.clone(),
+                    measure
+                );
 
                 Some(growth)
             },
@@ -400,23 +447,27 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     return Err(format_err!("Bad formatting for RCA param."));
                 }
 
-                let drill1_l = rca_split[0].clone();
-                let drill2_l = rca_split[1].clone();
+                let drill1_level_key = rca_split[0].clone();
+                let drill2_level_key = rca_split[1].clone();
                 let measure = rca_split[2].clone();
 
-                let (drill1_d, drill1_h, _) = match cube.identify_level(drill1_l.clone()) {
-                    Ok(dh) => dh,
-                    Err(_) => return Err(format_err!("Unable to identify RCA drilldown #1 level."))
+                let level_name_1 = match level_map.get(&drill1_level_key) {
+                    Some(l) => l,
+                    None => bail!("Unable to find drill 1 level")
                 };
 
-                let (drill2_d, drill2_h, _) = match cube.identify_level(drill2_l.clone()) {
-                    Ok(dh) => dh,
-                    Err(_) => return Err(format_err!("Unable to identify RCA drilldown #2 level."))
+                let level_name_2 = match level_map.get(&drill2_level_key) {
+                    Some(l) => l,
+                    None => bail!("Unable to find drill 2 level")
                 };
 
                 let rca = RcaQuery::new(
-                    drill1_d, drill1_h, drill1_l,
-                    drill2_d, drill2_h, drill2_l,
+                    level_name_1.dimension.clone(),
+                    level_name_1.hierarchy.clone(),
+                    level_name_1.level.clone(),
+                    level_name_2.dimension.clone(),
+                    level_name_2.hierarchy.clone(),
+                    level_name_2.level.clone(),
                     measure
                 );
 

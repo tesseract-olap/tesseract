@@ -3,6 +3,8 @@ use std::collections::HashSet;
 
 use serde_derive::Deserialize;
 use serde_json;
+use tesseract_core::Schema;
+use tesseract_core::names::{LevelName, Property};
 
 
 #[derive(Debug, Clone, Deserialize)]
@@ -14,12 +16,22 @@ pub struct LogicLayerConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AliasConfig {
     pub cubes: Option<Vec<CubeAliasConfig>>,
+    pub shared_dimensions: Option<Vec<SharedDimensionAliasConfig>>
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CubeAliasConfig {
     pub name: String,
-    pub alternatives: Vec<String>
+    pub alternatives: Vec<String>,
+    pub levels: Option<Vec<LevelPropertyConfig>>,
+    pub properties: Option<Vec<LevelPropertyConfig>>
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SharedDimensionAliasConfig {
+    pub name: String,
+    pub levels: Option<Vec<LevelPropertyConfig>>,
+    pub properties: Option<Vec<LevelPropertyConfig>>
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -34,6 +46,84 @@ pub struct NamedSetConfig {
     pub values: Vec<String>
 }
 
+// TODO: Might want to consider eventually sharing the same structure as the current CubeAliasConfig
+#[derive(Debug, Clone, Deserialize)]
+pub struct LevelPropertyConfig {
+    pub current_name: String,
+    pub unique_name: String
+}
+
+
+
+pub trait GetLevels {
+    fn get_levels(&self) -> Option<Vec<LevelPropertyConfig>>;
+}
+
+impl GetLevels for CubeAliasConfig {
+    fn get_levels(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.levels.clone()
+    }
+}
+
+impl GetLevels for SharedDimensionAliasConfig {
+    fn get_levels(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.levels.clone()
+    }
+}
+
+pub trait GetProperties {
+    fn get_properties(&self) -> Option<Vec<LevelPropertyConfig>>;
+}
+
+impl GetProperties for CubeAliasConfig {
+    fn get_properties(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.properties.clone()
+    }
+}
+
+impl GetProperties for SharedDimensionAliasConfig {
+    fn get_properties(&self) -> Option<Vec<LevelPropertyConfig>> {
+        self.properties.clone()
+    }
+}
+
+pub fn find_unique_level_name<T>(
+        level_name: &LevelName, levels_obj: &T
+    ) -> Result<Option<String>, Error> where T: GetLevels
+{
+    let levels = levels_obj.get_levels();
+
+    if let Some(levels) = &levels {
+        for level in levels {
+            let ll_level_name: LevelName = level.current_name.parse()?;
+
+            if &ll_level_name == level_name {
+                return Ok(Some(level.unique_name.clone()))
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+pub fn find_unique_property_name<T>(
+    property_name: &Property, properties_obj: &T
+) -> Result<Option<String>, Error> where T: GetProperties
+{
+    let properties = properties_obj.get_properties();
+
+    if let Some(properties) = &properties {
+        for property in properties {
+            let ll_property_name: Property = property.current_name.parse()?;
+
+            if &ll_property_name == property_name {
+                return Ok(Some(property.unique_name.clone()))
+            }
+        }
+    }
+
+    Ok(None)
+}
 
 /// Reads Logic Layer Config JSON file.
 pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
@@ -137,5 +227,155 @@ impl LogicLayerConfig {
             },
             None => cut
         }
+    }
+
+    /// Returns a unique name definition for a given cube level if there is one.
+    pub fn find_unique_cube_level_name(
+        &self, cube_name: &String, level_name: &LevelName
+    ) -> Result<Option<String>, Error> {
+        if let Some(aliases) = &self.aliases {
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        let res = find_unique_level_name(&level_name, cube)?;
+                        if let Some(res) = res {
+                            return Ok(Some(res))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Returns a unique name definition for a given shared dimension level if there is one.
+    pub fn find_unique_shared_dimension_level_name(
+        &self, shared_dimension_name: &String, level_name: &LevelName
+    ) -> Result<Option<String>, Error> {
+        if let Some(aliases) = &self.aliases {
+            if let Some(shared_dimensions) = &aliases.shared_dimensions {
+                for shared_dimension in shared_dimensions {
+                    if &shared_dimension.name == shared_dimension_name {
+                        let res = find_unique_level_name(&level_name, shared_dimension)?;
+                        if let Some(res) = res {
+                            return Ok(Some(res))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Returns a unique name definition for a given cube property if there is one.
+    pub fn find_unique_cube_property_name(
+        &self, cube_name: &String, property_name: &Property
+    ) -> Result<Option<String>, Error> {
+        if let Some(aliases) = &self.aliases {
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        let res = find_unique_property_name(&property_name, cube)?;
+                        if let Some(res) = res {
+                            return Ok(Some(res))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Returns a unique name definition for a given shared dimension property if there is one.
+    pub fn find_unique_shared_dimension_property_name(
+        &self, shared_dimension_name: &String, property_name: &Property
+    ) -> Result<Option<String>, Error> {
+        if let Some(aliases) = &self.aliases {
+            if let Some(shared_dimensions) = &aliases.shared_dimensions {
+                for shared_dimension in shared_dimensions {
+                    if &shared_dimension.name == shared_dimension_name {
+                        let res = find_unique_property_name(&property_name, shared_dimension)?;
+                        if let Some(res) = res {
+                            return Ok(Some(res))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Ensures level and property names are unique inside each cube based on
+    /// name substitutions from a logic layer configuration.
+    pub fn has_unique_levels_properties(&self, schema: &Schema) -> Result<bool, Error> {
+        for cube in &schema.cubes {
+            let mut levels = HashSet::new();
+            let mut properties = HashSet::new();
+
+            for dimension in &cube.dimensions {
+                for hierarchy in &dimension.hierarchies {
+
+                    // Check each cube for unique level and property names
+                    for level in &hierarchy.levels {
+                        let level_name = LevelName::new(
+                            dimension.name.clone(),
+                            hierarchy.name.clone(),
+                            level.name.clone()
+                        );
+
+                        let unique_level_name_opt = if dimension.is_shared {
+                            self.find_unique_shared_dimension_level_name(
+                                &dimension.name, &level_name
+                            )?
+                        } else {
+                            self.find_unique_cube_level_name(
+                                &cube.name, &level_name
+                            )?
+                        };
+
+                        let unique_level_name = match unique_level_name_opt {
+                            Some(unique_level_name) => unique_level_name,
+                            None => level.name.clone()
+                        };
+
+                        if !levels.insert(unique_level_name) {
+                            return Ok(false)
+                        }
+
+                        if let Some(ref props) = level.properties {
+                            for property in props {
+                                let property_name = Property::new(
+                                    dimension.name.clone(),
+                                    hierarchy.name.clone(),
+                                    level.name.clone(),
+                                    property.name.clone()
+                                );
+
+                                let unique_property_name_opt = if dimension.is_shared {
+                                    self.find_unique_shared_dimension_property_name(
+                                        &dimension.name, &property_name
+                                    )?
+                                } else {
+                                    self.find_unique_cube_property_name(
+                                        &cube.name, &property_name
+                                    )?
+                                };
+
+                                let unique_property_name = match unique_property_name_opt {
+                                    Some(unique_property_name) => unique_property_name,
+                                    None => property.name.clone()
+                                };
+
+                                if !properties.insert(unique_property_name) {
+                                    return Ok(false)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(true)
     }
 }

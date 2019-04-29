@@ -101,6 +101,7 @@ impl From<SchemaConfigJson> for Schema {
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
                                     hierarchies,
                                     annotations: dim_annotations,
+                                    is_shared: true
                                 });
                             }
                         }
@@ -204,12 +205,16 @@ impl Cube {
     /// gets parents levels (not including the level itself)
     /// (it's the first level matched; for logic layer,
     /// it's assumed that all levels are unique)
-    pub fn get_level_parents(&self, level_name: &str) -> Result<Vec<Level>, Error> {
+    pub fn get_level_parents(&self, level_name: &LevelName) -> Result<Vec<Level>, Error> {
         for dimension in &self.dimensions {
-            for hierarchy in &dimension.hierarchies {
-                for (level_idx, level) in hierarchy.levels.iter().enumerate() {
-                    if level.name == level_name {
-                        return Ok(hierarchy.levels.clone().into_iter().take(level_idx).collect())
+            if dimension.name == level_name.dimension {
+                for hierarchy in &dimension.hierarchies {
+                    if hierarchy.name == level_name.hierarchy {
+                        for (level_idx, level) in hierarchy.levels.iter().enumerate() {
+                            if level.name == level_name.level {
+                                return Ok(hierarchy.levels.clone().into_iter().take(level_idx).collect())
+                            }
+                        }
                     }
                 }
             }
@@ -239,6 +244,24 @@ impl Cube {
 
         Err(format_err!("'{}' not found", property_name))
     }
+
+    /// Returns a Level object corresponding to a provided LevelName.
+    pub fn get_level(&self, level_name: &LevelName) -> Option<Level> {
+        for dimension in &self.dimensions {
+            if dimension.name == level_name.dimension {
+                for hierarchy in &dimension.hierarchies {
+                    if hierarchy.name == level_name.hierarchy {
+                        for level in &hierarchy.levels {
+                            if level.name == level_name.level {
+                                return Some(level.clone())
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 
@@ -248,6 +271,7 @@ pub struct Dimension {
     pub foreign_key: Option<String>,
     pub hierarchies: Vec<Hierarchy>,
     pub annotations: Option<Vec<Annotation>>,
+    pub is_shared: bool
 }
 
 impl From<DimensionConfigJson> for Dimension {
@@ -267,6 +291,7 @@ impl From<DimensionConfigJson> for Dimension {
             foreign_key: dimension_config.foreign_key,
             hierarchies,
             annotations,
+            is_shared: false
         }
     }
 }
