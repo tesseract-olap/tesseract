@@ -598,8 +598,19 @@ impl Schema {
             // either to an explicit drilldown or parent
             // - filter by properties for this drilldown
             // - for each property, get the level
-            let caption_cols: Result<HashMap<_, _>, _>= captions.iter()
-                .filter(|p| p.level_name.dimension == drill.0.dimension)
+
+            // let through parent captions only if parent == true
+            let captions_filtered = if parents {
+                Box::new(captions.iter()
+                    .filter(|p| p.level_name.dimension == drill.0.dimension)
+                ) as Box<Iterator<Item=&Property>>
+            } else {
+                Box::new(captions.iter()
+                    .filter(|p| p.level_name == drill.0)
+                ) as Box<Iterator<Item=&Property>>
+            };
+
+            let caption_cols: Result<HashMap<_, _>, _> = captions_filtered
                 .map(|p| {
                     levels.iter()
                         .find(|lvl| lvl.name == p.level_name.level)
