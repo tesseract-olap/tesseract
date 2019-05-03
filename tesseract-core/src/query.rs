@@ -444,3 +444,23 @@ impl FromStr for FilterQuery {
         }
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct RateQuery {
+    pub level_name: LevelName,
+    pub value: String,
+    pub measure: Measure,
+}
+
+impl RateQuery {
+    pub fn new(level_name: LevelName, value: String, measure: String) -> Self {
+        let measure = Measure::new(measure);
+
+        RateQuery {
+            level_name,
+            value,
+            measure,
+        }
+    }
+}
