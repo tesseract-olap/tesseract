@@ -132,7 +132,7 @@ pub fn primary_agg(
     let mut fact_sql = format!("select {}", all_fact_dim_cols);
     fact_sql.push_str(&format!(", {} from {}", mea_cols, table.name));
 
-    let agg = match meas[0].aggregator {
+    let rate_aggregator = match meas[0].aggregator {
         Aggregator::Count => "count".to_string(),
         _ => "sum".to_string()
     };
@@ -141,7 +141,7 @@ pub fn primary_agg(
 
     if let Some(_r) = rate {
         rate_fact_sql = format!("select {}", all_fact_dim_cols);
-        rate_fact_sql.push_str(&format!(", {}({}) as rate_num from {}", agg, meas[0].column, table.name));
+        rate_fact_sql.push_str(&format!(", {}({}) as rate_num from {}", rate_aggregator, meas[0].column, table.name));
     }
 
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
@@ -258,8 +258,8 @@ pub fn primary_agg(
             format!("select {}, {}, {}(rate_num) / {}(m0) as rate from ({}) group by {}",
                 final_drill_cols,
                 final_mea_cols,
-                agg,
-                agg,
+                rate_aggregator,
+                rate_aggregator,
                 sub_queries,
                 final_drill_cols,
             )

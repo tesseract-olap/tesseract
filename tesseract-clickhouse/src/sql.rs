@@ -42,9 +42,6 @@ pub fn clickhouse_sql(
     rate: &Option<RateSql>,
     ) -> String
 {
-
-    // TODO: Should rate calculation be a separate method?
-
     let (mut final_sql, mut final_drill_cols) = {
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rate, rca)
