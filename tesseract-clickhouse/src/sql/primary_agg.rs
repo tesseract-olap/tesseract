@@ -242,10 +242,6 @@ pub fn primary_agg(
         }
     }
 
-    println!(" ");
-    println!("{}", sub_queries);
-    println!(" ");
-
     // Finally, wrap with final agg and result
     let final_drill_cols = drills.iter().map(|drill| drill.col_alias_only_string());
     let final_drill_cols = join(final_drill_cols, ", ");
@@ -259,7 +255,6 @@ pub fn primary_agg(
     // This is the final result of the groupings.
     let final_sql = match rate {
         Some(_r) => {
-            // TODO: Use appropriate aggregator
             format!("select {}, {}, {}(rate_num) / {}(m0) as rate from ({}) group by {}",
                 final_drill_cols,
                 final_mea_cols,

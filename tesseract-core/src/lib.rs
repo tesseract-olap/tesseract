@@ -411,12 +411,6 @@ impl Schema {
                 _ => return Err(format_err!("Rate can only be calculated for measures with sum or count aggregations"))
             }
 
-            println!(" ");
-            println!(" ");
-            println!("{:?}", mea_cols);
-            println!(" ");
-            println!(" ");
-
             let members_query_ir = self.get_dim_col_table(cube, &rate.level_name)?;
 
             Some(RateSql {

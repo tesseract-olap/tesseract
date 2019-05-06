@@ -1,3 +1,5 @@
+use itertools::join;
+
 use failure::{Error, format_err, bail};
 use std::str::FromStr;
 
@@ -460,5 +462,27 @@ impl RateQuery {
             level_name,
             values,
         }
+    }
+}
+
+impl FromStr for RateQuery {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let rate_split: Vec<String> = s.split(".").map(|x| x.to_string()).collect();
+        let n = rate_split.len();
+
+        if n <= 2 || n >= 5 {
+            return Err(format_err!("Malformatted RateQuery"));
+        }
+
+        let level = join(rate_split[0..n-1].iter(), ".");
+        let level_name = level.parse::<LevelName>()?;
+        let values: Vec<String> = rate_split[n-1].split(",").map(|s| s.to_string()).collect();
+
+        Ok(RateQuery{
+            level_name,
+            values
+        })
     }
 }
