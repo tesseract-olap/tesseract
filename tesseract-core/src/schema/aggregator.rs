@@ -30,14 +30,12 @@ pub enum Aggregator {
     #[serde(rename="weighted_sum")]
     WeightedSum {
         weight_column: String,
-
     },
     /// Weighted Average is calculated against the measure's value column.
     /// sum(column * weight_column) / sum(weight_column)
     #[serde(rename="weighted_avg")]
     WeightedAverage {
         weight_column: String,
-
     },
     /// Where the measure column is the primary value,
     /// and a list of secondary column is provided to the MO aggregator:

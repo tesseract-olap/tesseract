@@ -394,12 +394,28 @@ impl Schema {
         };
 
         let rate = if let Some(ref rate) = query.rate {
-            // TODO: Perform drills and cols checks here
+            // For now at least, we'll allow drilldowns and cuts on the level
+            // used for the rate calculation. Drilldowns will always result in
+            // a rate of 1. Cuts allow for rate calculation in a subset of the
+            // level universe (for example, calculating the rate of "Non-fiction"
+            // sales inside a "Books" named set.
 
             // Only one measure allowed when getting rates for now
             if mea_cols.len() > 1 {
                 return Err(format_err!("Only one measure allowed for rate calculations"));
             }
+
+            match mea_cols[0].aggregator {
+                Aggregator::Sum => (),
+                Aggregator::Count => (),
+                _ => return Err(format_err!("Rate can only be calculated for measures with sum or count aggregations"))
+            }
+
+            println!(" ");
+            println!(" ");
+            println!("{:?}", mea_cols);
+            println!(" ");
+            println!(" ");
 
             let members_query_ir = self.get_dim_col_table(cube, &rate.level_name)?;
 

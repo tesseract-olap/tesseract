@@ -15,6 +15,8 @@ use super::{
     dim_subquery,
 };
 
+use tesseract_core::{Aggregator};
+
 
 /// Error checking is done before this point. This string formatter
 /// accepts any input
@@ -130,12 +132,16 @@ pub fn primary_agg(
     let mut fact_sql = format!("select {}", all_fact_dim_cols);
     fact_sql.push_str(&format!(", {} from {}", mea_cols, table.name));
 
+    let agg = match meas[0].aggregator {
+        Aggregator::Count => "count".to_string(),
+        _ => "sum".to_string()
+    };
+
     let mut rate_fact_sql = "".to_string();
 
     if let Some(_r) = rate {
-        // TODO: Use aggregator information?
         rate_fact_sql = format!("select {}", all_fact_dim_cols);
-        rate_fact_sql.push_str(&format!(", sum({}) as rate_num from {}", meas[0].column, table.name));
+        rate_fact_sql.push_str(&format!(", {}({}) as rate_num from {}", agg, meas[0].column, table.name));
     }
 
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
@@ -254,9 +260,11 @@ pub fn primary_agg(
     let final_sql = match rate {
         Some(_r) => {
             // TODO: Use appropriate aggregator
-            format!("select {}, {}, sum(rate_num) / sum(m0) as rate from ({}) group by {}",
+            format!("select {}, {}, {}(rate_num) / {}(m0) as rate from ({}) group by {}",
                 final_drill_cols,
                 final_mea_cols,
+                agg,
+                agg,
                 sub_queries,
                 final_drill_cols,
             )
