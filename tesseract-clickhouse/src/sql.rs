@@ -17,6 +17,7 @@ use tesseract_core::query_ir::{
     RcaSql,
     GrowthSql,
     FilterSql,
+    RateSql,
     dim_subquery,
 };
 use self::options::wrap_options;
@@ -38,13 +39,17 @@ pub fn clickhouse_sql(
     limit: &Option<LimitSql>,
     rca: &Option<RcaSql>,
     growth: &Option<GrowthSql>,
+    rate: &Option<RateSql>,
     ) -> String
 {
+
+    // TODO: Should rate calculation be a separate method?
+
     let (mut final_sql, mut final_drill_cols) = {
         if let Some(rca) = rca {
-            rca::calculate(table, cuts, drills, meas, rca)
+            rca::calculate(table, cuts, drills, meas, rate, rca)
         } else {
-            primary_agg(table, cuts, drills, meas)
+            primary_agg(table, cuts, drills, meas, rate)
         }
     };
 

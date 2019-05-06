@@ -21,6 +21,7 @@ pub struct QueryIr {
     pub limit: Option<LimitSql>,
     pub rca: Option<RcaSql>,
     pub growth: Option<GrowthSql>,
+    pub rate: Option<RateSql>,
 }
 
 #[derive(Debug, Clone)]
@@ -304,6 +305,18 @@ pub struct RcaSql {
 pub struct GrowthSql {
     pub time_drill: DrilldownSql,
     pub mea: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RateSql {
+    pub table: Table,
+//    pub primary_key: String,
+//    pub foreign_key: String,
+    pub column: String,
+    pub members: String,
+//    pub members: Vec<String>,
+//    pub member_type: MemberType,
+//    pub inline_table: Option<InlineTable>,
 }
 
 #[derive(Debug, Clone)]

@@ -238,6 +238,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             rca,
             growth,
             debug,
+            rate: None
         })
     }
 }

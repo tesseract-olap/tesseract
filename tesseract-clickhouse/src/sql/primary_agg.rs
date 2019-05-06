@@ -11,6 +11,7 @@ use super::{
     CutSql,
     DrilldownSql,
     MeasureSql,
+    RateSql,
     dim_subquery,
 };
 
@@ -22,6 +23,7 @@ pub fn primary_agg(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    rate: &Option<RateSql>,
     ) -> (String, String)
 {
     // Before first section, need to separate out inline dims.
@@ -126,10 +128,15 @@ pub fn primary_agg(
     let all_fact_dim_aliass = join(inline_dim_aliass.chain(dim_idx_cols), ", ");
 
     let mut fact_sql = format!("select {}", all_fact_dim_cols);
+    fact_sql.push_str(&format!(", {} from {}", mea_cols, table.name));
 
-    fact_sql.push_str(
-        &format!(", {} from {}", mea_cols, table.name)
-    );
+    let mut rate_fact_sql = "".to_string();
+
+    if let Some(_r) = rate {
+        // TODO: Use aggregator information?
+        rate_fact_sql = format!("select {}", all_fact_dim_cols);
+        rate_fact_sql.push_str(&format!(", sum({}) as rate_num from {}", meas[0].column, table.name));
+    }
 
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
         let inline_cut_clause = inline_cuts
@@ -152,20 +159,26 @@ pub fn primary_agg(
                     c.primary_key,
                     cut_table,
                     cut_sql_string(&c),
-                    )
+                )
             });
-
 
         let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "and ");
 
-        fact_sql.push_str(
-            &format!(" where {}", cut_clause)
-        );
+        fact_sql.push_str(&format!(" where {}", cut_clause));
+
+        if let Some(r) = rate {
+            // TODO: Allow for multiple members
+            rate_fact_sql.push_str(
+                &format!(" where {} = {} and {}", r.column.clone(), r.members.clone(), cut_clause)
+            );
+        }
     }
 
-    fact_sql.push_str(
-        &format!(" group by {}", all_fact_dim_aliass)
-    );
+    fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
+
+    if let Some(_r) = rate {
+        rate_fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
+    }
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
     // TODO allow for differently named cols to be joined on. (using an alias for as)
@@ -207,7 +220,22 @@ pub fn primary_agg(
             sub_queries,
             dim_subquery.foreign_key
         );
+
+        // Wrap with rate subquery if there is a rate calculation
+        if let Some(_r) = rate {
+            sub_queries = format!("select {}{}, rate_num from ({}) all inner join ({}) using {}",
+                sub_queries_dim_cols,
+                select_mea_cols,
+                sub_queries,
+                rate_fact_sql,
+                dim_subquery.foreign_key
+            );
+        }
     }
+
+    println!(" ");
+    println!("{}", sub_queries);
+    println!(" ");
 
     // Finally, wrap with final agg and result
     let final_drill_cols = drills.iter().map(|drill| drill.col_alias_only_string());
@@ -220,12 +248,25 @@ pub fn primary_agg(
     let final_mea_cols = join(final_mea_cols, ", ");
 
     // This is the final result of the groupings.
-    let final_sql = format!("select {}, {} from ({}) group by {}",
-        final_drill_cols,
-        final_mea_cols,
-        sub_queries,
-        final_drill_cols,
-    );
+    let final_sql = match rate {
+        Some(_r) => {
+            // TODO: Use appropriate aggregator
+            format!("select {}, {}, sum(rate_num) / sum(m0) as rate from ({}) group by {}",
+                final_drill_cols,
+                final_mea_cols,
+                sub_queries,
+                final_drill_cols,
+            )
+        },
+        None => {
+            format!("select {}, {} from ({}) group by {}",
+                final_drill_cols,
+                final_mea_cols,
+                sub_queries,
+                final_drill_cols,
+            )
+        }
+    };
 
     (final_sql, final_drill_cols)
 }

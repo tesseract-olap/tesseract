@@ -38,6 +38,7 @@ use self::query_ir::{
     SortSql,
     RcaSql,
     GrowthSql,
+    RateSql,
     FilterSql,
 };
 pub use self::query::{Query, MeaOrCalc, FilterQuery};
@@ -392,6 +393,25 @@ impl Schema {
             None
         };
 
+        let rate = if let Some(ref rate) = query.rate {
+            // TODO: Perform drills and cols checks here
+
+            // Only one measure allowed when getting rates for now
+            if mea_cols.len() > 1 {
+                return Err(format_err!("Only one measure allowed for rate calculations"));
+            }
+
+            let members_query_ir = self.get_dim_col_table(cube, &rate.level_name)?;
+
+            Some(RateSql {
+                table: members_query_ir.table,
+                column: members_query_ir.key_column,
+                members: rate.value.clone()
+            })
+        } else {
+            None
+        };
+
         // getting headers, not for sql but needed for formatting
         let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
             .map_err(|err| format_err!("Error getting drill headers: {}", err))?;
@@ -414,9 +434,9 @@ impl Schema {
             mea_headers.insert(0, format!("{} RCA", rca.mea.0.clone()));
         }
 
-
-        // Be careful with other calculations. TODO figure out a more composable system.
-        let headers = if let Some(ref growth) = query.growth {
+        // Be careful with other calculations.
+        // TODO figure out a more composable system.
+        let mut headers = if let Some(ref growth) = query.growth {
             // swapping around measure headers. growth mea moves to back.
             let g_mea_idx = query.measures.iter()
                     .position(|mea| *mea == growth.mea )
@@ -453,6 +473,11 @@ impl Schema {
             [&drill_headers[..], &mea_headers[..]].concat()
         };
 
+        // Rate calculations always come last
+        if let Some(ref rate) = query.rate {
+            headers.push("Rate".to_string());
+        }
+
         Ok((
             QueryIr {
                 table,
@@ -466,6 +491,7 @@ impl Schema {
                 limit,
                 rca,
                 growth,
+                rate,
             },
             headers,
         ))

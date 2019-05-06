@@ -44,6 +44,7 @@ use super::{
     CutSql,
     DrilldownSql,
     MeasureSql,
+    RateSql,
     RcaSql,
 };
 
@@ -52,6 +53,7 @@ pub fn calculate(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    rate: &Option<RateSql>,
     rca: &RcaSql,
     ) -> (String, String)
 {
@@ -132,8 +134,8 @@ pub fn calculate(
     // If there's no internal cuts, then b, c, d are calculated from a.
 
     // First do aggregation for part a, b
-    let (a, a_final_drills) = primary_agg(table, &ac_cuts, &a_drills, &all_meas);
-    let (b, b_final_drills) = primary_agg(table, &bd_cuts, &b_drills, &all_meas);
+    let (a, a_final_drills) = primary_agg(table, &ac_cuts, &a_drills, &all_meas, &rate);
+    let (b, b_final_drills) = primary_agg(table, &bd_cuts, &b_drills, &all_meas, &rate);
 
     // replace final_m0 with letter name.
     // I put the rca measure at the beginning of the drills, so it should

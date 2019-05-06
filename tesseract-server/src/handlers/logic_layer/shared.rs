@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName};
+use tesseract_core::names::{Cut, Drilldown, Property, Measure};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
 use tesseract_core::{Query as TsQuery, Schema, MeaOrCalc};
 use tesseract_core::schema::{Cube};
@@ -212,24 +212,6 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
         let ll_config = agg_query_opt.config.clone();
 
         let parents = agg_query_opt.parents.unwrap_or(false);
-
-        let rate = match agg_query_opt.rate {
-            Some(rate) => {
-                let level_value_split: Vec<String> = rate.split(".").map(|s| s.to_string()).collect();
-                if level_value_split.len() != 2 {
-                    bail!("Malformatted rate calculation specification.");
-                }
-
-                let level_name = match level_map.get(&level_value_split[0]) {
-                    Some(level_name) => level_name.clone(),
-                    None => bail!("Unrecognized level in rate calculation.")
-                };
-                let value = level_value_split[1].clone();
-
-                Some(RateQuery::new(level_name, value))
-            },
-            None => None
-        };
 
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
@@ -493,6 +475,24 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 );
 
                 Some(rca)
+            },
+            None => None
+        };
+
+        let rate = match agg_query_opt.rate {
+            Some(rate) => {
+                let level_value_split: Vec<String> = rate.split(".").map(|s| s.to_string()).collect();
+                if level_value_split.len() != 2 {
+                    bail!("Malformatted rate calculation specification.");
+                }
+
+                let level_name = match level_map.get(&level_value_split[0]) {
+                    Some(level_name) => level_name.clone(),
+                    None => bail!("Unrecognized level in rate calculation.")
+                };
+                let value = level_value_split[1].clone();
+
+                Some(RateQuery::new(level_name, value))
             },
             None => None
         };
