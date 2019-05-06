@@ -479,6 +479,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             None => None
         };
 
+        // TODO: Resolve named sets
         let rate = match agg_query_opt.rate {
             Some(rate) => {
                 let level_value_split: Vec<String> = rate.split(".").map(|s| s.to_string()).collect();
@@ -492,7 +493,9 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 };
                 let value = level_value_split[1].clone();
 
-                Some(RateQuery::new(level_name, value))
+                let values: Vec<String> = value.split(",").map(|s| s.to_string()).collect();
+
+                Some(RateQuery::new(level_name, values))
             },
             None => None
         };

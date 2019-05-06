@@ -406,7 +406,7 @@ impl Schema {
             Some(RateSql {
                 table: members_query_ir.table,
                 column: members_query_ir.key_column,
-                members: rate.value.clone()
+                members: rate.values.clone()
             })
         } else {
             None

@@ -451,14 +451,14 @@ impl FromStr for FilterQuery {
 #[derive(Debug, Clone)]
 pub struct RateQuery {
     pub level_name: LevelName,
-    pub value: String,
+    pub values: Vec<String>,
 }
 
 impl RateQuery {
-    pub fn new(level_name: LevelName, value: String) -> Self {
+    pub fn new(level_name: LevelName, values: Vec<String>) -> Self {
         RateQuery {
             level_name,
-            value,
+            values,
         }
     }
 }

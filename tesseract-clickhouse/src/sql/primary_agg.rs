@@ -167,9 +167,12 @@ pub fn primary_agg(
         fact_sql.push_str(&format!(" where {}", cut_clause));
 
         if let Some(r) = rate {
-            // TODO: Allow for multiple members
             rate_fact_sql.push_str(
-                &format!(" where {} = {} and {}", r.column.clone(), r.members.clone(), cut_clause)
+                &format!(" where {} in ({}) and {}",
+                     r.column.clone(),
+                     join(r.members.clone(), ", "),
+                     cut_clause
+                )
             );
         }
     }

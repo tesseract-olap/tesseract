@@ -313,8 +313,7 @@ pub struct RateSql {
 //    pub primary_key: String,
 //    pub foreign_key: String,
     pub column: String,
-    pub members: String,
-//    pub members: Vec<String>,
+    pub members: Vec<String>,
 //    pub member_type: MemberType,
 //    pub inline_table: Option<InlineTable>,
 }

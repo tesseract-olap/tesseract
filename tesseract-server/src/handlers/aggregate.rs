@@ -223,6 +223,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
 
         let debug = agg_query_opt.debug.unwrap_or(false);
 
+        // TODO: deserialize rate
         Ok(TsQuery {
             drilldowns,
             cuts,
