@@ -213,6 +213,24 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 
+        let rate = match agg_query_opt.rate {
+            Some(rate) => {
+                let level_value_split: Vec<String> = rate.split(".").map(|s| s.to_string()).collect();
+                if level_value_split.len() != 2 {
+                    bail!("Malformatted rate calculation specification.");
+                }
+
+                let level_name = match level_map.get(&level_value_split[0]) {
+                    Some(level_name) => level_name.clone(),
+                    None => bail!("Unrecognized level in rate calculation.")
+                };
+                let value = level_value_split[1].clone();
+
+                Some(RateQuery::new(level_name, value))
+            },
+            None => None
+        };
+
         let drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
@@ -481,43 +499,6 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
         let debug = agg_query_opt.debug.unwrap_or(false);
 
-        println!(" ");
-
-        if let Some(rate) = agg_query_opt.rate {
-            // TODO: There can't be a drilldown or cut on `level_name`
-            // TODO: Easier to extract this before drills and cuts
-            //       can check as we go through these other structs and return error
-
-            let rate_split: Vec<String> = rate.split(",").map(|s| s.to_string()).collect();
-            if rate_split.len() != 2 {
-                bail!("Malformatted rate calculation specification.");
-            }
-
-            let level_value = rate_split[0].clone();
-            let measure = rate_split[1].clone();
-
-            let level_value_split: Vec<String> = level_value.split(".").map(|s| s.to_string()).collect();
-            if level_value_split.len() != 2 {
-                bail!("Malformatted rate calculation specification.");
-            }
-
-            let level_name = match level_map.get(&level_value_split[0]) {
-                Some(level_name) => level_name.clone(),
-                None => bail!("Unrecognized level in rate calculation.")
-            };
-            let value = level_value_split[1].clone();
-
-            let rt = RateQuery::new(
-                level_name,
-                value,
-                measure
-            );
-
-            println!("{:?}", rt);
-        }
-
-        println!(" ");
-
         Ok(TsQuery {
             drilldowns,
             cuts,
@@ -533,6 +514,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
             growth,
             debug,
             filters,
+            rate
         })
     }
 }

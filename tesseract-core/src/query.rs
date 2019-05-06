@@ -24,6 +24,7 @@ pub struct Query {
     pub limit: Option<LimitQuery>,
     pub rca: Option<RcaQuery>,
     pub growth: Option<GrowthQuery>,
+    pub rate: Option<RateQuery>,
     pub debug: bool,
 }
 
@@ -43,6 +44,7 @@ impl Query {
             limit: None,
             rca: None,
             growth: None,
+            rate: None,
             debug: false,
         }
     }
@@ -450,17 +452,13 @@ impl FromStr for FilterQuery {
 pub struct RateQuery {
     pub level_name: LevelName,
     pub value: String,
-    pub measure: Measure,
 }
 
 impl RateQuery {
-    pub fn new(level_name: LevelName, value: String, measure: String) -> Self {
-        let measure = Measure::new(measure);
-
+    pub fn new(level_name: LevelName, value: String) -> Self {
         RateQuery {
             level_name,
             value,
-            measure,
         }
     }
 }
