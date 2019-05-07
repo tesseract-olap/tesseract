@@ -139,7 +139,7 @@ pub fn primary_agg(
 
     let mut rate_fact_sql = "".to_string();
 
-    if let Some(_r) = rate {
+    if rate.is_some() {
         rate_fact_sql = format!("select {}", all_fact_dim_cols);
         rate_fact_sql.push_str(&format!(", {}({}) as rate_num from {}", rate_aggregator, meas[0].column, table.name));
     }
@@ -185,7 +185,7 @@ pub fn primary_agg(
 
     fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
 
-    if let Some(_r) = rate {
+    if rate.is_some() {
         rate_fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
     }
 
@@ -231,7 +231,7 @@ pub fn primary_agg(
         );
 
         // Wrap with rate subquery if there is a rate calculation
-        if let Some(_r) = rate {
+        if rate.is_some() {
             sub_queries = format!("select {}{}, rate_num from ({}) all inner join ({}) using {}",
                 sub_queries_dim_cols,
                 select_mea_cols,
