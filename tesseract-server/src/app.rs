@@ -2,6 +2,7 @@ use actix_web::{
     http::Method,
     middleware,
     App,
+    http::NormalizePath,
 };
 use tesseract_core::{Backend, Schema};
 
@@ -93,7 +94,9 @@ pub fn create_app(
 
         .resource("/flush", |r| {
             r.method(Method::POST).with(flush_handler)
-        });
+        })
+        // Allow the API to accept /my-path or /my-path/ for all requests
+        .default_resource(|r| r.h(NormalizePath::default()));
 
     let app = if streaming_response {
         app
