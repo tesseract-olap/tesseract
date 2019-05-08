@@ -11,7 +11,6 @@ use super::{
     CutSql,
     DrilldownSql,
     MeasureSql,
-    RateSql,
     dim_subquery,
 };
 
@@ -25,7 +24,6 @@ pub fn primary_agg(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
-    rate: &Option<RateSql>,
     ) -> (String, String)
 {
     // Before first section, need to separate out inline dims.
