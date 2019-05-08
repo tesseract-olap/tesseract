@@ -309,13 +309,8 @@ pub struct GrowthSql {
 
 #[derive(Debug, Clone)]
 pub struct RateSql {
-    pub table: Table,
-//    pub primary_key: String,
-//    pub foreign_key: String,
-    pub column: String,
+    pub drilldown_sql: DrilldownSql,
     pub members: Vec<String>,
-//    pub member_type: MemberType,
-//    pub inline_table: Option<InlineTable>,
 }
 
 #[derive(Debug, Clone)]

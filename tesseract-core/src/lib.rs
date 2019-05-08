@@ -411,12 +411,14 @@ impl Schema {
                 _ => return Err(format_err!("Rate can only be calculated for measures with sum or count aggregations"))
             }
 
-            let members_query_ir = self.get_dim_col_table(cube, &rate.level_name)?;
+            let drilldown_sql = self.cube_drill_cols(
+                &cube, &[Drilldown(rate.level_name.clone())],
+                &query.properties, &query.captions, query.parents
+            )?;
 
             Some(RateSql {
-                table: members_query_ir.table,
-                column: members_query_ir.key_column,
-                members: rate.values.clone()
+                drilldown_sql: drilldown_sql[0].clone(),
+                members: rate.values.clone(),
             })
         } else {
             None
@@ -484,7 +486,7 @@ impl Schema {
         };
 
         // Rate calculations always come last
-        if let Some(ref rate) = query.rate {
+        if query.rate.is_some() {
             headers.push("Rate".to_string());
         }
 

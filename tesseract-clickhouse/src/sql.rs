@@ -48,15 +48,19 @@ pub fn clickhouse_sql(
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rca)
         } else {
-            primary_agg(table, cuts, drills, meas)
+            if let Some(rate) = rate {
+                rate_calculation(table, cuts, drills, meas, rate)
+            } else {
+                primary_agg(table, cuts, drills, meas)
+            }
         }
     };
 
-    if let Some(rate) = rate {
-        final_sql = rate_calculation(
-            table, cuts, drills, meas, rate, &final_sql, &final_drill_cols
-        );
-    }
+    println!(" ");
+    println!("{}", final_sql);
+    println!(" ");
+    println!("{}", final_drill_cols);
+    println!(" ");
 
     if let Some(growth) = growth {
         let (sql, drill_cols) = growth::calculate(final_sql, &final_drill_cols, meas.len(), growth);

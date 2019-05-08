@@ -14,8 +14,6 @@ use super::{
     dim_subquery,
 };
 
-use tesseract_core::{Aggregator};
-
 
 /// Error checking is done before this point. This string formatter
 /// accepts any input
