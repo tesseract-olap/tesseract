@@ -132,18 +132,6 @@ pub fn primary_agg(
     let mut fact_sql = format!("select {}", all_fact_dim_cols);
     fact_sql.push_str(&format!(", {} from {}", mea_cols, table.name));
 
-    let rate_aggregator = match meas[0].aggregator {
-        Aggregator::Count => "count".to_string(),
-        _ => "sum".to_string()
-    };
-
-    let mut rate_fact_sql = "".to_string();
-
-    if rate.is_some() {
-        rate_fact_sql = format!("select {}", all_fact_dim_cols);
-        rate_fact_sql.push_str(&format!(", {}({}) as rate_num from {}", rate_aggregator, meas[0].column, table.name));
-    }
-
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
         let inline_cut_clause = inline_cuts
             .iter()
@@ -171,23 +159,9 @@ pub fn primary_agg(
         let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "and ");
 
         fact_sql.push_str(&format!(" where {}", cut_clause));
-
-        if let Some(r) = rate {
-            rate_fact_sql.push_str(
-                &format!(" where {} in ({}) and {}",
-                     r.column.clone(),
-                     join(r.members.clone(), ", "),
-                     cut_clause
-                )
-            );
-        }
     }
 
     fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
-
-    if rate.is_some() {
-        rate_fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
-    }
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
     // TODO allow for differently named cols to be joined on. (using an alias for as)
@@ -229,17 +203,6 @@ pub fn primary_agg(
             sub_queries,
             dim_subquery.foreign_key
         );
-
-        // Wrap with rate subquery if there is a rate calculation
-        if rate.is_some() {
-            sub_queries = format!("select {}{}, rate_num from ({}) all inner join ({}) using {}",
-                sub_queries_dim_cols,
-                select_mea_cols,
-                sub_queries,
-                rate_fact_sql,
-                dim_subquery.foreign_key
-            );
-        }
     }
 
     // Finally, wrap with final agg and result
@@ -253,26 +216,12 @@ pub fn primary_agg(
     let final_mea_cols = join(final_mea_cols, ", ");
 
     // This is the final result of the groupings.
-    let final_sql = match rate {
-        Some(_r) => {
-            format!("select {}, {}, {}(rate_num) / {}(m0) as rate from ({}) group by {}",
-                final_drill_cols,
-                final_mea_cols,
-                rate_aggregator,
-                rate_aggregator,
-                sub_queries,
-                final_drill_cols,
-            )
-        },
-        None => {
-            format!("select {}, {} from ({}) group by {}",
-                final_drill_cols,
-                final_mea_cols,
-                sub_queries,
-                final_drill_cols,
-            )
-        }
-    };
+    let final_sql = format!("select {}, {} from ({}) group by {}",
+        final_drill_cols,
+        final_mea_cols,
+        sub_queries,
+        final_drill_cols,
+    );
 
     (final_sql, final_drill_cols)
 }
