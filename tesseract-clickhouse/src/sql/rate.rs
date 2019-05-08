@@ -23,10 +23,24 @@ pub fn rate_calculation(
 {
     // Add a drilldown on the level we are getting the rate for
     let mut new_drills: Vec<DrilldownSql> = vec![];
+    let mut found_rate_drill = false;
+
     for drill in drills {
+        if drill == &rate.drilldown_sql {
+//            found_rate_drill = true;
+
+            println!(" ");
+            println!("CONTINUING...");
+            println!(" ");
+
+            continue;
+        }
         new_drills.push(drill.clone());
     }
-    new_drills.push(rate.drilldown_sql.clone());
+
+    if !found_rate_drill {
+        new_drills.push(rate.drilldown_sql.clone());
+    }
 
     // Call primary agg
     let (mut final_sql, mut final_drill_cols) = {
@@ -50,31 +64,35 @@ pub fn rate_calculation(
 
     let rate_drill_cols = rate.drilldown_sql.col_alias_only_vec();
     for rate_drill_col in &rate_drill_cols {
-        rate_sql = format!("{}, groupArray({}) as {}", rate_sql, rate_drill_col, rate_drill_col);
+        rate_sql = format!("{}, groupArray({}) as {}_group", rate_sql, rate_drill_col, rate_drill_col);
     }
 
     rate_sql = format!("{} from ({}) group by {}", rate_sql, final_sql, original_drill_cols);
 
     // Unpivot
-    //    Watch out for the appropriate aggregation
-    rate_sql = format!("select {}, final_m0_agg as final_m0, final_m0_rate from ({}) array join",
-        final_drill_cols, rate_sql
+    let mut rate_sql_unpivot = format!("select {}, ", original_drill_cols);
+
+    for rate_drill_col in &rate_drill_cols {
+        rate_sql_unpivot = format!("{}{}_group, ", rate_sql_unpivot, rate_drill_col);
+    }
+
+    rate_sql = format!("{}final_m0_agg as final_m0, final_m0_rate from ({}) array join",
+        rate_sql_unpivot, rate_sql
     );
 
     for rate_drill_col in &rate_drill_cols {
-        rate_sql = format!("{} {} as {},", rate_sql, rate_drill_col, rate_drill_col);
+        rate_sql = format!("{} {}_group as {}_group,", rate_sql, rate_drill_col, rate_drill_col);
     }
 
     rate_sql = format!("{} final_m0_rate as final_m0_rate", rate_sql);
 
     // Final aggregation
-    rate_sql = format!("select {}, final_m0, {}(final_m0_rate) / avg(final_m0) from ({}) where {} in ({}) group by {}, final_m0 order by {}",
+    rate_sql = format!("select {}, final_m0, {}(final_m0_rate) / avg(final_m0) from ({}) where {}_group in ({}) group by {}, final_m0",
         original_drill_cols,
         rate_aggregator,
         rate_sql,
         rate_drill_cols[0],
         join(rate.members.clone(), ", "),
-        original_drill_cols,
         original_drill_cols
     );
 
