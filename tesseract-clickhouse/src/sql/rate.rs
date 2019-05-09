@@ -27,12 +27,6 @@ pub fn rate_calculation(
 
     for drill in drills {
         if drill == &rate.drilldown_sql {
-//            found_rate_drill = true;
-
-            println!(" ");
-            println!("CONTINUING...");
-            println!(" ");
-
             continue;
         }
         new_drills.push(drill.clone());

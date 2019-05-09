@@ -47,20 +47,12 @@ pub fn clickhouse_sql(
     let (mut final_sql, mut final_drill_cols) = {
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rca)
+        } else if let Some(rate) = rate {
+            rate_calculation(table, cuts, drills, meas, rate)
         } else {
-            if let Some(rate) = rate {
-                rate_calculation(table, cuts, drills, meas, rate)
-            } else {
-                primary_agg(table, cuts, drills, meas)
-            }
+            primary_agg(table, cuts, drills, meas)
         }
     };
-
-    println!(" ");
-    println!("{}", final_sql);
-    println!(" ");
-    println!("{}", final_drill_cols);
-    println!(" ");
 
     if let Some(growth) = growth {
         let (sql, drill_cols) = growth::calculate(final_sql, &final_drill_cols, meas.len(), growth);
