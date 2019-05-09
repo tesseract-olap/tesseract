@@ -87,6 +87,7 @@ impl Backend for Clickhouse {
             &query_ir.limit,
             &query_ir.rca,
             &query_ir.growth,
+            &query_ir.rate,
         )
     }
 

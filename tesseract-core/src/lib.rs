@@ -38,6 +38,7 @@ use self::query_ir::{
     SortSql,
     RcaSql,
     GrowthSql,
+    RateSql,
     FilterSql,
 };
 pub use self::query::{Query, MeaOrCalc, FilterQuery};
@@ -392,6 +393,37 @@ impl Schema {
             None
         };
 
+        let rate = if let Some(ref rate) = query.rate {
+            // For now at least, we'll allow drilldowns and cuts on the level
+            // used for the rate calculation. Drilldowns will always result in
+            // a rate of 1. Cuts allow for rate calculation in a subset of the
+            // level universe (for example, calculating the rate of "Non-fiction"
+            // sales inside a "Books" named set.
+
+            // Only one measure allowed when getting rates for now
+            if mea_cols.len() > 1 {
+                return Err(format_err!("Only one measure allowed for rate calculations"));
+            }
+
+            match mea_cols[0].aggregator {
+                Aggregator::Sum => (),
+                Aggregator::Count => (),
+                _ => return Err(format_err!("Rate can only be calculated for measures with sum or count aggregations"))
+            }
+
+            let drilldown_sql = self.cube_drill_cols(
+                &cube, &[Drilldown(rate.level_name.clone())],
+                &query.properties, &query.captions, query.parents
+            )?;
+
+            Some(RateSql {
+                drilldown_sql: drilldown_sql[0].clone(),
+                members: rate.values.clone(),
+            })
+        } else {
+            None
+        };
+
         // getting headers, not for sql but needed for formatting
         let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
             .map_err(|err| format_err!("Error getting drill headers: {}", err))?;
@@ -414,9 +446,9 @@ impl Schema {
             mea_headers.insert(0, format!("{} RCA", rca.mea.0.clone()));
         }
 
-
-        // Be careful with other calculations. TODO figure out a more composable system.
-        let headers = if let Some(ref growth) = query.growth {
+        // Be careful with other calculations.
+        // TODO figure out a more composable system.
+        let mut headers = if let Some(ref growth) = query.growth {
             // swapping around measure headers. growth mea moves to back.
             let g_mea_idx = query.measures.iter()
                     .position(|mea| *mea == growth.mea )
@@ -453,6 +485,11 @@ impl Schema {
             [&drill_headers[..], &mea_headers[..]].concat()
         };
 
+        // Rate calculations always come last
+        if query.rate.is_some() {
+            headers.push("Rate".to_string());
+        }
+
         Ok((
             QueryIr {
                 table,
@@ -466,6 +503,7 @@ impl Schema {
                 limit,
                 rca,
                 growth,
+                rate,
             },
             headers,
         ))

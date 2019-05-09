@@ -126,10 +126,7 @@ pub fn primary_agg(
     let all_fact_dim_aliass = join(inline_dim_aliass.chain(dim_idx_cols), ", ");
 
     let mut fact_sql = format!("select {}", all_fact_dim_cols);
-
-    fact_sql.push_str(
-        &format!(", {} from {}", mea_cols, table.name)
-    );
+    fact_sql.push_str(&format!(", {} from {}", mea_cols, table.name));
 
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
         let inline_cut_clause = inline_cuts
@@ -152,20 +149,15 @@ pub fn primary_agg(
                     c.primary_key,
                     cut_table,
                     cut_sql_string(&c),
-                    )
+                )
             });
-
 
         let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "and ");
 
-        fact_sql.push_str(
-            &format!(" where {}", cut_clause)
-        );
+        fact_sql.push_str(&format!(" where {}", cut_clause));
     }
 
-    fact_sql.push_str(
-        &format!(" group by {}", all_fact_dim_aliass)
-    );
+    fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
     // TODO allow for differently named cols to be joined on. (using an alias for as)

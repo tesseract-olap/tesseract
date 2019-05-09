@@ -280,4 +280,3 @@ pub fn calculate(
 
     (final_sql, a_final_drills)
 }
-

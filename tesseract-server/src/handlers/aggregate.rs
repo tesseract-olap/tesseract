@@ -145,6 +145,7 @@ pub struct AggregateQueryOpt {
     limit: Option<String>,
     growth: Option<String>,
     rca: Option<String>,
+    rate: Option<String>,
     debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
@@ -221,8 +222,13 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             .map(|r| r.parse())
             .transpose()?;
 
+        let rate = agg_query_opt.rate
+            .map(|r| r.parse())
+            .transpose()?;
+
         let debug = agg_query_opt.debug.unwrap_or(false);
 
+        // TODO: deserialize rate
         Ok(TsQuery {
             drilldowns,
             cuts,
@@ -238,6 +244,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             rca,
             growth,
             debug,
+            rate
         })
     }
 }

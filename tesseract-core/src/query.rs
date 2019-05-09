@@ -1,3 +1,5 @@
+use itertools::join;
+
 use failure::{Error, format_err, bail};
 use std::str::FromStr;
 
@@ -24,6 +26,7 @@ pub struct Query {
     pub limit: Option<LimitQuery>,
     pub rca: Option<RcaQuery>,
     pub growth: Option<GrowthQuery>,
+    pub rate: Option<RateQuery>,
     pub debug: bool,
 }
 
@@ -43,6 +46,7 @@ impl Query {
             limit: None,
             rca: None,
             growth: None,
+            rate: None,
             debug: false,
         }
     }
@@ -442,5 +446,43 @@ impl FromStr for FilterQuery {
             },
             _ => bail!("Could not parse a filter query"),
         }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct RateQuery {
+    pub level_name: LevelName,
+    pub values: Vec<String>,
+}
+
+impl RateQuery {
+    pub fn new(level_name: LevelName, values: Vec<String>) -> Self {
+        RateQuery {
+            level_name,
+            values,
+        }
+    }
+}
+
+impl FromStr for RateQuery {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let rate_split: Vec<String> = s.split(".").map(|x| x.to_string()).collect();
+        let n = rate_split.len();
+
+        if n <= 2 || n >= 5 {
+            return Err(format_err!("Malformatted RateQuery"));
+        }
+
+        let level = join(rate_split[0..n-1].iter(), ".");
+        let level_name = level.parse::<LevelName>()?;
+        let values: Vec<String> = rate_split[n-1].split(",").map(|s| s.to_string()).collect();
+
+        Ok(RateQuery{
+            level_name,
+            values
+        })
     }
 }

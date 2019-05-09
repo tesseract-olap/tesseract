@@ -3,6 +3,7 @@ mod cuts;
 mod growth;
 mod options;
 mod primary_agg;
+mod rate;
 mod rca;
 
 use tesseract_core::query_ir::{
@@ -17,10 +18,12 @@ use tesseract_core::query_ir::{
     RcaSql,
     GrowthSql,
     FilterSql,
+    RateSql,
     dim_subquery,
 };
 use self::options::wrap_options;
 use self::primary_agg::primary_agg;
+use self::rate::rate_calculation;
 
 
 /// Error checking is done before this point. This string formatter
@@ -38,11 +41,14 @@ pub fn clickhouse_sql(
     limit: &Option<LimitSql>,
     rca: &Option<RcaSql>,
     growth: &Option<GrowthSql>,
+    rate: &Option<RateSql>,
     ) -> String
 {
     let (mut final_sql, mut final_drill_cols) = {
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rca)
+        } else if let Some(rate) = rate {
+            rate_calculation(table, cuts, drills, meas, rate)
         } else {
             primary_agg(table, cuts, drills, meas)
         }
@@ -58,6 +64,7 @@ pub fn clickhouse_sql(
 
     final_sql
 }
+
 
 // TODO test having not cuts or drilldowns
 #[cfg(test)]
