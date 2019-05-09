@@ -183,6 +183,7 @@ impl From<&Aggregator> for AggregatorMetadata {
             Aggregator::WeightedSum { ..} => "weighted_sum".into(),
             Aggregator::Moe { .. } => "MOE".into(),
             Aggregator::WeightedAverageMoe { .. } => "weighted_average_moe".into(),
+            Aggregator::GroupedMedian { .. } => "grouped_median".into(),
             Aggregator::Custom(_) => "custom".into(),
         };
 

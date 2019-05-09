@@ -22,6 +22,10 @@ pub enum Aggregator {
     /// median on the second
     #[serde(rename="median")]
     Median,
+    #[serde(rename="grouped_median")]
+    GroupedMedian {
+        sub_aggregator: GroupMedianAggregator,
+    },
     /// Weighted Sum is calculated against the measure's value column.
     /// sum(column * weight_column)
     ///
@@ -66,6 +70,23 @@ pub enum Aggregator {
     // two roll-ups. For example, median won't work across two roll-ups
     #[serde(rename="custom")]
     Custom(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum GroupMedianAggregator {
+    #[serde(rename="sum")]
+    Sum,
+    #[serde(rename="count")]
+    Count,
+}
+
+impl GroupMedianAggregator {
+    pub fn sql_string(&self) -> String {
+        match self {
+            GroupMedianAggregator::Sum => "sum".to_owned(),
+            GroupMedianAggregator::Count => "count".to_owned(),
+        }
+    }
 }
 
 #[cfg(test)]
