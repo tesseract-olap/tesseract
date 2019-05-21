@@ -964,3 +964,46 @@ struct MembersQueryIR {
     key_column: String,
     name_column: Option<String>,
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde_json;
+
+    const SCHEMA_STR_MULTIPLE_HIER_NO_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+    const SCHEMA_STR_MULTIPLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+    const SCHEMA_STR_SINGLE_HIER_NO_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+    const SCHEMA_STR_SINGLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+
+    #[test]
+    #[should_panic]
+    fn test_validate_schema_multiple_hier_no_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_MULTIPLE_HIER_NO_DEFAULT).unwrap();
+        schema.validate().unwrap();
+    }
+
+    #[test]
+    fn test_validate_schema_multiple_hier_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_MULTIPLE_HIER_DEFAULT).unwrap();
+        schema.validate().unwrap();
+    }
+
+    #[test]
+    fn test_validate_schema_single_hier_no_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_SINGLE_HIER_NO_DEFAULT).unwrap();
+        schema.validate().unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_validate_schema_single_hier_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_SINGLE_HIER_DEFAULT).unwrap();
+
+        assert_eq!(schema.cubes[0].dimensions[0].default_hierarchy.clone().unwrap(), "Tract".to_owned());
+
+        schema.validate().unwrap();
+
+        // should be rewritten to NONE
+        schema.cubes[0].dimensions[0].default_hierarchy.clone().unwrap();
+    }
+}

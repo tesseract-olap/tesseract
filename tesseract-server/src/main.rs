@@ -103,7 +103,8 @@ fn main() -> Result<(), Error> {
     // NOTE: Local schema is the only supported SchemaSource for now
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
-    let schema = schema_config::read_schema(&schema_path)?;
+    let mut schema = schema_config::read_schema(&schema_path)?;
+    schema.validate()?;
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();
     let schema_arc = Arc::new(RwLock::new(schema.clone()));
 

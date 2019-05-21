@@ -631,6 +631,7 @@ mod test {
                             inline_table: None,
                         },
                     ],
+                    default_hierarchy: None,
                     annotations: None,
                 }
             ]),

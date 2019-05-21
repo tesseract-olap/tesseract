@@ -58,6 +58,7 @@ impl From<&Cube> for CubeMetadata {
 pub struct DimensionMetadata {
     pub name: String,
     pub hierarchies: Vec<HierarchyMetadata>,
+    pub default_hierarchy: Option<String>,
     pub annotations: AnnotationMetadata,
 }
 
@@ -68,6 +69,7 @@ impl From<&Dimension> for DimensionMetadata {
         DimensionMetadata {
             name: dimension.name.clone(),
             hierarchies: dimension.hierarchies.iter().map(|h| h.into()).collect(),
+            default_hierarchy: dimension.default_hierarchy.clone(),
             annotations,
         }
     }
