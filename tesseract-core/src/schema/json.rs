@@ -27,6 +27,7 @@ pub struct DimensionConfigJson {
     pub name: String,
     pub foreign_key: Option<String>, // does not exist for shared dims
     pub hierarchies: Vec<HierarchyConfigJson>,
+    pub default_hierarchy: Option<String>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
@@ -34,6 +35,7 @@ pub struct DimensionConfigJson {
 pub struct SharedDimensionConfigJson {
     pub name: String,
     pub hierarchies: Vec<HierarchyConfigJson>,
+    pub default_hierarchy: Option<String>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 

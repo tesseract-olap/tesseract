@@ -64,6 +64,43 @@ impl Schema {
         Schema::from_json(&serialized)
     }
 
+    /// schema validation
+    pub fn validate(&mut self) -> Result<(), Error> {
+        // if there's multiple hierarchies in a dim, there must be a default hierarchy.
+        // also, the default hierarchy must match names with an actual hierarchy.
+        //
+        // Also, a single hierarchy should not have a default set
+        //
+        // This means that later, we can just check whether there is a default
+        // hierarchy only, instead of also checking for hierarchy cardinality during
+        // a request
+
+        for cube in self.cubes.iter_mut() {
+            for dim in cube.dimensions.iter_mut() {
+                if dim.hierarchies.len() == 1 {
+                    dim.default_hierarchy = None;
+                } else if !dim.hierarchies.is_empty() {
+                    // first, default_hierarchy must be assigned
+                    let default_hierarchy = dim.default_hierarchy
+                        .clone()
+                        .ok_or_else(|| format_err!("Default hierarchy required for multiple hierarchies"))?;
+
+                    // if default_hierarchy exists, then check that it's in one of the
+                    // hierarchies
+                    let contains_default = dim.hierarchies.iter()
+                        .map(|hier| &hier.name)
+                        .any(|hier_name| *hier_name == default_hierarchy);
+
+                    if !contains_default {
+                        bail!("Default hierarchy must exist in multiple hierarchies");
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn cube_metadata(&self, cube_name: &str) -> Option<CubeMetadata> {
         // Takes the first cube with the name.
         // TODO we still have to check that the cube names are distinct
