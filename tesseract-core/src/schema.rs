@@ -100,6 +100,7 @@ impl From<SchemaConfigJson> for Schema {
                                     name: shared_dim_config.name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
                                     hierarchies,
+                                    default_hierarchy: shared_dim_config.default_hierarchy.clone(),
                                     annotations: dim_annotations,
                                     is_shared: true
                                 });
@@ -270,8 +271,9 @@ pub struct Dimension {
     pub name: String,
     pub foreign_key: Option<String>,
     pub hierarchies: Vec<Hierarchy>,
+    pub default_hierarchy: Option<String>,
     pub annotations: Option<Vec<Annotation>>,
-    pub is_shared: bool
+    pub is_shared: bool,
 }
 
 impl From<DimensionConfigJson> for Dimension {
@@ -289,6 +291,7 @@ impl From<DimensionConfigJson> for Dimension {
         Dimension {
             name: dimension_config.name,
             foreign_key: dimension_config.foreign_key,
+            default_hierarchy: dimension_config.default_hierarchy,
             hierarchies,
             annotations,
             is_shared: false
@@ -628,6 +631,7 @@ mod test {
                             inline_table: None,
                         },
                     ],
+                    default_hierarchy: None,
                     annotations: None,
                 }
             ]),

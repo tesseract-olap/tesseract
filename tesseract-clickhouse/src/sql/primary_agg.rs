@@ -144,12 +144,22 @@ pub fn primary_agg(
                     None => c.table.full_name()
                 };
 
-                format!("{} in (select {} from {} where {})",
-                    c.foreign_key,
-                    c.primary_key,
-                    cut_table,
-                    cut_sql_string(&c),
-                )
+                if c.members.is_empty() {
+                    // this case is for default hierarchy
+                    // in multiple hierarchies
+                    format!("{} in (select {} from {})",
+                        c.foreign_key,
+                        c.primary_key,
+                        cut_table,
+                    )
+                } else {
+                    format!("{} in (select {} from {} where {})",
+                        c.foreign_key,
+                        c.primary_key,
+                        cut_table,
+                        cut_sql_string(&c),
+                    )
+                }
             });
 
         let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "and ");

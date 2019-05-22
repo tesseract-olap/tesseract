@@ -48,6 +48,7 @@ pub struct DimensionConfigXML {
     pub foreign_key: Option<String>, // does not exist for shared dims
     #[serde(rename(deserialize="Hierarchy"))]
     pub hierarchies: Vec<HierarchyConfigXML>,
+    pub default_hierarchy: Option<String>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
@@ -57,6 +58,7 @@ pub struct SharedDimensionConfigXML {
     pub name: String,
     #[serde(rename(deserialize="Hierarchy"))]
     pub hierarchies: Vec<HierarchyConfigXML>,
+    pub default_hierarchy: Option<String>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
 }

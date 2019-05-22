@@ -23,6 +23,7 @@ use self::names::{
     Measure,
     Property,
     LevelName,
+    Mask,
 };
 pub use self::schema::{Schema, Cube, Dimension, Table, Aggregator};
 use self::schema::metadata::{SchemaMetadata, CubeMetadata};
@@ -62,6 +63,43 @@ impl Schema {
         // Serialize XML to JSON as intermediary step
         let serialized = serde_json::to_string(&schema_config)?;
         Schema::from_json(&serialized)
+    }
+
+    /// schema validation
+    pub fn validate(&mut self) -> Result<(), Error> {
+        // if there's multiple hierarchies in a dim, there must be a default hierarchy.
+        // also, the default hierarchy must match names with an actual hierarchy.
+        //
+        // Also, a single hierarchy should not have a default set
+        //
+        // This means that later, we can just check whether there is a default
+        // hierarchy only, instead of also checking for hierarchy cardinality during
+        // a request
+
+        for cube in self.cubes.iter_mut() {
+            for dim in cube.dimensions.iter_mut() {
+                if dim.hierarchies.len() == 1 {
+                    dim.default_hierarchy = None;
+                } else if !dim.hierarchies.is_empty() {
+                    // first, default_hierarchy must be assigned
+                    let default_hierarchy = dim.default_hierarchy
+                        .clone()
+                        .ok_or_else(|| format_err!("Default hierarchy required for multiple hierarchies"))?;
+
+                    // if default_hierarchy exists, then check that it's in one of the
+                    // hierarchies
+                    let contains_default = dim.hierarchies.iter()
+                        .map(|hier| &hier.name)
+                        .any(|hier_name| *hier_name == default_hierarchy);
+
+                    if !contains_default {
+                        bail!("Default hierarchy must exist in multiple hierarchies");
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn cube_metadata(&self, cube_name: &str) -> Option<CubeMetadata> {
@@ -140,6 +178,10 @@ impl Schema {
         query: &Query,
         ) -> Result<(QueryIr, Vec<String>), Error>
     {
+        // TODO check that cuts have members:
+        // at the beginning of sql_query, (or maybe on cut parsing?), to make
+        // clear that blank members will trigger default hierarchy behavior in sql generation
+
         // First do checks, like making sure there's a measure, and that there's
         // either a cut or drilldown
         if query.measures.is_empty() && query.rca.is_none() {
@@ -170,6 +212,47 @@ impl Schema {
                 }
             }
         }
+
+        // check for default hierarchy that isn't drilled down on. And create a cut for it.
+        // TODO should do this at top, and everything is method on cube, instead of on schema
+        let schema_cube = self.cubes.iter()
+            .find(|c| c.name == cube)
+            .ok_or_else(|| format_err!("schema does not contain cube"))?;
+
+        // Note that the marker for a default hierarchy cuts query is that there are no members
+        let default_hierarchy_cuts_query: Result<Vec<_>, Error> = schema_cube.dimensions.iter()
+            .filter(|dim| {
+                // filter out dims that have a drilldown or cut
+                let dim_contains_drill = query.drilldowns.iter()
+                    .any(|drill| dim.name == drill.0.dimension());
+
+                let dim_contains_cut = query.cuts.iter()
+                    .any(|c| dim.name == c.level_name.dimension());
+
+                !(dim_contains_drill || dim_contains_cut)
+            })
+            .filter(|dim| dim.default_hierarchy.is_some())
+            .map(|dim| {
+                // for each default hierarchy, get the lowest level
+                // the join will actually be on primary key, which does the actual
+                // filtering. But this is to be consistent
+                let default_hierarchy = dim.default_hierarchy.clone()
+                    .ok_or_else(|| format_err!("logic err, is_some already checked"))?;
+
+                let level_name = dim.hierarchies.iter()
+                    .find(|hier| hier.name == default_hierarchy)
+                    .ok_or_else(|| format_err!("logic error, validation occurred for matching default hier"))
+                    .and_then(|hier| {
+                        hier.levels.last()
+                            .ok_or_else(|| format_err!("logic error, must have a level in hier"))
+                    })
+                    .map(|level| level.name.clone())?;
+
+                Ok(Cut::new(dim.name.clone(), default_hierarchy, level_name, vec![], Mask::Include, false))
+            })
+            .collect();
+        let default_hierarchy_cuts_query = default_hierarchy_cuts_query?;
+
 
         // TODO check that top dim and mea are in here?
         // TODO check that top_where maps to a mea that's not in top, but is in meas.
@@ -202,8 +285,13 @@ impl Schema {
         let table = self.cube_table(&cube)
             .ok_or(format_err!("No table found for cube {}", cube))?;
 
-        let cut_cols = self.cube_cut_cols(&cube, &query.cuts)
+        let mut cut_cols = self.cube_cut_cols(&cube, &query.cuts)
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
+
+        let default_hierarchy_cut_cols = self.cube_cut_cols(&cube, &default_hierarchy_cuts_query)
+            .map_err(|err| format_err!("Error getting cut cols for default hierarchy: {}", err))?;
+
+        cut_cols.extend_from_slice(&default_hierarchy_cut_cols);
 
         let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, &query.properties, &query.captions, query.parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
@@ -926,4 +1014,47 @@ struct MembersQueryIR {
     table: Table,
     key_column: String,
     name_column: Option<String>,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde_json;
+
+    const SCHEMA_STR_MULTIPLE_HIER_NO_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+    const SCHEMA_STR_MULTIPLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+    const SCHEMA_STR_SINGLE_HIER_NO_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+    const SCHEMA_STR_SINGLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+
+    #[test]
+    #[should_panic]
+    fn test_validate_schema_multiple_hier_no_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_MULTIPLE_HIER_NO_DEFAULT).unwrap();
+        schema.validate().unwrap();
+    }
+
+    #[test]
+    fn test_validate_schema_multiple_hier_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_MULTIPLE_HIER_DEFAULT).unwrap();
+        schema.validate().unwrap();
+    }
+
+    #[test]
+    fn test_validate_schema_single_hier_no_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_SINGLE_HIER_NO_DEFAULT).unwrap();
+        schema.validate().unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_validate_schema_single_hier_default() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_STR_SINGLE_HIER_DEFAULT).unwrap();
+
+        assert_eq!(schema.cubes[0].dimensions[0].default_hierarchy.clone().unwrap(), "Tract".to_owned());
+
+        schema.validate().unwrap();
+
+        // should be rewritten to NONE
+        schema.cubes[0].dimensions[0].default_hierarchy.clone().unwrap();
+    }
 }
