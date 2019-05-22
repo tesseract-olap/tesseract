@@ -178,7 +178,9 @@ impl Schema {
         query: &Query,
         ) -> Result<(QueryIr, Vec<String>), Error>
     {
-        // TODO check that cuts have members
+        // TODO check that cuts have members:
+        // at the beginning of sql_query, (or maybe on cut parsing?), to make
+        // clear that blank members will trigger default hierarchy behavior in sql generation
 
         // First do checks, like making sure there's a measure, and that there's
         // either a cut or drilldown
@@ -287,7 +289,7 @@ impl Schema {
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
 
         let default_hierarchy_cut_cols = self.cube_cut_cols(&cube, &default_hierarchy_cuts_query)
-            .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
+            .map_err(|err| format_err!("Error getting cut cols for default hierarchy: {}", err))?;
 
         cut_cols.extend_from_slice(&default_hierarchy_cut_cols);
 
