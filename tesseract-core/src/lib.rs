@@ -23,6 +23,7 @@ use self::names::{
     Measure,
     Property,
     LevelName,
+    Mask,
 };
 pub use self::schema::{Schema, Cube, Dimension, Table, Aggregator};
 use self::schema::metadata::{SchemaMetadata, CubeMetadata};
@@ -177,6 +178,8 @@ impl Schema {
         query: &Query,
         ) -> Result<(QueryIr, Vec<String>), Error>
     {
+        // TODO check that cuts have members
+
         // First do checks, like making sure there's a measure, and that there's
         // either a cut or drilldown
         if query.measures.is_empty() && query.rca.is_none() {
@@ -207,6 +210,47 @@ impl Schema {
                 }
             }
         }
+
+        // check for default hierarchy that isn't drilled down on. And create a cut for it.
+        // TODO should do this at top, and everything is method on cube, instead of on schema
+        let schema_cube = self.cubes.iter()
+            .find(|c| c.name == cube)
+            .ok_or_else(|| format_err!("schema does not contain cube"))?;
+
+        // Note that the marker for a default hierarchy cuts query is that there are no members
+        let default_hierarchy_cuts_query: Result<Vec<_>, Error> = schema_cube.dimensions.iter()
+            .filter(|dim| {
+                // filter out dims that have a drilldown or cut
+                let dim_contains_drill = query.drilldowns.iter()
+                    .any(|drill| dim.name == drill.0.dimension());
+
+                let dim_contains_cut = query.cuts.iter()
+                    .any(|c| dim.name == c.level_name.dimension());
+
+                !(dim_contains_drill || dim_contains_cut)
+            })
+            .filter(|dim| dim.default_hierarchy.is_some())
+            .map(|dim| {
+                // for each default hierarchy, get the lowest level
+                // the join will actually be on primary key, which does the actual
+                // filtering. But this is to be consistent
+                let default_hierarchy = dim.default_hierarchy.clone()
+                    .ok_or_else(|| format_err!("logic err, is_some already checked"))?;
+
+                let level_name = dim.hierarchies.iter()
+                    .find(|hier| hier.name == default_hierarchy)
+                    .ok_or_else(|| format_err!("logic error, validation occurred for matching default hier"))
+                    .and_then(|hier| {
+                        hier.levels.last()
+                            .ok_or_else(|| format_err!("logic error, must have a level in hier"))
+                    })
+                    .map(|level| level.name.clone())?;
+
+                Ok(Cut::new(dim.name.clone(), default_hierarchy, level_name, vec![], Mask::Include, false))
+            })
+            .collect();
+        let default_hierarchy_cuts_query = default_hierarchy_cuts_query?;
+
 
         // TODO check that top dim and mea are in here?
         // TODO check that top_where maps to a mea that's not in top, but is in meas.
@@ -239,8 +283,13 @@ impl Schema {
         let table = self.cube_table(&cube)
             .ok_or(format_err!("No table found for cube {}", cube))?;
 
-        let cut_cols = self.cube_cut_cols(&cube, &query.cuts)
+        let mut cut_cols = self.cube_cut_cols(&cube, &query.cuts)
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
+
+        let default_hierarchy_cut_cols = self.cube_cut_cols(&cube, &default_hierarchy_cuts_query)
+            .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
+
+        cut_cols.extend_from_slice(&default_hierarchy_cut_cols);
 
         let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, &query.properties, &query.captions, query.parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
