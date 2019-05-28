@@ -1074,4 +1074,31 @@ mod test {
         let mut schema: Schema = Schema::from_json(SCHEMA_NO_DIM).unwrap();
         schema.validate().unwrap();
     }
+
+    #[test]
+    fn shared_dim_two_dims() {
+        let s = r##"
+            <Schema name="my_schema">
+                <SharedDimension name="Geo">
+                    <Hierarchy name="Country">
+                        <Level name="Country" key_column="id" />
+                    </Hierarchy>
+                </SharedDimension>
+                <Cube name="my_cube">
+                    <Table name="my_table" />
+                    <DimensionUsage name="Import Countries" source="Geo" foreign_key="country_id" />
+                    <DimensionUsage name="Export Countries" source="Geo" foreign_key="country_id" />
+                    <Measure name="my_mea" column="mea" aggregator="sum" />
+                </Cube>
+            </Schema>
+        "##;
+        let schema: Schema = Schema::from_xml(s).unwrap();
+        println!("{:#?}", schema);
+
+        assert_eq!(schema.cubes[0].dimensions[0].hierarchies[0].name, "Country".to_owned());
+        assert_eq!(schema.cubes[0].dimensions[1].hierarchies[0].name, "Country".to_owned());
+
+        assert_eq!(schema.cubes[0].dimensions[0].name, "Import Countries".to_owned());
+        assert_eq!(schema.cubes[0].dimensions[1].name, "Export Countries".to_owned());
+    }
 }

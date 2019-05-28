@@ -65,7 +65,8 @@ pub struct SharedDimensionConfigXML {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DimensionUsageXML {
-    pub name: String,
+    pub source: String,
+    pub name: Option<String>,
     pub foreign_key: String,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
