@@ -50,7 +50,9 @@ impl From<SchemaConfigJson> for Schema {
         let mut cubes = vec![];
 
         for cube_config in schema_config.cubes {
-            let mut dimensions: Vec<_> = cube_config.dimensions.into_iter()
+            let mut dimensions: Vec<_> = cube_config.dimensions
+                .unwrap_or(vec![])
+                .into_iter()
                 .map(|dim| dim.into())
                 .collect();
             let measures = cube_config.measures.into_iter()
@@ -643,7 +645,7 @@ mod test {
                         schema: None,
                         primary_key: None,
                     },
-                    dimensions: vec![],
+                    dimensions: Some(vec![]),
                     dimension_usages: Some(vec![
                         DimensionUsageJson {
                             name: "geo".into(),

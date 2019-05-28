@@ -16,7 +16,7 @@ pub struct SchemaConfigJson {
 pub struct CubeConfigJson {
     pub name: String,
     pub table: TableConfigJson,
-    pub dimensions: Vec<DimensionConfigJson>,
+    pub dimensions: Option<Vec<DimensionConfigJson>>,
     pub dimension_usages: Option<Vec<DimensionUsageJson>>,
     pub measures: Vec<MeasureConfigJson>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,

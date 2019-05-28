@@ -33,7 +33,7 @@ pub struct CubeConfigXML {
     #[serde(rename(deserialize="Table"))]
     pub table: TableConfigXML,
     #[serde(rename(deserialize="Dimension"))]
-    pub dimensions: Vec<DimensionConfigXML>,
+    pub dimensions: Option<Vec<DimensionConfigXML>>,
     #[serde(rename(deserialize="DimensionUsage"))]
     pub dimension_usages: Option<Vec<DimensionUsageXML>>,
     #[serde(rename(deserialize="Measure"))]

@@ -67,6 +67,15 @@ impl Schema {
 
     /// schema validation
     pub fn validate(&mut self) -> Result<(), Error> {
+        // There should be at least one dimension. Both dim and shared dim are optional,
+        // so need to do a validation check here.
+
+        for cube in &self.cubes {
+            if cube.dimensions.is_empty() {
+                bail!("Between Dimensions and Shared Dimensions, a cube must have a total of at least 1.");
+            }
+        };
+
         // if there's multiple hierarchies in a dim, there must be a default hierarchy.
         // also, the default hierarchy must match names with an actual hierarchy.
         //
@@ -1025,6 +1034,7 @@ mod test {
     const SCHEMA_STR_MULTIPLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
     const SCHEMA_STR_SINGLE_HIER_NO_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
     const SCHEMA_STR_SINGLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
+    const SCHEMA_NO_DIM: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
 
     #[test]
     #[should_panic]
@@ -1056,5 +1066,12 @@ mod test {
 
         // should be rewritten to NONE
         schema.cubes[0].dimensions[0].default_hierarchy.clone().unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_validate_schema_dimension_number() {
+        let mut schema: Schema = Schema::from_json(SCHEMA_NO_DIM).unwrap();
+        schema.validate().unwrap();
     }
 }
