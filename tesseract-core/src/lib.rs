@@ -76,6 +76,19 @@ impl Schema {
             }
         };
 
+        // There should be no duplicate dimension names in a cube
+        for cube in &self.cubes {
+            let set = cube.dimensions.iter()
+                .map(|dim| {
+                    &dim.name
+                })
+                .collect::<HashSet<_>>();
+
+            if set.len() != cube.dimensions.len() {
+                bail!("Duplicate dimension names not allowed");
+            }
+        };
+
         // if there's multiple hierarchies in a dim, there must be a default hierarchy.
         // also, the default hierarchy must match names with an actual hierarchy.
         //
@@ -1100,5 +1113,28 @@ mod test {
 
         assert_eq!(schema.cubes[0].dimensions[0].name, "Import Countries".to_owned());
         assert_eq!(schema.cubes[0].dimensions[1].name, "Export Countries".to_owned());
+    }
+
+    #[test]
+    #[should_panic]
+    fn shared_dim_validate_duplicate_name() {
+        let s = r##"
+            <Schema name="my_schema">
+                <SharedDimension name="Geo">
+                    <Hierarchy name="Country">
+                        <Level name="Country" key_column="id" />
+                    </Hierarchy>
+                </SharedDimension>
+                <Cube name="my_cube">
+                    <Table name="my_table" />
+                    <DimensionUsage source="Geo" foreign_key="country_id" />
+                    <DimensionUsage source="Geo" foreign_key="country_id" />
+                    <Measure name="my_mea" column="mea" aggregator="sum" />
+                </Cube>
+            </Schema>
+        "##;
+        let mut schema: Schema = Schema::from_xml(s).unwrap();
+        schema.validate().unwrap();
+        println!("{:#?}", schema);
     }
 }
