@@ -983,7 +983,7 @@ impl Schema {
         // inline table has highest precedence. TODO have a check that there can't be inline table
         // and regular table at the same time.
         let table_sql = if let Some(ref inline) = hier.inline_table {
-            inline.sql_string()
+            format!("({})", inline.sql_string())
         } else {
             table.full_name()
         };
