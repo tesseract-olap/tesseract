@@ -41,7 +41,8 @@ pub struct SharedDimensionConfigJson {
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct DimensionUsageJson {
-    pub name: String,
+    pub source: String,
+    pub name: Option<String>,
     pub foreign_key: String,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }

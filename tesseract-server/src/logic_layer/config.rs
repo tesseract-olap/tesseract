@@ -19,6 +19,7 @@ pub struct AliasConfig {
     pub shared_dimensions: Option<Vec<SharedDimensionAliasConfig>>
 }
 
+// TODO: Remove requirement for `alternatives`
 #[derive(Debug, Clone, Deserialize)]
 pub struct CubeAliasConfig {
     pub name: String,
@@ -46,7 +47,6 @@ pub struct NamedSetConfig {
     pub values: Vec<String>
 }
 
-// TODO: Might want to consider eventually sharing the same structure as the current CubeAliasConfig
 #[derive(Debug, Clone, Deserialize)]
 pub struct LevelPropertyConfig {
     pub current_name: String,
@@ -250,9 +250,21 @@ impl LogicLayerConfig {
 
     /// Returns a unique name definition for a given shared dimension level if there is one.
     pub fn find_unique_shared_dimension_level_name(
-        &self, shared_dimension_name: &String, level_name: &LevelName
+        &self, shared_dimension_name: &String, cube_name: &String, level_name: &LevelName
     ) -> Result<Option<String>, Error> {
         if let Some(aliases) = &self.aliases {
+            // Checks if there is a more specific definition in `cubes` first
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        let res = find_unique_level_name(&level_name, cube)?;
+                        if let Some(res) = res {
+                            return Ok(Some(res))
+                        }
+                    }
+                }
+            }
+
             if let Some(shared_dimensions) = &aliases.shared_dimensions {
                 for shared_dimension in shared_dimensions {
                     if &shared_dimension.name == shared_dimension_name {
@@ -264,6 +276,7 @@ impl LogicLayerConfig {
                 }
             }
         }
+
         Ok(None)
     }
 
@@ -288,9 +301,21 @@ impl LogicLayerConfig {
 
     /// Returns a unique name definition for a given shared dimension property if there is one.
     pub fn find_unique_shared_dimension_property_name(
-        &self, shared_dimension_name: &String, property_name: &Property
+        &self, shared_dimension_name: &String, cube_name: &String, property_name: &Property
     ) -> Result<Option<String>, Error> {
         if let Some(aliases) = &self.aliases {
+            // Checks if there is a more specific definition in `cubes` first
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        let res = find_unique_property_name(&property_name, cube)?;
+                        if let Some(res) = res {
+                            return Ok(Some(res))
+                        }
+                    }
+                }
+            }
+
             if let Some(shared_dimensions) = &aliases.shared_dimensions {
                 for shared_dimension in shared_dimensions {
                     if &shared_dimension.name == shared_dimension_name {
@@ -325,7 +350,7 @@ impl LogicLayerConfig {
 
                         let unique_level_name_opt = if dimension.is_shared {
                             self.find_unique_shared_dimension_level_name(
-                                &dimension.name, &level_name
+                                &dimension.name, &cube.name, &level_name
                             )?
                         } else {
                             self.find_unique_cube_level_name(
@@ -353,7 +378,7 @@ impl LogicLayerConfig {
 
                                 let unique_property_name_opt = if dimension.is_shared {
                                     self.find_unique_shared_dimension_property_name(
-                                        &dimension.name, &property_name
+                                        &dimension.name, &cube.name, &property_name
                                     )?
                                 } else {
                                     self.find_unique_cube_property_name(

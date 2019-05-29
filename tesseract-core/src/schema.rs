@@ -66,6 +66,11 @@ impl From<SchemaConfigJson> for Schema {
                 });
 
             // special case: check for dimension_usages
+            //
+            // If source field only, use the shared dim name as the name.
+            // if optional name field present, use that for name.
+            // validation that all dimensions have different names will happen
+            // in validate method
             if let Some(dim_usages) = cube_config.dimension_usages {
                 for dim_usage in dim_usages {
                     // prep annotations to be merged with shared dim annotations
@@ -78,7 +83,9 @@ impl From<SchemaConfigJson> for Schema {
 
                     if let Some(ref shared_dims) = schema_config.shared_dimensions {
                         for shared_dim_config in shared_dims {
-                            if dim_usage.name == shared_dim_config.name {
+                            let dim_name = dim_usage.name.as_ref().unwrap_or(&dim_usage.source);
+
+                            if dim_usage.source == shared_dim_config.name {
                                 let hierarchies = shared_dim_config.hierarchies.iter()
                                     .map(|h| h.clone().into())
                                     .collect();
@@ -99,7 +106,7 @@ impl From<SchemaConfigJson> for Schema {
 
 
                                 dimensions.push(Dimension {
-                                    name: shared_dim_config.name.clone(),
+                                    name: dim_name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
                                     hierarchies,
                                     default_hierarchy: shared_dim_config.default_hierarchy.clone(),
@@ -648,7 +655,8 @@ mod test {
                     dimensions: Some(vec![]),
                     dimension_usages: Some(vec![
                         DimensionUsageJson {
-                            name: "geo".into(),
+                            source: "geo".into(),
+                            name: Some("geo".into()),
                             foreign_key: "fact_geoid".into(),
                             annotations: None,
                         }

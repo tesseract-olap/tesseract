@@ -245,7 +245,7 @@ pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Resul
                     Some(ll_config) => {
                         let unique_level_name_opt = if dimension.is_shared {
                             ll_config.find_unique_shared_dimension_level_name(
-                                &dimension.name, &level_name
+                                &dimension.name, &cube.name, &level_name
                             )?
                         } else {
                             ll_config.find_unique_cube_level_name(
@@ -291,7 +291,7 @@ pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Re
                             Some(ll_config) => {
                                 let unique_property_name_opt = if dimension.is_shared {
                                     ll_config.find_unique_shared_dimension_property_name(
-                                        &dimension.name, &property
+                                        &dimension.name, &cube.name, &property
                                     )?
                                 } else {
                                     ll_config.find_unique_cube_property_name(
