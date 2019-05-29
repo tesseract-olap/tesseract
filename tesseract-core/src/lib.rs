@@ -188,7 +188,7 @@ impl Schema {
             members_query_ir.key_column,
             if members_query_ir.name_column.is_some() { ", " } else { "" },
             name_col,
-            members_query_ir.table.full_name(),
+            members_query_ir.table_sql,
         );
 
         Ok((sql, header))
@@ -980,11 +980,19 @@ impl Schema {
             .ok_or(format_err!("could not find level for level name"))?;
 
         let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
+        // inline table has highest precedence. TODO have a check that there can't be inline table
+        // and regular table at the same time.
+        let table_sql = if let Some(ref inline) = hier.inline_table {
+            inline.sql_string()
+        } else {
+            table.full_name()
+        };
+
         let key_column = level.key_column.clone();
         let name_column = level.name_column.clone();
 
         Ok(MembersQueryIR {
-            table,
+            table_sql,
             key_column,
             name_column,
         })
@@ -1033,7 +1041,7 @@ impl Schema {
 }
 
 struct MembersQueryIR {
-    table: Table,
+    table_sql: String,
     key_column: String,
     name_column: Option<String>,
 }
