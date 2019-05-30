@@ -51,7 +51,7 @@ pub fn primary_agg(
         .collect();
 
     let ext_cuts: Vec<_> = cuts.iter()
-        .filter(|c| c.table.name != table.name)
+        .filter(|c| c.table.name != table.name || c.inline_table.is_some())
         .collect();
     let ext_cuts_for_inline = ext_cuts.clone();
 
@@ -66,7 +66,7 @@ pub fn primary_agg(
         .collect();
 
     let inline_cuts: Vec<_> = cuts.iter()
-        .filter(|c| c.table.name == table.name)
+        .filter(|c| c.table.name == table.name && !c.inline_table.is_some())
         .collect();
 
     let mut dim_subqueries = vec![];
