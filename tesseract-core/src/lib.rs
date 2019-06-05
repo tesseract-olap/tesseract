@@ -103,10 +103,11 @@ impl Schema {
                 if dim.hierarchies.len() == 1 {
                     dim.default_hierarchy = None;
                 } else if !dim.hierarchies.is_empty() {
+                    let cube_name = &cube.name;
                     // first, default_hierarchy must be assigned
                     let default_hierarchy = dim.default_hierarchy
                         .clone()
-                        .ok_or_else(|| format_err!("Default hierarchy required for multiple hierarchies"))?;
+                        .ok_or_else(|| format_err!("Default hierarchy required for multiple hierarchies in cube: {} dimension: {}", cube_name, &dim.name))?;
 
                     // if default_hierarchy exists, then check that it's in one of the
                     // hierarchies
