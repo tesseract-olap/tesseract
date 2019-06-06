@@ -13,6 +13,7 @@ pub struct QueryIr {
     pub cuts: Vec<CutSql>,
     pub drills: Vec<DrilldownSql>,
     pub meas: Vec<MeasureSql>,
+    pub hidden_drills: Vec<HiddenDrilldownSql>,
     pub filters: Vec<FilterSql>,
     // TODO put Filters and Calculations into own structs
     pub top: Option<TopSql>,

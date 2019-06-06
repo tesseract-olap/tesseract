@@ -11,6 +11,7 @@ use super::{
     CutSql,
     DrilldownSql,
     MeasureSql,
+    HiddenDrilldownSql,
     dim_subquery,
 };
 
@@ -22,6 +23,7 @@ pub fn primary_agg(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    hidden_drills: Option<&[HiddenDrilldownSql]>,
     ) -> (String, String)
 {
     // Before first section, need to separate out inline dims.
@@ -106,6 +108,9 @@ pub fn primary_agg(
     // dim exists
     //
     // This is also the section where inline dims and cuts get put
+    //
+    // Note new feature: hidden drilldowns are added here; they are added to the
+    // select here, and the group by; but do not have the columns projected upstream.
 
     let mea_cols = meas
         .iter()
@@ -125,7 +130,17 @@ pub fn primary_agg(
     let all_fact_dim_cols = join(inline_dim_cols.chain(dim_idx_cols.clone()), ", ");
     let all_fact_dim_aliass = join(inline_dim_aliass.chain(dim_idx_cols), ", ");
 
+    // TODO remove allocation
+    let hidden_drills = hidden_drills.map(|ds| ds.to_vec()).unwrap_or(vec![]);
+    let hidden_dim_cols = join(hidden_drills.iter().map(|d| d.drilldown_sql.col_alias_string()), ", ");
+
     let mut fact_sql = format!("select {}", all_fact_dim_cols);
+
+    // done separately so that it isn't projected up the subqueries
+    if !hidden_drills.is_empty() {
+        fact_sql.push_str(&format!(", {}", hidden_dim_cols));
+    }
+
     fact_sql.push_str(&format!(", {} from {}", mea_cols, table.name));
 
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
@@ -168,6 +183,11 @@ pub fn primary_agg(
     }
 
     fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
+
+    // done separately so that it isn't projected up the subqueries
+    if !hidden_drills.is_empty() {
+        fact_sql.push_str(&format!(", {}", hidden_dim_cols));
+    }
 
     // Now second half, feed DimSubquery into the multiple joins with fact table
     // TODO allow for differently named cols to be joined on. (using an alias for as)

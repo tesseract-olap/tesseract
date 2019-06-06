@@ -38,7 +38,7 @@ pub fn rate_calculation(
 
     // Call primary agg
     let (mut final_sql, mut final_drill_cols) = {
-        primary_agg(table, cuts, &new_drills, meas)
+        primary_agg(table, cuts, &new_drills, meas, None)
     };
 
     let mut rate_sql = "".to_string();

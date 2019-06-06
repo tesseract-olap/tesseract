@@ -11,6 +11,7 @@ use tesseract_core::query_ir::{
     CutSql,
     DrilldownSql,
     MeasureSql,
+    HiddenDrilldownSql,
     TopSql,
     TopWhereSql,
     SortSql,
@@ -33,6 +34,7 @@ pub fn clickhouse_sql(
     cuts: &[CutSql],
     drills: &[DrilldownSql],
     meas: &[MeasureSql],
+    hidden_drilldown_sql: &[HiddenDrilldownSql],
     filters: &[FilterSql],
     // TODO put Filters and Calculations into own structs
     top: &Option<TopSql>,
@@ -45,12 +47,15 @@ pub fn clickhouse_sql(
     ) -> String
 {
     let (mut final_sql, mut final_drill_cols) = {
+        // HiddenDrilldownSql, for grouped median, only works with primar agg,
+        // will currently silently fail if used for rca or rate. (you can see
+        // here that it's simply not passed to calculations.
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rca)
         } else if let Some(rate) = rate {
             rate_calculation(table, cuts, drills, meas, rate)
         } else {
-            primary_agg(table, cuts, drills, meas)
+            primary_agg(table, cuts, drills, meas, Some(hidden_drilldown_sql))
         }
     };
 

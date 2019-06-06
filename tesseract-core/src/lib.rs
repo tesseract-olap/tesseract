@@ -342,9 +342,10 @@ impl Schema {
             .collect::<Result<_,_>>()
             .map_err(|err| format_err!("Error parsing hidden grouping drill level: {}", err))?;
 
-        let hidden_dim_cols: Vec<_> = self.cube_drill_cols(&cube, &hidden_dims, &[], &[], false)
+        let hidden_drill_cols: Vec<_> = self.cube_drill_cols(&cube, &hidden_dims, &[], &[], false)
+            .map_err(|err| format_err!("Error getting hidden grouping drill cols: {}", err))?
             .iter()
-            .map(|dim_cols| dim_cols.iter().map(|dim_col| HiddenDrilldownSql { drilldown_sql: dim_col.clone() }))
+            .map(|dim_col| HiddenDrilldownSql { drilldown_sql: dim_col.clone() })
             .collect();
 
         // Options for sorting and limiting
@@ -632,6 +633,7 @@ impl Schema {
                 cuts: cut_cols,
                 drills: drill_cols,
                 meas: mea_cols,
+                hidden_drills: hidden_drill_cols,
                 filters,
                 top,
                 top_where,
