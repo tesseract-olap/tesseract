@@ -31,6 +31,7 @@ use self::query_ir::{
     CutSql,
     DrilldownSql,
     MeasureSql,
+    HiddenDrilldownSql,
     MemberType,
     TableSql,
     LevelColumn,
@@ -321,6 +322,30 @@ impl Schema {
 
         let mea_cols = self.cube_mea_cols(&cube, &query.measures)
             .map_err(|err| format_err!("Error getting mea cols: {}", err))?;
+
+        // special case for "hidden dimension" used for grouped median. This is where there
+        // is a special grouping, currently at the lowest level, of a dimension that is not
+        // specified in the query drilldown
+        //
+        // Not entirely sure if there needs to be a check for only one hidden dimension per query
+        let hidden_dims: Vec<_> = mea_cols.iter()
+            .filter_map(|mea_ir| {
+                // extract group dimension from basic grouped median dimension
+                match mea_ir.aggregator {
+                    Aggregator::BasicGroupedMedian { ref group_dimension, .. } => {
+                        Some(group_dimension)
+                    },
+                    _ => None,
+                }
+            })
+            .map(|group_dim| group_dim.parse())
+            .collect::<Result<_,_>>()
+            .map_err(|err| format_err!("Error parsing hidden grouping drill level: {}", err))?;
+
+        let hidden_dim_cols: Vec<_> = self.cube_drill_cols(&cube, &hidden_dims, &[], &[], false)
+            .iter()
+            .map(|dim_cols| dim_cols.iter().map(|dim_col| HiddenDrilldownSql { drilldown_sql: dim_col.clone() }))
+            .collect();
 
         // Options for sorting and limiting
 

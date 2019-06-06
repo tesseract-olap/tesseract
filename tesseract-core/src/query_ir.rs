@@ -146,6 +146,11 @@ impl DrilldownSql {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct HiddenDrilldownSql {
+    pub drilldown_sql: DrilldownSql,
+}
+
 // TODO make level column an enum, to deal better with
 // levels with only key column and no name column?
 #[derive(Debug, Clone, PartialEq)]

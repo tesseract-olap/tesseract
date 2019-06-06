@@ -32,7 +32,7 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
         Aggregator::Sum => format!("sum({}) as m{}", col, mea_idx),
         Aggregator::Count => format!("count({}) as m{}", col, mea_idx),
         Aggregator::Average => format!("avg({}) as m{}", col, mea_idx),
-        Aggregator::Median => format!("{} as m{}", col, mea_idx),
+        Aggregator::BasicGroupedMedian { group_aggregator, .. } => format!("{}({}) as m{}", group_aggregator, col, mea_idx),
         Aggregator::WeightedAverage { weight_column } => {
             format!("sum({0} * {1}) as m{2}_weighted_avg_num, sum({1}) as m{2}_weighted_avg_denom",
                 col,
@@ -96,7 +96,7 @@ pub fn agg_sql_string_select_mea(aggregator: &Aggregator, mea_idx: usize) -> Str
         Aggregator::Sum => format!("m{0}", mea_idx),
         Aggregator::Count => format!("m{0}", mea_idx),
         Aggregator::Average => format!("m{0}", mea_idx),
-        Aggregator::Median => format!("m{0}", mea_idx),
+        Aggregator::BasicGroupedMedian { .. } => format!("m{0}", mea_idx),
         Aggregator::WeightedAverage { .. } => {
             format!("m{0}_weighted_avg_num, m{0}_weighted_avg_denom",
                 mea_idx,
@@ -145,7 +145,7 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
         Aggregator::Sum => format!("sum(m{0}) as final_m{0}", mea_idx),
         Aggregator::Count => format!("sum(m{0}) as final_m{0}", mea_idx),
         Aggregator::Average => format!("avg(m{0}) as final_m{0}", mea_idx),
-        Aggregator::Median => format!("median(m{0}) as final_m{0}", mea_idx),
+        Aggregator::BasicGroupedMedian { .. } => format!("median(m{0}) as final_m{0}", mea_idx),
         Aggregator::WeightedAverage { .. } => {
             format!("(sum(m{0}_weighted_avg_num) / sum(m{0}_weighted_avg_denom)) as final_m{0}",
                 mea_idx,

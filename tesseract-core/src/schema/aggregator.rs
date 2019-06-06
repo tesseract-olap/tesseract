@@ -20,8 +20,11 @@ pub enum Aggregator {
     ///
     /// Needs two steps. It's slow because there won't be aggregation on the first step, only
     /// median on the second
-    #[serde(rename="median")]
-    Median,
+    #[serde(rename="basic_grouped_median")]
+    BasicGroupedMedian{
+        group_aggregator: String,
+        group_dimension: String,
+    },
     /// Weighted Sum is calculated against the measure's value column.
     /// sum(column * weight_column)
     ///
