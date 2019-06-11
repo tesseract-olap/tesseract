@@ -142,6 +142,7 @@ impl From<&Measure> for MeasureMetadata {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PropertyMetadata {
     pub name: String,
+    pub caption_set: Option<String>,
     pub annotations: AnnotationMetadata,
 }
 
@@ -151,6 +152,7 @@ impl From<&Property> for PropertyMetadata {
 
         PropertyMetadata {
             name: property.name.clone(),
+            caption_set: property.caption_set.clone(),
             annotations,
         }
     }
