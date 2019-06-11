@@ -104,12 +104,14 @@ impl From<SchemaConfigJson> for Schema {
                                         })
                                     });
 
+                                let dim_type = shared_dim_config.dim_type.clone().unwrap_or(DimensionType::default());
 
                                 dimensions.push(Dimension {
                                     name: dim_name.clone(),
                                     foreign_key: Some(dim_usage.foreign_key.clone()),
                                     hierarchies,
                                     default_hierarchy: shared_dim_config.default_hierarchy.clone(),
+                                    dim_type,
                                     annotations: dim_annotations,
                                     is_shared: true
                                 });
@@ -281,6 +283,7 @@ pub struct Dimension {
     pub foreign_key: Option<String>,
     pub hierarchies: Vec<Hierarchy>,
     pub default_hierarchy: Option<String>,
+    pub dim_type: DimensionType,
     pub annotations: Option<Vec<Annotation>>,
     pub is_shared: bool,
 }
@@ -297,15 +300,32 @@ impl From<DimensionConfigJson> for Dimension {
                     .collect()
             });
 
+        let dim_type = dimension_config.dim_type.unwrap_or(DimensionType::default());
+
         Dimension {
             name: dimension_config.name,
             foreign_key: dimension_config.foreign_key,
             default_hierarchy: dimension_config.default_hierarchy,
             hierarchies,
+            dim_type,
             annotations,
             is_shared: false
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DimensionType {
+    #[serde(rename="standard")]
+    Standard,
+    #[serde(rename="time")]
+    Time,
+    #[serde(rename="geo")]
+    Geo,
+}
+
+impl std::default::Default for DimensionType {
+    fn default() -> Self { DimensionType::Standard }
 }
 
 

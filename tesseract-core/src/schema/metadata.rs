@@ -6,6 +6,7 @@ use super::{
     Schema,
     Cube,
     Dimension,
+    DimensionType,
     Hierarchy,
     Level,
     Measure,
@@ -59,6 +60,8 @@ pub struct DimensionMetadata {
     pub name: String,
     pub hierarchies: Vec<HierarchyMetadata>,
     pub default_hierarchy: Option<String>,
+    #[serde(rename="type")]
+    pub dim_type: DimensionType,
     pub annotations: AnnotationMetadata,
 }
 
@@ -70,6 +73,7 @@ impl From<&Dimension> for DimensionMetadata {
             name: dimension.name.clone(),
             hierarchies: dimension.hierarchies.iter().map(|h| h.into()).collect(),
             default_hierarchy: dimension.default_hierarchy.clone(),
+            dim_type: dimension.dim_type.clone(),
             annotations,
         }
     }

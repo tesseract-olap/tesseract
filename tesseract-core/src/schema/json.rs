@@ -2,6 +2,7 @@ use serde_derive::Deserialize;
 
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
+use super::DimensionType;
 
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -28,6 +29,8 @@ pub struct DimensionConfigJson {
     pub foreign_key: Option<String>, // does not exist for shared dims
     pub hierarchies: Vec<HierarchyConfigJson>,
     pub default_hierarchy: Option<String>,
+    #[serde(rename="type")]
+    pub dim_type: Option<DimensionType>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
@@ -36,6 +39,8 @@ pub struct SharedDimensionConfigJson {
     pub name: String,
     pub hierarchies: Vec<HierarchyConfigJson>,
     pub default_hierarchy: Option<String>,
+    #[serde(rename="type")]
+    pub dim_type: Option<DimensionType>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 

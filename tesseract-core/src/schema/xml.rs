@@ -14,6 +14,7 @@ use serde_derive::Serialize;
 
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
+use super::DimensionType;
 
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -49,6 +50,8 @@ pub struct DimensionConfigXML {
     #[serde(rename(deserialize="Hierarchy"))]
     pub hierarchies: Vec<HierarchyConfigXML>,
     pub default_hierarchy: Option<String>,
+    #[serde(rename="type")]
+    pub dim_type: Option<DimensionType>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
@@ -59,6 +62,8 @@ pub struct SharedDimensionConfigXML {
     #[serde(rename(deserialize="Hierarchy"))]
     pub hierarchies: Vec<HierarchyConfigXML>,
     pub default_hierarchy: Option<String>,
+    #[serde(rename="type")]
+    pub dim_type: Option<DimensionType>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
