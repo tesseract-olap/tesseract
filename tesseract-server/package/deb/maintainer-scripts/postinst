@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+read -p "Would you like to use the default db address 127.0.0.1:9000?" -n -r
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+    
+fi
