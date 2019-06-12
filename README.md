@@ -4,6 +4,21 @@ More documentation is coming soon!
 
 ## For Users
 
+### Getting started
+
+Tesseract serves an api which allows the user to drill-down, cut, filter, and otherwise examine a [cube](https://en.wikipedia.org/wiki/OLAP_cube) of data.
+
+The logical construct of the "cube" allows for powerful, flexible, and fast data analysis while keeping the data in the most efficient physical format (in-db).
+
+1) Get `tesseract`: See installation instructions below.
+2) Get data into "cube" format: [star schema](https://en.wikipedia.org/wiki/Star_schema)-like is simplest.
+3) Write a schema, which shows how the logical representation of the cube maps to the data in the database.
+4) Set options as environment variables and/or cli flags. See instructions below.
+5) (Optional) Set up a process monitor like systemd.
+6) Run tesseract! For some examples of cli invocations, see the [justfile](https://github.com/hwchen/tesseract/blob/master/justfile). 
+
+If you installed using Homebrew on macOS, the binary is automatically moved to your `usr/local/bin` and is called `tesseract-olap`.
+
 ### Installation
 
 #### macOS
@@ -18,21 +33,6 @@ brew install tesseract-olap
 #### Linux
 
 Coming soon.
-
-### Getting started
-
-Tesseract serves an api which allows the user to drill-down, cut, filter, and otherwise examine a [cube](https://en.wikipedia.org/wiki/OLAP_cube) of data.
-
-The logical construct of the "cube" allows for powerful, flexible, and fast data analysis while keeping the data in the most efficient physical format (in-db).
-
-1) Get `tesseract`: Check the [releases](https://github.com/hwchen/tesseract/releases) page for a binary download.
-2) Get data into "cube" format: [star schema](https://en.wikipedia.org/wiki/Star_schema)-like is simplest.
-3) Write a schema, which shows how the logical representation of the cube maps to the data in the database.
-4) Set options as environment variables and/or cli flags.
-5) (Optional) Set up a process monitor like systemd.
-6) Run tesseract! For some examples of cli invocations, see the [justfile](https://github.com/hwchen/tesseract/blob/master/justfile)
-
-Then once environment variables are set.
 
 ### Environment Variables
 - `TESSERACT_DATABASE_URL`: required, is the address of the database; make sure to include the user, password, and database name.
