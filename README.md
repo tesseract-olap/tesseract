@@ -17,7 +17,7 @@ The logical construct of the "cube" allows for powerful, flexible, and fast data
 5) (Optional) Set up a process monitor like systemd.
 6) Run tesseract! For some examples of cli invocations, see the [justfile](https://github.com/hwchen/tesseract/blob/master/justfile). 
 
-If you installed using Homebrew on macOS, the binary is automatically moved to your `usr/local/bin` and is called `tesseract-olap`.
+If you installed using Homebrew on macOS, the binary is automatically moved to your `usr/local/bin` folder and is called `tesseract-olap`.
 
 ### Installation
 
