@@ -4,6 +4,21 @@ More documentation is coming soon!
 
 ## For Users
 
+### Installation
+
+#### macOS
+
+Using [Homebrew](https://brew.sh/):
+
+```
+brew tap hwchen/tesseract https://github.com/hwchen/tesseract.git
+brew install tesseract-olap
+```
+
+#### Linux
+
+Coming soon.
+
 ### Getting started
 
 Tesseract serves an api which allows the user to drill-down, cut, filter, and otherwise examine a [cube](https://en.wikipedia.org/wiki/OLAP_cube) of data.
