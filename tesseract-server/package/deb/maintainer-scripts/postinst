@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -e
+
+TESSERACT_SERVICE_PATH=/etc/systemd/system/tesseract.service
+
+echo "### Tesseract service setup ###"
+# add user if does not exist
+# > redirect just surpresses warning. id -u returns a non-zero exit code when user does not exist
+
+echo "# Creating user `tesseract` if needed"
+
+id -u tesseract >/dev/null 2>&1 || useradd tesseract
+
+read -p "Would you like to use the default db address 127.0.0.1:9000? y/n: " -r
+if [[ ! $REPLY =~ ^[Yy]$ ]]
+then
+    read -p "Enter your db address: " -r
+    sed -i "s/127.0.0.1:9000/$REPLY/g" $TESSERACT_SERVICE_PATH
+    echo "Updated db address to $REPLY"
+else
+    echo "Using default db address 127.0.0.1:9000"
+fi
+
+read -p "Would you like to use the default schema path of $HOME/tesseract-schema/schema.json? y/n: " -r
+if [[ ! $REPLY =~ ^[Yy]$ ]]
+then
+    read -p "Enter your schema path: " -r
+    sed -i "s/schema.json/$REPLY/g" $TESSERACT_SERVICE_PATH
+    echo "Updated schema path to $REPLY"
+else
+    sed -i "s|schema.json|$HOME/tesseract-schema/schema.json|g" $TESSERACT_SERVICE_PATH
+    echo "Using default schema path $HOME/tesseract-schema/schema.json"
+fi
+
+echo "### Tesseract service setup complete###"
+echo "To start tesseract service, 'systemctl start tesseract'"

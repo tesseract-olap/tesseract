@@ -1,5 +1,8 @@
 [package]
 authors = ["Walther Chen <walther.chen@gmail.com>"]
+description = "ROLAP engine for web applications, in Rust"
+license = "MIT"
+readme = "README.md"
 edition = "2018"
 name = "tesseract"
 version = "0.12.0"
@@ -31,3 +34,15 @@ path = "../tesseract-postgres"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"
+
+[package.metadata.deb]
+maintainer = "Walther Chen <walther.chen@gmail.com>"
+extended-description = "Olap engine for serving web applications"
+depends = "$auto"
+section = "Web Servers"
+priority = "optional"
+assets = [
+    ["../target/release/tesseract", "usr/bin/", "755"],
+    ["package/deb/tesseract.service", "/etc/systemd/system/tesseract.service", "644"],
+]
+maintainer-scripts = "package/deb/maintainer-scripts"
