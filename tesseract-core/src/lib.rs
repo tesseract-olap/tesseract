@@ -12,7 +12,7 @@ use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
-
+use std::str::FromStr;
 use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
@@ -196,6 +196,46 @@ impl Schema {
         Ok((sql, header))
     }
 
+    fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query) -> Box<Vec<Cut>> {
+        let target_dims: Vec<Dimension> = self.get_unused_dims_with_default_member(schema_cube, query);
+        let result = target_dims.iter().map(|dim| {
+            let target_hierarchy_name = match &dim.default_hierarchy {
+                Some(hierarchy_name) => hierarchy_name,
+                None => &dim.hierarchies.get(0).unwrap().name
+            };
+            let hierarchy_obj = &dim.hierarchies.iter()
+                .find(|h| &h.name == target_hierarchy_name).expect("bad hierarchy unpacking");
+            let default_member = &hierarchy_obj.default_member;
+            match default_member {
+                Some(val) => Cut::from_str(&val),
+                None => Err(format_err!("Bad default member"))
+            }
+        }).filter_map(Result::ok).collect();
+        return Box::new(result);
+    }
+
+    fn get_unused_dims_with_default_member(&self, schema_cube: &Cube, query: &Query) -> Vec<Dimension> {
+        let dims: Vec<Dimension> = schema_cube.dimensions.iter()
+            .filter(|dim| {
+                // filter out dims that have a drilldown or cut
+                let dim_contains_drill = query.drilldowns.iter()
+                    .any(|drill| dim.name == drill.0.dimension());
+
+                let dim_contains_cut = query.cuts.iter()
+                    .any(|c| dim.name == c.level_name.dimension());
+
+                // if the dimension has a drilldown or a cut, it can be skipped.
+                !(dim_contains_drill || dim_contains_cut)
+            })
+            // keep only the dims that have a default hierarchy value set
+            // OR have only one hierarchy
+            // TODO raise error if default member is set and there is no clear default hierarchy
+            .filter(|dim| dim.default_hierarchy.is_some() || dim.hierarchies.len() == 1)
+            .map(|d| d.clone())
+            .collect();
+        dims
+    }
+
     pub fn sql_query(
         &self,
         cube: &str,
@@ -316,6 +356,11 @@ impl Schema {
             .map_err(|err| format_err!("Error getting cut cols for default hierarchy: {}", err))?;
 
         cut_cols.extend_from_slice(&default_hierarchy_cut_cols);
+
+        let default_member_cuts_query = self.build_default_member_cuts(schema_cube, query);
+        let default_member_cut_cols = self.cube_cut_cols(&cube, &default_member_cuts_query)
+            .map_err(|err| format_err!("Error creating cuts for default member: {}", err))?;
+        cut_cols.extend_from_slice(&default_member_cut_cols);
 
         let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, &query.properties, &query.captions, query.parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
