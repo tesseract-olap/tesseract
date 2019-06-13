@@ -337,6 +337,7 @@ pub struct Hierarchy {
     pub levels: Vec<Level>,
     pub annotations: Option<Vec<Annotation>>,
     pub inline_table: Option<InlineTable>,
+    pub default_member: Option<String>,
 }
 
 impl From<HierarchyConfigJson> for Hierarchy {
@@ -368,6 +369,7 @@ impl From<HierarchyConfigJson> for Hierarchy {
             levels,
             annotations,
             inline_table: hierarchy_config.inline_table.map(|t| t.into()),
+            default_member: hierarchy_config.default_member
         }
     }
 }

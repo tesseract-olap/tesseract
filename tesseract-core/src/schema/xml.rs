@@ -89,6 +89,7 @@ pub struct HierarchyConfigXML {
     pub annotations: Option<Vec<AnnotationConfigXML>>,
     #[serde(rename(deserialize="InlineTable"))]
     pub inline_table: Option<InlineTableXML>,
+    pub default_member: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
