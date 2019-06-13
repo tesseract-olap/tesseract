@@ -8,7 +8,7 @@ echo "### Tesseract service setup ###"
 # add user if does not exist
 # > redirect just surpresses warning. id -u returns a non-zero exit code when user does not exist
 
-echo "# Creating user `tesseract` if needed"
+echo "# Creating user 'tesseract' if needed"
 
 id -u tesseract >/dev/null 2>&1 || useradd tesseract
 

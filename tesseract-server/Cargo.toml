@@ -43,6 +43,6 @@ section = "Web Servers"
 priority = "optional"
 assets = [
     ["../target/release/tesseract", "usr/bin/", "755"],
-    ["package/deb/tesseract.service", "/etc/systemd/system/tesseract.service", "644"],
+    ["pkg/deb/tesseract.service", "/etc/systemd/system/tesseract.service", "644"],
 ]
-maintainer-scripts = "package/deb/maintainer-scripts"
+maintainer-scripts = "pkg/deb/maintainer-scripts"
