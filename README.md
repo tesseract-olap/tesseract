@@ -32,7 +32,19 @@ brew install tesseract-olap
 
 #### Linux
 
-Coming soon.
+You should check the exact release on the releases page. v0.12.0 is just the first version that a deb package is available.
+
+For now, just `wget` and `dpkg -i`. In the future, a ppa may be set up.
+
+```
+wget https://github.com/hwchen/tesseract/releases/download/v0.12.0/tesseract_0.12.0_amd64.deb
+dpkg -i tesseract_0.12.0_amd64.deb
+```
+
+You can then run the binary `tesseract`.
+
+Note that a systemd `.service` is also installed. You will probably need to modify the defaults, and you can do so at the install script prompt. To start the tesseract service, use `systemctl start tesseract`.
+
 
 ### Environment Variables
 - `TESSERACT_DATABASE_URL`: required, is the address of the database; make sure to include the user, password, and database name.
