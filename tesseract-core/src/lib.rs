@@ -376,7 +376,7 @@ impl Schema {
             .map_err(|err| format_err!("Error creating cuts for default member: {}", err))?;
         cut_cols.extend_from_slice(&default_member_cut_cols);
 
-        if query.exclude_default_member_in_drilldown {
+        if query.exclude_default_members {
             let exclude_default_member_cuts_query = self.build_default_member_cuts(schema_cube, query, true);
             let exclude_default_member_cut_cols = self.cube_cut_cols(&cube, &exclude_default_member_cuts_query)
                 .map_err(|err| format_err!("Error creating exclude cuts for default member: {}", err))?;

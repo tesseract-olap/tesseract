@@ -147,7 +147,7 @@ pub struct AggregateQueryOpt {
     rca: Option<String>,
     rate: Option<String>,
     debug: Option<bool>,
-    exclude_default_member_in_drilldown: Option<bool>,
+    exclude_default_members: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
 //    sparse: Option<bool>,
@@ -228,7 +228,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             .transpose()?;
 
         let debug = agg_query_opt.debug.unwrap_or(false);
-        let exclude_default_member_in_drilldown = agg_query_opt.exclude_default_member_in_drilldown.unwrap_or(false);
+        let exclude_default_members = agg_query_opt.exclude_default_members.unwrap_or(false);
 
         // TODO: deserialize rate
         Ok(TsQuery {
@@ -246,7 +246,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             rca,
             growth,
             debug,
-            exclude_default_member_in_drilldown,
+            exclude_default_members,
             rate
         })
     }
