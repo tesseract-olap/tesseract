@@ -196,6 +196,17 @@ impl Schema {
         Ok((sql, header))
     }
 
+    /// Convert user parameters into required default member cuts based on cube defintion.
+    ///
+    /// Given a cube and user supplied Query parameters and a boolean for negate mode, this function will:
+    ///
+    /// 1. Use the get_dims_for_default_member to determine which dimensions are not involved in
+    /// a cut or drilldown for the query and are therefore candidates for default member filtering logic
+    /// 2. It will read out the default_member strings from relevant hierarchies and parse them into cuts
+    /// 3. Returns a list of the cuts that should be added to the query based on the default members
+    ///
+    /// If the function runs in negate mode, it will add or remove a ~ from the front of the default member
+    /// cut string to flip the logic in order to exclude the default member from being returned in queries.
     fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Box<Vec<Cut>> {
         let target_dims = self.get_dims_for_default_member(schema_cube, query, negate);
         let result = target_dims.iter().map(|dim| {
@@ -225,25 +236,27 @@ impl Schema {
         return Box::new(result);
     }
 
+    /// Helper function for build_default_member_cuts to get a list of dimensions.
+    ///
+    /// Negate is a boolean value which indicates if the the list is being built for a negate mode query.
+    /// In a negate mode, the idea is to build a cut which will exclude the default member when
+    /// drilling down which is why in negate mode the logic for the dimension filter differs.
     fn get_dims_for_default_member<'a>(&self, schema_cube: &'a Cube, query: &Query, negate: bool) -> Vec<&'a Dimension> {
         let dims = schema_cube.dimensions.iter()
             .filter(|dim| {
                 // filter out dims that have a drilldown or cut
                 let dim_contains_drill = query.drilldowns.iter()
                     .any(|drill| dim.name == drill.0.dimension());
-
                 let dim_contains_cut = query.cuts.iter()
                     .any(|c| dim.name == c.level_name.dimension());
-
-                // if the dimension has a drilldown or a cut, it can be skipped.
                 match negate {
                     false => !(dim_contains_drill || dim_contains_cut),
                     true => dim_contains_drill && !dim_contains_cut
                 }
             })
-            // keep only the dims that have a default hierarchy value set
-            // OR have only one hierarchy
-            // TODO raise error if default member is set and there is no clear default hierarchy
+            // Keep only the dims that have a default hierarchy value set
+            // OR have only one hierarchy. Note that due to the schema validation process,
+            // if a dimension has more than one hierarchy, it must have a default hierarchy specified.
             .filter(|dim| dim.default_hierarchy.is_some() || dim.hierarchies.len() == 1)
             .collect();
         dims
