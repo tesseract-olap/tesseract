@@ -660,10 +660,12 @@ mod test {
                             ],
                             annotations: None,
                             inline_table: None,
+                            default_member: None,
                         },
                     ],
                     default_hierarchy: None,
                     annotations: None,
+                    dim_type: None,
                 }
             ]),
             cubes: vec![
