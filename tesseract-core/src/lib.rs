@@ -197,7 +197,7 @@ impl Schema {
     }
 
     fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Box<Vec<Cut>> {
-        let target_dims: Vec<Dimension> = self.get_dims_for_default_member(schema_cube, query, negate);
+        let target_dims = self.get_dims_for_default_member(schema_cube, query, negate);
         let result = target_dims.iter().map(|dim| {
             let target_hierarchy_name = match &dim.default_hierarchy {
                 Some(hierarchy_name) => hierarchy_name,
@@ -225,8 +225,8 @@ impl Schema {
         return Box::new(result);
     }
 
-    fn get_dims_for_default_member(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Vec<Dimension> {
-        let dims: Vec<Dimension> = schema_cube.dimensions.iter()
+    fn get_dims_for_default_member<'a>(&self, schema_cube: &'a Cube, query: &Query, negate: bool) -> Vec<&'a Dimension> {
+        let dims = schema_cube.dimensions.iter()
             .filter(|dim| {
                 // filter out dims that have a drilldown or cut
                 let dim_contains_drill = query.drilldowns.iter()
@@ -245,7 +245,6 @@ impl Schema {
             // OR have only one hierarchy
             // TODO raise error if default member is set and there is no clear default hierarchy
             .filter(|dim| dim.default_hierarchy.is_some() || dim.hierarchies.len() == 1)
-            .map(|d| d.clone())
             .collect();
         dims
     }
