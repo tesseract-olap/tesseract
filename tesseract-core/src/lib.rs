@@ -1239,4 +1239,25 @@ mod test {
         schema.validate().unwrap();
         println!("{:#?}", schema);
     }
+
+    #[test]
+    fn test_basic_default_member() {
+        let s = r##"
+            <Schema name="my_schema">
+                <Cube name="my_cube">
+                    <Table name="my_table" />
+                    <Dimension foreign_key="race" name="Race">
+                        <Hierarchy name="Race" primary_key="race" default_member="Race.Race.Race.Total">
+                            <Level name="Race" key_column="race" key_type="text"/>
+                        </Hierarchy>
+                    </Dimension>
+                    <Measure name="my_mea" column="mea" aggregator="sum" />
+                </Cube>
+            </Schema>
+        "##;
+        let schema: Schema = Schema::from_xml(s).unwrap();
+        println!("{:#?}", schema);
+        let dm = schema.cubes[0].dimensions[0].hierarchies[0].default_member.clone();
+        assert_eq!(dm.unwrap(), "Race.Race.Race.Total".to_owned());
+    }
 }
