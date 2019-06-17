@@ -19,7 +19,9 @@ use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time, boxed_error};
+use crate::errors::ServerError;
 use crate::logic_layer::LogicLayerConfig;
+use super::super::util;
 
 
 /// Handles default aggregation when a format is not specified.
@@ -58,6 +60,7 @@ pub fn logic_layer_aggregation(
 
     let query = req.query_string();
     let schema = req.state().schema.read().unwrap();
+    let debug = req.state().debug;
 
     let logic_layer_config: Option<LogicLayerConfig> = match &req.state().logic_layer_config {
         Some(llc) => Some(llc.read().unwrap().clone()),
@@ -182,19 +185,23 @@ pub fn logic_layer_aggregation(
     req.state()
         .backend
         .exec_sql(sql)
-        .from_err()
         .and_then(move |df| {
+            let content_type = util::format_to_content_type(&format);
+
             match format_records(&headers, df, format) {
                 Ok(res) => {
-                    if format_str == "jsonrecords" {
-                        Ok(HttpResponse::Ok()
-                            .set(ContentType::json())
-                            .body(res))
-                    } else {
-                        Ok(HttpResponse::Ok().body(res))
-                    }
+                    Ok(HttpResponse::Ok()
+                        .set(content_type)
+                        .body(res))
                 },
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+            }
+        })
+        .map_err(move |e| {
+            if debug {
+                ServerError::Db { cause: e.to_string() }.into()
+            } else {
+                ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
             }
         })
         .responder()

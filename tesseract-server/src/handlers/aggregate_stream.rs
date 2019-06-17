@@ -15,6 +15,7 @@ use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use super::aggregate::AggregateQueryOpt;
+use super::util;
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
@@ -113,9 +114,14 @@ pub fn do_aggregate(
         .backend
         .exec_sql_stream(sql);
 
+    let content_type = util::format_to_content_type(&format);
 
     Box::new(
-        futures::future::ok(HttpResponse::Ok().streaming(format_records_stream(headers, df_stream, format)))
+        futures::future::ok(
+            HttpResponse::Ok()
+            .set(content_type)
+            .streaming(format_records_stream(headers, df_stream, format))
+        )
     )
     //    .and_then(move |df_stream_res| {
     //        match df_stream_res {

@@ -7,6 +7,18 @@ edition = "2018"
 name = "tesseract"
 version = "0.13.0-alpha"
 
+[package.metadata.deb]
+maintainer = "Walther Chen <walther.chen@gmail.com>"
+extended-description = "Olap engine for serving web applications"
+depends = "$auto"
+section = "Web Servers"
+priority = "optional"
+assets = [
+    ["../target/release/tesseract", "usr/bin/", "755"],
+    ["pkg/deb/tesseract.service", "/etc/systemd/system/tesseract.service", "644"],
+]
+maintainer-scripts = "pkg/deb/maintainer-scripts"
+
 [dependencies]
 actix = "0.7.7"
 actix-web = "0.7.18"
@@ -22,6 +34,7 @@ serde_derive = "1.0.70"
 serde_json = "1.0.33"
 serde_qs = "0.4.1"
 structopt = "0.2.13"
+mime = "0.3.13"
 
 [dependencies.tesseract-clickhouse]
 path = "../tesseract-clickhouse"
@@ -34,15 +47,3 @@ path = "../tesseract-postgres"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"
-
-[package.metadata.deb]
-maintainer = "Walther Chen <walther.chen@gmail.com>"
-extended-description = "Olap engine for serving web applications"
-depends = "$auto"
-section = "Web Servers"
-priority = "optional"
-assets = [
-    ["../target/release/tesseract", "usr/bin/", "755"],
-    ["pkg/deb/tesseract.service", "/etc/systemd/system/tesseract.service", "644"],
-]
-maintainer-scripts = "pkg/deb/maintainer-scripts"
