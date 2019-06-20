@@ -207,7 +207,7 @@ impl Schema {
     ///
     /// If the function runs in negate mode, it will add or remove a ~ from the front of the default member
     /// cut string to flip the logic in order to exclude the default member from being returned in queries.
-    fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Box<Vec<Cut>> {
+    fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Vec<Cut> {
         let target_dims = self.get_dims_for_default_member(schema_cube, query, negate);
         let result = target_dims.iter().map(|dim| {
             let target_hierarchy_name = match &dim.default_hierarchy {
@@ -233,7 +233,7 @@ impl Schema {
                 None => Err(format_err!("Bad default member"))
             }
         }).filter_map(Result::ok).collect();
-        return Box::new(result);
+        return result;
     }
 
     /// Helper function for build_default_member_cuts to get a list of dimensions.
