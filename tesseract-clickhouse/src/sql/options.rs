@@ -1,4 +1,6 @@
 use itertools::join;
+use tesseract_core::query::{Comparison, Constraint};
+use tesseract_core::{QueryIr};
 
 use super::{
     LimitSql,
@@ -11,15 +13,16 @@ use super::{
 pub fn wrap_options(
     final_sql: String,
     final_drill_cols: &str,
-    top: &Option<TopSql>,
-    top_where: &Option<TopWhereSql>,
-    sort: &Option<SortSql>,
-    limit: &Option<LimitSql>,
-    filters: &[FilterSql],
+    query_ir: &QueryIr,
+    num_measures: usize
     ) -> String
 {
     let mut final_sql = final_sql;
-
+    let top = &query_ir.top;
+    let top_where = &query_ir.top_where;
+    let sort = &query_ir.sort;
+    let limit = &query_ir.limit;
+    let filters = &query_ir.filters;
     // Now that final groupings are done, do wrapping options
     // like top, filter, sort
     if let Some(top) = top {
@@ -71,13 +74,25 @@ pub fn wrap_options(
         }
     };
 
-    let filters_sql = if !filters.is_empty() {
+    let mut filters_sql = if !filters.is_empty() {
         let filter_clauses = filters.iter()
             .map(|f| format!("{} {}", f.by_column, f.constraint.sql_string()));
         format!("where {}", join(filter_clauses, " and "))
-    } else {
+    }
+    else {
         "".into()
     };
+
+    // Determine if sparse filter is needed, and construct appropriate filters_sql
+    {
+        let sparse_clauses = (0..num_measures).into_iter().map(|i| format!("isNotNull(final_m{})", i));
+        let sparse_filter_sql = join(sparse_clauses, " and ");
+        if filters.is_empty() && query_ir.sparse {
+            filters_sql = format!("where {}", sparse_filter_sql);
+        } else if !filters.is_empty() && query_ir.sparse {
+            filters_sql = format!("{} and {}", filters_sql, sparse_filter_sql);
+        }
+    }
 
 
     final_sql = format!("select * from ({}) {} {} {}",
