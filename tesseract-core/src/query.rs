@@ -28,6 +28,7 @@ pub struct Query {
     pub growth: Option<GrowthQuery>,
     pub rate: Option<RateQuery>,
     pub debug: bool,
+    pub sparse: bool,
 }
 
 impl Query {
@@ -48,6 +49,7 @@ impl Query {
             growth: None,
             rate: None,
             debug: false,
+            sparse: false,
         }
     }
 }

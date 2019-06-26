@@ -156,7 +156,7 @@ pub struct AggregateQueryOpt {
     debug: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
-//    sparse: Option<bool>,
+    sparse: Option<bool>,
 }
 
 impl TryFrom<AggregateQueryOpt> for TsQuery {
@@ -234,6 +234,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             .transpose()?;
 
         let debug = agg_query_opt.debug.unwrap_or(false);
+        let sparse = agg_query_opt.sparse.unwrap_or(false);
 
         // TODO: deserialize rate
         Ok(TsQuery {
@@ -251,7 +252,8 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             rca,
             growth,
             debug,
-            rate
+            rate,
+            sparse,
         })
     }
 }
