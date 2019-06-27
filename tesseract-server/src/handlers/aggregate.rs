@@ -154,6 +154,7 @@ pub struct AggregateQueryOpt {
     rca: Option<String>,
     rate: Option<String>,
     debug: Option<bool>,
+    exclude_default_members: Option<bool>,
 //    distinct: Option<bool>,
 //    nonempty: Option<bool>,
     sparse: Option<bool>,
@@ -235,6 +236,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
 
         let debug = agg_query_opt.debug.unwrap_or(false);
         let sparse = agg_query_opt.sparse.unwrap_or(false);
+        let exclude_default_members = agg_query_opt.exclude_default_members.unwrap_or(false);
 
         // TODO: deserialize rate
         Ok(TsQuery {
@@ -254,6 +256,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             debug,
             rate,
             sparse,
+            exclude_default_members,
         })
     }
 }

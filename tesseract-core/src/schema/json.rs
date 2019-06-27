@@ -60,6 +60,7 @@ pub struct HierarchyConfigJson {
     pub levels: Vec<LevelConfigJson>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
     pub inline_table: Option<InlineTableJson>,
+    pub default_member: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

@@ -29,6 +29,7 @@ pub struct Query {
     pub rate: Option<RateQuery>,
     pub debug: bool,
     pub sparse: bool,
+    pub exclude_default_members: bool,
 }
 
 impl Query {
@@ -50,6 +51,7 @@ impl Query {
             rate: None,
             debug: false,
             sparse: false,
+            exclude_default_members: false,
         }
     }
 }
