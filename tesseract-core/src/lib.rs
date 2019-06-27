@@ -12,7 +12,7 @@ use failure::{Error, format_err, bail};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
-
+use std::str::FromStr;
 use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
@@ -196,6 +196,75 @@ impl Schema {
         Ok((sql, header))
     }
 
+    /// Convert user parameters into required default member cuts based on cube defintion.
+    ///
+    /// Given a cube and user supplied Query parameters and a boolean for negate mode, this function will:
+    ///
+    /// 1. Use the get_dims_for_default_member to determine which dimensions are not involved in
+    /// a cut or drilldown for the query and are therefore candidates for default member filtering logic
+    /// 2. It will read out the default_member strings from relevant hierarchies and parse them into cuts
+    /// 3. Returns a list of the cuts that should be added to the query based on the default members
+    ///
+    /// If the function runs in negate mode, it will add or remove a ~ from the front of the default member
+    /// cut string to flip the logic in order to exclude the default member from being returned in queries.
+    fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Result<Vec<Cut>, Error> {
+        let target_dims = self.get_dims_for_default_member(schema_cube, query, negate);
+        let result = target_dims.iter().map(|dim| {
+            let target_hierarchy_name = match &dim.default_hierarchy {
+                Some(hierarchy_name) => hierarchy_name,
+                None => &dim.hierarchies.get(0).unwrap().name
+            };
+            let hierarchy_obj = &dim.hierarchies.iter()
+                .find(|h| &h.name == target_hierarchy_name).expect("bad hierarchy unpacking");
+            let default_member = &hierarchy_obj.default_member;
+            match default_member {
+                Some(val) => {
+                    let mut new_cut_str: String = val.to_string();
+                    if negate {
+                        let first_ch_opt = new_cut_str.chars().next();
+                        let first_ch = first_ch_opt.ok_or_else(|| format_err!("Expected at least one character in default member"))?;
+                        new_cut_str = match first_ch {
+                            '~' => new_cut_str[1..].to_string(),
+                            _ => format!("~{}", new_cut_str)
+                        }
+                    }
+                    Cut::from_str(&new_cut_str)
+                },
+                None => {
+                    return Err(format_err!("Bad default member"))
+                }
+            }
+        }).collect();
+
+        return result;
+    }
+
+    /// Helper function for build_default_member_cuts to get a list of dimensions.
+    ///
+    /// Negate is a boolean value which indicates if the the list is being built for a negate mode query.
+    /// In a negate mode, the idea is to build a cut which will exclude the default member when
+    /// drilling down which is why in negate mode the logic for the dimension filter differs.
+    fn get_dims_for_default_member<'a>(&self, schema_cube: &'a Cube, query: &Query, negate: bool) -> Vec<&'a Dimension> {
+        let dims = schema_cube.dimensions.iter()
+            .filter(|dim| {
+                // filter out dims that have a drilldown or cut
+                let dim_contains_drill = query.drilldowns.iter()
+                    .any(|drill| dim.name == drill.0.dimension());
+                let dim_contains_cut = query.cuts.iter()
+                    .any(|c| dim.name == c.level_name.dimension());
+                match negate {
+                    false => !(dim_contains_drill || dim_contains_cut),
+                    true => dim_contains_drill && !dim_contains_cut
+                }
+            })
+            // Keep only the dims that have a default hierarchy value set
+            // OR have only one hierarchy. Note that due to the schema validation process,
+            // if a dimension has more than one hierarchy, it must have a default hierarchy specified.
+            .filter(|dim| dim.default_hierarchy.is_some() || dim.hierarchies.len() == 1)
+            .collect();
+        dims
+    }
+
     pub fn sql_query(
         &self,
         cube: &str,
@@ -316,6 +385,19 @@ impl Schema {
             .map_err(|err| format_err!("Error getting cut cols for default hierarchy: {}", err))?;
 
         cut_cols.extend_from_slice(&default_hierarchy_cut_cols);
+
+        let default_member_cuts_query = self.build_default_member_cuts(schema_cube, query, false)?;
+        let default_member_cut_cols = self.cube_cut_cols(&cube, &default_member_cuts_query)
+            .map_err(|err| format_err!("Error creating cuts for default member: {}", err))?;
+        cut_cols.extend_from_slice(&default_member_cut_cols);
+
+        if query.exclude_default_members {
+            let exclude_default_member_cuts_query = self.build_default_member_cuts(schema_cube, query, true)?;
+            let exclude_default_member_cut_cols = self.cube_cut_cols(&cube, &exclude_default_member_cuts_query)
+                .map_err(|err| format_err!("Error creating exclude cuts for default member: {}", err))?;
+            cut_cols.extend_from_slice(&exclude_default_member_cut_cols);
+        }
+
 
         let drill_cols = self.cube_drill_cols(&cube, &query.drilldowns, &query.properties, &query.captions, query.parents)
             .map_err(|err| format_err!("Error getting drill cols: {}", err))?;
@@ -1172,5 +1254,26 @@ mod test {
         let mut schema: Schema = Schema::from_xml(s).unwrap();
         schema.validate().unwrap();
         println!("{:#?}", schema);
+    }
+
+    #[test]
+    fn test_basic_default_member() {
+        let s = r##"
+            <Schema name="my_schema">
+                <Cube name="my_cube">
+                    <Table name="my_table" />
+                    <Dimension foreign_key="race" name="Race">
+                        <Hierarchy name="Race" primary_key="race" default_member="Race.Race.Race.Total">
+                            <Level name="Race" key_column="race" key_type="text"/>
+                        </Hierarchy>
+                    </Dimension>
+                    <Measure name="my_mea" column="mea" aggregator="sum" />
+                </Cube>
+            </Schema>
+        "##;
+        let schema: Schema = Schema::from_xml(s).unwrap();
+        println!("{:#?}", schema);
+        let dm = schema.cubes[0].dimensions[0].hierarchies[0].default_member.clone();
+        assert_eq!(dm.unwrap(), "Race.Race.Race.Total".to_owned());
     }
 }

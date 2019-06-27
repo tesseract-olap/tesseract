@@ -28,6 +28,7 @@ pub struct Query {
     pub growth: Option<GrowthQuery>,
     pub rate: Option<RateQuery>,
     pub debug: bool,
+    pub exclude_default_members: bool,
 }
 
 impl Query {
@@ -48,6 +49,7 @@ impl Query {
             growth: None,
             rate: None,
             debug: false,
+            exclude_default_members: false,
         }
     }
 }
