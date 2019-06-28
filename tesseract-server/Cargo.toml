@@ -15,7 +15,7 @@ section = "Web Servers"
 priority = "optional"
 assets = [
     ["../target/release/tesseract-olap", "usr/bin/", "755"],
-    ["pkg/deb/tesseract-olap.service", "/etc/systemd/system/tesseract.service", "644"],
+    ["pkg/deb/tesseract-olap.service", "/etc/systemd/system/tesseract-olap.service", "644"],
 ]
 maintainer-scripts = "pkg/deb/maintainer-scripts"
 
