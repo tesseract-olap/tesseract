@@ -1,5 +1,5 @@
 class TesseractOlap < Formula
-  version '0.12.0'
+  version '0.13.0'
   desc "ROLAP engine for web applications, in Rust."
   homepage "https://github.com/hwchen/tesseract"
   url "https://github.com/hwchen/tesseract/releases/download/v#{version}/tesseract-olap-#{version}-x86_64-apple-darwin.tar.gz"

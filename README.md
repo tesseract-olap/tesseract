@@ -19,6 +19,8 @@ The logical construct of the "cube" allows for powerful, flexible, and fast data
 
 If you installed using Homebrew on macOS, the binary is automatically moved to your `usr/local/bin` folder and is called `tesseract-olap`.
 
+Note: as of v0.13.0 the binary is called `tesseract-olap` on both linux and osx.
+
 ### Installation
 
 #### macOS

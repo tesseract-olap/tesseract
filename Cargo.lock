@@ -1886,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "tesseract-olap"
-version = "0.13.0-alpha"
+version = "0.13.0"
 dependencies = [
  "actix 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 0.7.19 (registry+https://github.com/rust-lang/crates.io-index)",
