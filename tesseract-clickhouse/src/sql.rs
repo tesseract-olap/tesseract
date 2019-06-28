@@ -22,6 +22,8 @@ use tesseract_core::query_ir::{
     RateSql,
     dim_subquery,
 };
+use tesseract_core::{QueryIr};
+
 use self::options::wrap_options;
 use self::primary_agg::primary_agg;
 use self::rate::rate_calculation;
@@ -30,42 +32,36 @@ use self::rate::rate_calculation;
 /// Error checking is done before this point. This string formatter
 /// accepts any input
 pub fn clickhouse_sql(
-    table: &TableSql,
-    cuts: &[CutSql],
-    drills: &[DrilldownSql],
-    meas: &[MeasureSql],
-    hidden_drilldown_sql: &[HiddenDrilldownSql],
-    filters: &[FilterSql],
-    // TODO put Filters and Calculations into own structs
-    top: &Option<TopSql>,
-    top_where: &Option<TopWhereSql>,
-    sort: &Option<SortSql>,
-    limit: &Option<LimitSql>,
-    rca: &Option<RcaSql>,
-    growth: &Option<GrowthSql>,
-    rate: &Option<RateSql>,
+    query_ir: &QueryIr
     ) -> String
 {
+    let meas = &query_ir.meas;
+
     let (mut final_sql, mut final_drill_cols) = {
         // HiddenDrilldownSql, for grouped median, only works with primar agg,
         // will currently silently fail if used for rca or rate. (you can see
         // here that it's simply not passed to calculations.
+        let table = &query_ir.table;
+        let cuts = &query_ir.cuts;
+        let drills = &query_ir.drills;
+
+        let rca = &query_ir.rca;
+        let rate = &query_ir.rate;
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rca)
         } else if let Some(rate) = rate {
             rate_calculation(table, cuts, drills, meas, rate)
         } else {
-            primary_agg(table, cuts, drills, meas, Some(hidden_drilldown_sql))
+            primary_agg(table, cuts, drills, meas, Some(&query_ir.hidden_drills))
         }
     };
-
-    if let Some(growth) = growth {
+    if let Some(growth) = &query_ir.growth {
         let (sql, drill_cols) = growth::calculate(final_sql, &final_drill_cols, meas.len(), growth);
         final_sql = sql;
         final_drill_cols = drill_cols;
     }
 
-    final_sql = wrap_options(final_sql, &final_drill_cols, top, top_where, sort, limit, filters);
+    final_sql = wrap_options(final_sql, &final_drill_cols, &query_ir, meas.len());
 
     final_sql
 }

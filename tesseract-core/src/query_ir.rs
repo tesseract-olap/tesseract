@@ -23,6 +23,7 @@ pub struct QueryIr {
     pub rca: Option<RcaSql>,
     pub growth: Option<GrowthSql>,
     pub rate: Option<RateSql>,
+    pub sparse: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -721,6 +721,7 @@ impl Schema {
                 rca,
                 growth,
                 rate,
+                sparse: query.sparse,
             },
             headers,
         ))

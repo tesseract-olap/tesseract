@@ -76,19 +76,7 @@ impl Backend for Clickhouse {
 
     fn generate_sql(&self, query_ir: QueryIr) -> String {
         clickhouse_sql(
-            &query_ir.table,
-            &query_ir.cuts,
-            &query_ir.drills,
-            &query_ir.meas,
-            &query_ir.hidden_drills,
-            &query_ir.filters,
-            &query_ir.top,
-            &query_ir.top_where,
-            &query_ir.sort,
-            &query_ir.limit,
-            &query_ir.rca,
-            &query_ir.growth,
-            &query_ir.rate,
+            &query_ir
         )
     }
 
