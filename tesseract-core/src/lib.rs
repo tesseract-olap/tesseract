@@ -209,7 +209,7 @@ impl Schema {
     /// cut string to flip the logic in order to exclude the default member from being returned in queries.
     fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Result<Vec<Cut>, Error> {
         let target_dims = self.get_dims_for_default_member(schema_cube, query, negate);
-        let result = target_dims.iter().map(|dim| {
+        let result = target_dims.iter().filter_map(|dim| {
             let target_hierarchy_name = match &dim.default_hierarchy {
                 Some(hierarchy_name) => hierarchy_name,
                 None => &dim.hierarchies.get(0).unwrap().name
@@ -217,26 +217,23 @@ impl Schema {
             let hierarchy_obj = &dim.hierarchies.iter()
                 .find(|h| &h.name == target_hierarchy_name).expect("bad hierarchy unpacking");
             let default_member = &hierarchy_obj.default_member;
-            match default_member {
-                Some(val) => {
-                    let mut new_cut_str: String = val.to_string();
-                    if negate {
-                        let first_ch_opt = new_cut_str.chars().next();
-                        let first_ch = first_ch_opt.ok_or_else(|| format_err!("Expected at least one character in default member"))?;
-                        new_cut_str = match first_ch {
-                            '~' => new_cut_str[1..].to_string(),
-                            _ => format!("~{}", new_cut_str)
-                        }
-                    }
-                    Cut::from_str(&new_cut_str)
-                },
-                None => {
-                    return Err(format_err!("Bad default member"))
-                }
-            }
-        }).collect();
 
-        return result;
+            default_member.as_ref().map(|val| {
+                let mut new_cut_str: String = val.to_string();
+                if negate {
+                    let first_ch = new_cut_str.chars().next().expect("Expected at least one character in default member");
+                    new_cut_str = match first_ch {
+                        '~' => new_cut_str[1..].to_string(),
+                        _ => format!("~{}", new_cut_str)
+                    }
+
+                }
+                Cut::from_str(&new_cut_str)
+            })
+        })
+        .collect::<Result<Vec<_>,_>>();
+
+        result
     }
 
     /// Helper function for build_default_member_cuts to get a list of dimensions.
