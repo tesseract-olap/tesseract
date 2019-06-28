@@ -207,9 +207,9 @@ impl Schema {
     ///
     /// If the function runs in negate mode, it will add or remove a ~ from the front of the default member
     /// cut string to flip the logic in order to exclude the default member from being returned in queries.
-    fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Vec<Cut> {
+    fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Result<Vec<Cut>, Error> {
         let target_dims = self.get_dims_for_default_member(schema_cube, query, negate);
-        let result = target_dims.iter().map(|dim| {
+        let result = target_dims.iter().filter_map(|dim| {
             let target_hierarchy_name = match &dim.default_hierarchy {
                 Some(hierarchy_name) => hierarchy_name,
                 None => &dim.hierarchies.get(0).unwrap().name
@@ -217,23 +217,23 @@ impl Schema {
             let hierarchy_obj = &dim.hierarchies.iter()
                 .find(|h| &h.name == target_hierarchy_name).expect("bad hierarchy unpacking");
             let default_member = &hierarchy_obj.default_member;
-            match default_member {
-                Some(val) => {
-                    let mut new_cut_str: String = val.to_string();
-                    if negate {
-                        let first_ch = new_cut_str.chars().next().expect("Expected at least one character in default member");
-                        new_cut_str = match first_ch {
-                            '~' => new_cut_str[1..].to_string(),
-                            _ => format!("~{}", new_cut_str)
-                        }
 
+            default_member.as_ref().map(|val| {
+                let mut new_cut_str: String = val.to_string();
+                if negate {
+                    let first_ch = new_cut_str.chars().next().expect("Expected at least one character in default member");
+                    new_cut_str = match first_ch {
+                        '~' => new_cut_str[1..].to_string(),
+                        _ => format!("~{}", new_cut_str)
                     }
-                    Cut::from_str(&new_cut_str)
-                },
-                None => Err(format_err!("Skipping empty default member"))
-            }
-        }).filter_map(Result::ok).collect();
-        return result;
+
+                }
+                Cut::from_str(&new_cut_str)
+            })
+        })
+        .collect::<Result<Vec<_>,_>>();
+
+        result
     }
 
     /// Helper function for build_default_member_cuts to get a list of dimensions.
@@ -383,13 +383,13 @@ impl Schema {
 
         cut_cols.extend_from_slice(&default_hierarchy_cut_cols);
 
-        let default_member_cuts_query = self.build_default_member_cuts(schema_cube, query, false);
+        let default_member_cuts_query = self.build_default_member_cuts(schema_cube, query, false)?;
         let default_member_cut_cols = self.cube_cut_cols(&cube, &default_member_cuts_query)
             .map_err(|err| format_err!("Error creating cuts for default member: {}", err))?;
         cut_cols.extend_from_slice(&default_member_cut_cols);
 
         if query.exclude_default_members {
-            let exclude_default_member_cuts_query = self.build_default_member_cuts(schema_cube, query, true);
+            let exclude_default_member_cuts_query = self.build_default_member_cuts(schema_cube, query, true)?;
             let exclude_default_member_cut_cols = self.cube_cut_cols(&cube, &exclude_default_member_cuts_query)
                 .map_err(|err| format_err!("Error creating exclude cuts for default member: {}", err))?;
             cut_cols.extend_from_slice(&exclude_default_member_cut_cols);
