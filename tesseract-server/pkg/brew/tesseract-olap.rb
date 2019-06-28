@@ -3,10 +3,10 @@ class TesseractOlap < Formula
   desc "ROLAP engine for web applications, in Rust."
   homepage "https://github.com/hwchen/tesseract"
   url "https://github.com/hwchen/tesseract/releases/download/v#{version}/tesseract-olap-#{version}-x86_64-apple-darwin.tar.gz"
-  sha256 "0e13cfb7505fc5b786039cfe9007842ba0682f07217beef1e94d86de8c78c740"
+  sha256 "5b30018ee4a0a31c78bcbf8524ba153ac16ded5ce4b20f5483f9a5c4f2e40c97"
 
   def install
-    bin.install "release/tesseract-olap"
+    bin.install "tesseract-olap"
   end
 end
 
