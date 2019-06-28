@@ -3,14 +3,14 @@ Description=tesseract olap server
 After=network.target
 
 [Service]
-User=tesseract
-Group=tesseract
+User=tesseract-olap
+Group=tesseract-olap
 Type=simple
 RemainAfterExit=yes
 Environment=RUST_LOG=info
 Environment=TESSERACT_DATABASE_URL=127.0.0.1:9000
 Environment=TESSERACT_SCHEMA_FILEPATH=schema.json
-ExecStart=/usr/bin/tesseract
+ExecStart=/usr/bin/tesseract-olap
 TimeoutSec=600
 
 [Install]

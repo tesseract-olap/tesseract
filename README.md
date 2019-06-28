@@ -37,13 +37,13 @@ You should check the exact release on the releases page. v0.12.0 is just the fir
 For now, just `wget` and `dpkg -i`. In the future, a ppa may be set up.
 
 ```
-wget https://github.com/hwchen/tesseract/releases/download/v0.12.0/tesseract_0.12.0_amd64.deb
-dpkg -i tesseract_0.12.0_amd64.deb
+wget https://github.com/hwchen/tesseract/releases/download/v0.13.0/tesseract-olap_0.13.0_amd64.deb
+dpkg -i tesseract-olap_0.13.0_amd64.deb
 ```
 
-You can then run the binary `tesseract`.
+You can then run the binary `tesseract-olap`.
 
-Note that a systemd `.service` is also installed. You will probably need to modify the defaults, and you can do so at the install script prompt. To start the tesseract service, use `systemctl start tesseract`.
+Note that a systemd `.service` is also installed. You will probably need to modify the defaults, and you can do so at the install script prompt. To start the tesseract service, use `systemctl start tesseract-olap`.
 
 
 ### Environment Variables

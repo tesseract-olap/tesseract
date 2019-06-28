@@ -2,15 +2,15 @@
 
 set -e
 
-TESSERACT_SERVICE_PATH=/etc/systemd/system/tesseract.service
+TESSERACT_SERVICE_PATH=/etc/systemd/system/tesseract-olap.service
 
 echo "### Tesseract service setup ###"
 # add user if does not exist
 # > redirect just surpresses warning. id -u returns a non-zero exit code when user does not exist
 
-echo "# Creating user 'tesseract' if needed"
+echo "# Creating user 'tesseract-olap' if needed"
 
-id -u tesseract >/dev/null 2>&1 || useradd tesseract
+id -u tesseract-olap >/dev/null 2>&1 || useradd tesseract-olap
 
 read -p "Would you like to use the default db address 127.0.0.1:9000? y/n: " -r
 if [[ ! $REPLY =~ ^[Yy]$ ]]
@@ -34,4 +34,4 @@ else
 fi
 
 echo "### Tesseract service setup complete###"
-echo "To start tesseract service, 'systemctl start tesseract'"
+echo "To start tesseract service, 'systemctl start tesseract-olap'"
