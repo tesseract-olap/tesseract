@@ -49,7 +49,6 @@ pub fn do_members(
     cube_format: (String, String),
     ) -> impl Future<Item=HttpResponse, Error=Error>
 {
-    // TODO RESTORE ERROR CHECKING!
     let (cube, format) = cube_format;
 
     let format = format.parse::<FormatType>();
