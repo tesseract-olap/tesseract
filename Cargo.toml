@@ -5,6 +5,6 @@ members = [
     "tesseract-postgres",
     "tesseract-core",
     "tesseract-server",
+    "tesseract-server2",
     "tests",
 ]
-
