@@ -36,7 +36,11 @@ use structopt::StructOpt;
 use std::sync::{Arc, RwLock};
 
 use crate::app::{EnvVars, SchemaSource};
-use crate::handlers::{index_handler, metadata_handler, metadata_all_handler};
+use crate::handlers::{index_handler,
+    metadata_handler,
+    metadata_all_handler,
+    members_handler,
+    members_default_handler};
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -91,7 +95,8 @@ fn main() -> Result<(), Error> {
             .service(web::resource("/").route(web::get().to(index_handler)))
             .service(web::resource("/cubes").route(web::get().to(metadata_all_handler)))
             .service(web::resource("/cubes/{cubes}").route(web::get().to(metadata_handler)))
-
+            .service(web::resource("/cubes/{cube}/members").route(web::get().to_async(members_default_handler)))
+            .service(web::resource("/cubes/{cube}/members.{format}").route(web::get().to_async(members_handler)))
     })
     .bind("localhost:8888")?
     .run();

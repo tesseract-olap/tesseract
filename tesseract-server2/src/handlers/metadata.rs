@@ -44,6 +44,12 @@ pub fn members_default_handler(req: HttpRequest, cube: Path<String>) -> impl Fut
     do_members(req, cube_format)
 }
 
+pub fn members_handler(req: HttpRequest, cube_format: Path<(String, String)>) -> impl Future<Item=HttpResponse, Error=Error>
+{
+    do_members(req, cube_format.into_inner())
+}
+
+
 pub fn do_members(
     req: HttpRequest,
     cube_format: (String, String),
