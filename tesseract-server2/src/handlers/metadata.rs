@@ -52,16 +52,45 @@ pub fn do_members(
     // TODO RESTORE ERROR CHECKING!
     let (cube, format) = cube_format;
 
-    let format = format.parse::<FormatType>().unwrap();
+    let format = format.parse::<FormatType>();
+    let format = match format {
+        Ok(f) => f,
+        Err(err) => {
+            return Either::A(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
+                )
+            );
+        },
+    };
 
     let query = req.query_string();
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
-    let query_res = QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(&query).unwrap();
 
-    let level: LevelName = query_res.level.parse().unwrap();
+    let query_res = QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(&query);
+    let query = match query_res {
+        Ok(q) => q,
+        Err(err) => {
+            return Either::A(
+                future::result(
+                    Ok(HttpResponse::BadRequest().json(err.to_string()))
+                )
+            );
+        },
+    };
 
+    let level: LevelName = match query.level.parse() {
+        Ok(q) => q,
+        Err(err) => {
+            return Either::A(
+                future::result(
+                    Ok(HttpResponse::BadRequest().json(err.to_string()))
+                )
+            );
+        },
+    };
     info!("Members for cube: {}, level: {}", cube, level);
     let app_state = req.app_data::<AppState>().unwrap();
 
