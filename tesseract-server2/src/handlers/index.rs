@@ -1,13 +1,8 @@
 use actix_web::{
-    get,
-    HttpRequest,
     HttpResponse,
-    Result as ActixResult,
 };
 use serde_derive::Serialize;
 use structopt::clap::crate_version;
-
-use crate::app::AppState;
 
 
 /// Returns server status and Tesseract version.
