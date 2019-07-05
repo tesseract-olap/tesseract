@@ -8,7 +8,6 @@ use actix_web::{
 };
 use failure::Error;
 
-use actix_web::http::header::ContentType;
 use futures::future::{Future, Either};
 use lazy_static::lazy_static;
 use log::*;
@@ -44,8 +43,6 @@ pub fn logic_layer_aggregation(
     format: String,
 ) -> impl Future<Item=HttpResponse, Error=Error>
 {
-    let format_str = format.clone();
-
     let format = format.parse::<FormatType>();
     let format = match format {
         Ok(f) => f,

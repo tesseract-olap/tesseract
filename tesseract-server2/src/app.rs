@@ -1,12 +1,6 @@
 use actix_web::{
-    http::Method,
-    middleware,
-    App,
-    dev::Body,
     web,
-    middleware::NormalizePath,
 };
-use actix_service::{NewService, Service};
 
 use tesseract_core::{Backend, Schema};
 

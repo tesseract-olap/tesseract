@@ -3,7 +3,6 @@ use actix_web::{
     HttpRequest,
     HttpResponse,
     web::Path,
-    Result as ActixResult
 };
 use failure::Error;
 use futures::future::Either;

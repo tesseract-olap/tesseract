@@ -98,7 +98,7 @@ impl CubeCache {
         Ok((ln, val))
     }
 
-    pub fn get_level_name(&self, time: &Time, level: Option<Level>) -> Option<String> {
+    pub fn get_level_name(&self, _time: &Time, level: Option<Level>) -> Option<String> {
         match level {
             Some(l) => Some(l.name),
             None => None

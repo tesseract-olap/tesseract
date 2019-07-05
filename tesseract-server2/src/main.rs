@@ -86,7 +86,6 @@ fn main() -> Result<(), Error> {
     // Logic Layer Config
     let mut schema = schema_config::read_schema(&schema_path)?;
     schema.validate()?;
-    let schema_arc = Arc::new(RwLock::new(schema.clone()));
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();
 
     let mut sys = actix::System::new("tesseract");

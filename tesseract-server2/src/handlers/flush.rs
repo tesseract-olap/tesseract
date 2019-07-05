@@ -7,7 +7,6 @@ use serde_qs as qs;
 use actix_web::{
     HttpRequest,
     HttpResponse,
-    Result as ActixResult,
 };
 
 use crate::app::{AppState, SchemaSource};

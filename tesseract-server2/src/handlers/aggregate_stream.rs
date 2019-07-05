@@ -11,7 +11,7 @@ use std::convert::TryInto;
 use tesseract_core::format::FormatType;
 use tesseract_core::format_stream::format_records_stream;
 use tesseract_core::Query as TsQuery;
-use futures::future::{Future, Either};
+use futures::future::{Future};
 use failure::Error;
 
 use crate::app::AppState;
