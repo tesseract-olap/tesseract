@@ -11,22 +11,8 @@ use actix_service::{NewService, Service};
 use tesseract_core::{Backend, Schema};
 
 use crate::db_config::Database;
-use crate::handlers::{
-    // aggregate_handler,
-    // aggregate_default_handler,
-    // aggregate_stream_handler,
-    // aggregate_stream_default_handler,
-    // logic_layer_default_handler,
-    // logic_layer_handler,
-    // logic_layer_non_unique_levels_handler,
-    // logic_layer_non_unique_levels_default_handler,
-    // flush_handler,
-    index_handler,
-    metadata_handler,
-    metadata_all_handler,
-    // members_handler,
-    // members_default_handler,
-};
+
+use crate::handlers;
 // use crate::logic_layer::{Cache, LogicLayerConfig};
 
 use std::sync::{Arc, RwLock};
@@ -61,84 +47,25 @@ pub struct AppState {
     // pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
 }
 
-// /// Creates an ActixWeb application with an `AppState`.
-// pub fn create_app(
-//         debug: bool,
-//         backend: Box<dyn Backend + Sync + Send>,
-//         db_type: Database,
-//         env_vars: EnvVars,
-//         schema: Arc<RwLock<Schema>>,
-//         // cache: Arc<RwLock<Cache>>,
-//         // logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
-//         streaming_response: bool,
-//         has_unique_levels_properties: bool,
-//     ) -> App<impl actix_service::NewService, Body>
-// {
-//     let app = App::new()
-//         .data(AppState { debug, backend, db_type, env_vars, schema, })
-//         .wrap(middleware::Logger::default())
-//         .service(
-//             web::resource("/")
-//             .route(web::get().to(index_handler))
-//         );
-//     return app;
-//         // .resource("/cubes", |r| {
-//         //     r.method(Method::GET).with(metadata_all_handler)
-//         // })
-//         // .resource("/cubes/{cube}", |r| {
-//         //     r.method(Method::GET).with(metadata_handler)
-//         // })
-//         //
-//         // // Helpers
-//         // .resource("/cubes/{cube}/members", |r| {
-//         //     r.method(Method::GET).with(members_default_handler)
-//         // })
-//         // .resource("/cubes/{cube}/members.{format}", |r| {
-//         //     r.method(Method::GET).with(members_handler)
-//         // })
-//         //
-//         // .resource("/flush", |r| {
-//         //     r.method(Method::POST).with(flush_handler)
-//         // })
-//         // Allow the API to accept /my-path or /my-path/ for all requests
-//         // .default_resource(|r| r.h(NormalizePath::default()));
-//
-//     // let app = if streaming_response {
-//     //     app
-//     //         .resource("/cubes/{cube}/aggregate", |r| {
-//     //             r.method(Method::GET).with(aggregate_stream_default_handler)
-//     //         })
-//     //         .resource("/cubes/{cube}/aggregate.{format}", |r| {
-//     //             r.method(Method::GET).with(aggregate_stream_handler)
-//     //         })
-//     // } else {
-//     //     app
-//     //         .resource("/cubes/{cube}/aggregate", |r| {
-//     //             r.method(Method::GET).with(aggregate_default_handler)
-//     //         })
-//     //         .resource("/cubes/{cube}/aggregate.{format}", |r| {
-//     //             r.method(Method::GET).with(aggregate_handler)
-//     //         })
-//     // };
-//
-//     // if has_unique_levels_properties {
-//     //     // Logic Layer
-//     //     app
-//     //         .resource("/data", |r| {
-//     //             r.method(Method::GET).with(logic_layer_default_handler)
-//     //         })
-//     //         .resource("/data.{format}", |r| {
-//     //             r.method(Method::GET).with(logic_layer_handler)
-//     //         })
-//     //
-//     // } else {
-//     //     app
-//     //         .resource("/data", |r| {
-//     //             r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
-//     //         })
-//     //         .resource("/data.{format}", |r| {
-//     //             r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
-//     //         })
-//     // }
-//
-// }
+pub fn streaming_agg_config(cfg: &mut web::ServiceConfig) {
+    cfg
+        .route("/cubes/{cube}/aggregate", web::get().to_async(handlers::aggregate_stream_default_handler))
+        .route("/cubes/{cube}/aggregate.{format}", web::get().to_async(handlers::aggregate_stream_handler));
+}
+
+pub fn standard_agg_config(cfg: &mut web::ServiceConfig) {
+    cfg
+        .route("/cubes/{cube}/aggregate", web::get().to_async(handlers::aggregate_default_handler))
+        .route("/cubes/{cube}/aggregate.{format}", web::get().to_async(handlers::aggregate_handler));
+}
+
+
+pub fn base_config(cfg: &mut web::ServiceConfig) {
+    cfg
+        .route("/", web::get().to(handlers::index_handler))
+        .route("/cubes", web::get().to(handlers::metadata_all_handler))
+        .route("/cubes/{cubes}", web::get().to(handlers::metadata_handler))
+        .route("/cubes/{cube}/members", web::get().to_async(handlers::members_default_handler))
+        .route("/cubes/{cube}/members.{format}", web::get().to_async(handlers::members_handler))
+        .route("/flush", web::get().to(handlers::flush_handler));
+}
