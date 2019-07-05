@@ -35,14 +35,7 @@ use structopt::StructOpt;
 
 use std::sync::{Arc, RwLock};
 
-use crate::app::{EnvVars, SchemaSource};
-use crate::handlers::{index_handler,
-    metadata_handler,
-    metadata_all_handler,
-    members_handler,
-    members_default_handler,
-    flush_handler,
-};
+use crate::app::{EnvVars, SchemaSource, base_config, streaming_agg_config, standard_agg_config};
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -58,8 +51,7 @@ fn main() -> Result<(), Error> {
     // streaming http response (transfer encoding chunked)
     // cli is boolean, but env var is Result.
     // cli opt overrides env var if env_var is false
-    // TODO this has the same logic as for debug. make util fn?
-    let env_var_streaming_response = util::get_bool_env_var("TESSERACT_STREAMING_RESPONSE", opt.streaming_response);
+    let streaming_response = util::get_bool_env_var("TESSERACT_STREAMING_RESPONSE", opt.streaming_response);
 
     // address
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
@@ -94,14 +86,13 @@ fn main() -> Result<(), Error> {
         App::new()
             .data(AppState { debug, backend: db.clone(), db_type: db_type.clone(), env_vars: env_vars.clone(), schema: schema_arc.clone(), })
             .wrap(middleware::Logger::default())
-            .service(web::resource("/").route(web::get().to(index_handler)))
-            .service(web::resource("/cubes").route(web::get().to(metadata_all_handler)))
-            .service(web::resource("/cubes/{cubes}").route(web::get().to(metadata_handler)))
-            .service(web::resource("/cubes/{cube}/members").route(web::get().to_async(members_default_handler)))
-            .service(web::resource("/cubes/{cube}/members.{format}").route(web::get().to_async(members_handler)))
-            .service(web::resource("/flush").route(web::get().to(flush_handler)))
+            .configure(base_config)
+            .configure(match streaming_response {
+                true => streaming_agg_config,
+                false => standard_agg_config
+            })
     })
-    .bind("localhost:8888")?
+    .bind(&server_addr)?
     .run();
 
     Ok(())
