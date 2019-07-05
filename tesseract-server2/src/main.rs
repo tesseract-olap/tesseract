@@ -23,11 +23,11 @@ mod app;
 mod db_config;
 mod errors;
 pub mod handlers;
-// mod logic_layer;
+mod logic_layer;
 mod schema_config;
 mod util;
 use crate::app::AppState;
-use actix_web::{App, HttpServer, middleware, web};
+use actix_web::{App, HttpServer, middleware};
 use dotenv::dotenv;
 use failure::{Error, format_err};
 use std::env;
@@ -35,7 +35,11 @@ use structopt::StructOpt;
 
 use std::sync::{Arc, RwLock};
 
-use crate::app::{EnvVars, SchemaSource, base_config, streaming_agg_config, standard_agg_config};
+use crate::app::{EnvVars, SchemaSource, base_config,
+    streaming_agg_config, standard_agg_config,
+    unique_levels_config, non_unique_levels_config,
+
+};
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -78,22 +82,78 @@ fn main() -> Result<(), Error> {
         schema_source,
         flush_secret,
     };
+
+    // Logic Layer Config
+    let mut schema = schema_config::read_schema(&schema_path)?;
+    schema.validate()?;
+    let schema_arc = Arc::new(RwLock::new(schema.clone()));
+    let mut has_unique_levels_properties = schema.has_unique_levels_properties();
+
+    let mut sys = actix::System::new("tesseract");
+    let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
+        Ok(config_path) => {
+            match logic_layer::read_config(&config_path) {
+                Ok(config_obj) => {
+                    has_unique_levels_properties = config_obj.has_unique_levels_properties(&schema)?;
+                    Some(config_obj)
+                },
+                Err(err) => return Err(err)
+            }
+        },
+        Err(_) => None
+    };
+    // Populate internal cache
+    let cache = match logic_layer::populate_cache(
+        schema.clone(), &logic_layer_config, db.clone(), &mut sys
+    ) {
+        Ok(cache) => cache,
+        Err(_) => panic!("Cache population failed."),
+    };
+    let cache_arc = Arc::new(RwLock::new(cache));
+
+    // Create lock on logic layer config
+    let logic_layer_config = match logic_layer_config {
+        Some(ll_config) => Some(Arc::new(RwLock::new(ll_config))),
+        None => None
+    };
+
     let mut schema = schema_config::read_schema(&schema_path)?;
     schema.validate()?;
     let schema_arc = Arc::new(RwLock::new(schema.clone()));
 
+    println!("Tesseract listening on: {}", server_addr);
+    println!("Tesseract database:     {}, {}", db_url, db_type_viz);
+    println!("Tesseract schema path:  {}", schema_path);
+
     let res = HttpServer::new(move || {
         App::new()
-            .data(AppState { debug, backend: db.clone(), db_type: db_type.clone(), env_vars: env_vars.clone(), schema: schema_arc.clone(), })
+            .data(AppState {
+                debug,
+                backend: db.clone(),
+                db_type: db_type.clone(),
+                env_vars: env_vars.clone(),
+                schema: schema_arc.clone(),
+                logic_layer_config: logic_layer_config.clone(),
+                cache: cache_arc.clone(),
+            })
             .wrap(middleware::Logger::default())
             .configure(base_config)
             .configure(match streaming_response {
                 true => streaming_agg_config,
                 false => standard_agg_config
             })
+            .configure(match has_unique_levels_properties {
+                true => unique_levels_config,
+                false => non_unique_levels_config
+            })
     })
     .bind(&server_addr)?
     .run();
+
+    match res {
+        Ok(_) => println!("Tesseract started succesfully"),
+        Err(err) => println!("Error starting Tesseract: {:?}", err)
+    }
 
     Ok(())
 }

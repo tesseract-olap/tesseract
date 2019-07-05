@@ -13,7 +13,7 @@ use tesseract_core::{Backend, Schema};
 use crate::db_config::Database;
 
 use crate::handlers;
-// use crate::logic_layer::{Cache, LogicLayerConfig};
+use crate::logic_layer::{Cache, LogicLayerConfig};
 
 use std::sync::{Arc, RwLock};
 
@@ -43,8 +43,8 @@ pub struct AppState {
     pub db_type: Database,
     pub env_vars: EnvVars,
     pub schema: Arc<RwLock<Schema>>,
-    // pub cache: Arc<RwLock<Cache>>,
-    // pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
+    pub cache: Arc<RwLock<Cache>>,
+    pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
 }
 
 pub fn streaming_agg_config(cfg: &mut web::ServiceConfig) {
@@ -59,6 +59,17 @@ pub fn standard_agg_config(cfg: &mut web::ServiceConfig) {
         .route("/cubes/{cube}/aggregate.{format}", web::get().to_async(handlers::aggregate_handler));
 }
 
+pub fn unique_levels_config(cfg: &mut web::ServiceConfig) {
+    cfg
+        .route("/data", web::get().to_async(handlers::logic_layer_default_handler))
+        .route("/data.{format}", web::get().to_async(handlers::logic_layer_handler));
+}
+
+pub fn non_unique_levels_config(cfg: &mut web::ServiceConfig) {
+    cfg
+        .route("/data", web::get().to_async(handlers::logic_layer_non_unique_levels_default_handler))
+        .route("/data.{format}", web::get().to_async(handlers::logic_layer_non_unique_levels_handler));
+}
 
 pub fn base_config(cfg: &mut web::ServiceConfig) {
     cfg
