@@ -40,7 +40,9 @@ use crate::handlers::{index_handler,
     metadata_handler,
     metadata_all_handler,
     members_handler,
-    members_default_handler};
+    members_default_handler,
+    flush_handler,
+};
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -97,6 +99,7 @@ fn main() -> Result<(), Error> {
             .service(web::resource("/cubes/{cubes}").route(web::get().to(metadata_handler)))
             .service(web::resource("/cubes/{cube}/members").route(web::get().to_async(members_default_handler)))
             .service(web::resource("/cubes/{cube}/members.{format}").route(web::get().to_async(members_handler)))
+            .service(web::resource("/flush").route(web::get().to(flush_handler)))
     })
     .bind("localhost:8888")?
     .run();

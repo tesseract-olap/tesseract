@@ -19,7 +19,7 @@ pub struct FlushQueryOpt {
     pub secret: String,
 }
 
-pub fn flush_handler(req: &HttpRequest) -> ActixResult<HttpResponse> {
+pub fn flush_handler(req: HttpRequest) -> HttpResponse {
     let query = req.query_string();
     let app_state = req.app_data::<AppState>().unwrap();
 
@@ -30,13 +30,13 @@ pub fn flush_handler(req: &HttpRequest) -> ActixResult<HttpResponse> {
     let query = match query_res {
         Ok(q) => q,
         Err(err) => {
-            return Ok(HttpResponse::BadRequest().json(err.to_string()));
+            return HttpResponse::BadRequest().json(err.to_string());
         },
     };
 
     let db_secret = match &app_state.env_vars.flush_secret {
         Some(db_secret) => db_secret,
-        None => { return Ok(HttpResponse::Unauthorized().finish()); }
+        None => { return HttpResponse::Unauthorized().finish(); }
     };
 
     if query.secret == *db_secret {
@@ -52,7 +52,7 @@ pub fn flush_handler(req: &HttpRequest) -> ActixResult<HttpResponse> {
             Ok(val) => val,
             Err(err) => {
                 error!("{}", err);
-                return Ok(HttpResponse::InternalServerError().finish());
+                return HttpResponse::InternalServerError().finish();
             },
         };
 
@@ -74,8 +74,8 @@ pub fn flush_handler(req: &HttpRequest) -> ActixResult<HttpResponse> {
 //        let mut w = req.state().cache.write().unwrap();
 //        *w = cache;
 
-        Ok(HttpResponse::Ok().finish())
+        HttpResponse::Ok().finish()
     } else {
-        Ok(HttpResponse::Unauthorized().finish())
+        HttpResponse::Unauthorized().finish()
     }
 }
