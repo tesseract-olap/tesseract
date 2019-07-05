@@ -1,4 +1,4 @@
-use failure::{Error, format_err};
+use failure::{format_err};
 use std::env;
 
 pub fn get_bool_env_var(var_name: &str, default_val: bool) -> bool {
