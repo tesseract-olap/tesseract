@@ -25,8 +25,9 @@ mod errors;
 pub mod handlers;
 mod logic_layer;
 mod schema_config;
-
-use actix_web::server;
+mod util;
+use crate::app::AppState;
+use actix_web::{App, HttpServer, middleware};
 use dotenv::dotenv;
 use failure::{Error, format_err};
 use std::env;
@@ -34,8 +35,11 @@ use structopt::StructOpt;
 
 use std::sync::{Arc, RwLock};
 
-use crate::app::{EnvVars, SchemaSource, create_app};
+use crate::app::{EnvVars, SchemaSource, base_config,
+    streaming_agg_config, standard_agg_config,
+    unique_levels_config, non_unique_levels_config,
 
+};
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -46,48 +50,17 @@ fn main() -> Result<(), Error> {
 
     // debug is boolean, but env var is Result.
     // cli opt overrides env var if env_var is false
-    let env_var_debug = env::var("TESSERACT_DEBUG")
-        .map_err(|_| format_err!(""))
-        .and_then(|d| {
-             d.parse::<bool>()
-            .map_err(|_| format_err!("could not parse bool from env_var TESSERACT_DEBUG"))
-        });
-    let debug = if !opt.debug {
-        if let Ok(d) = env_var_debug {
-            d
-        } else {
-            opt.debug // false
-        }
-    } else {
-        opt.debug // true
-    };
+    let debug = util::get_bool_env_var("TESSERACT_DEBUG", opt.debug);
 
     // streaming http response (transfer encoding chunked)
     // cli is boolean, but env var is Result.
     // cli opt overrides env var if env_var is false
-    // TODO this has the same logic as for debug. make util fn?
-    let env_var_streaming_response = env::var("TESSERACT_STREAMING_RESPONSE")
-        .map_err(|_| format_err!(""))
-        .and_then(|d| {
-             d.parse::<bool>()
-            .map_err(|_| format_err!("could not parse bool from env_var TESSERACT_STREAMING_RESPONSE"))
-        });
-    let streaming_response = if !opt.streaming_response {
-        if let Ok(d) = env_var_streaming_response {
-            d
-        } else {
-            opt.streaming_response // false
-        }
-    } else {
-        opt.streaming_response // true
-    };
+    let streaming_response = util::get_bool_env_var("TESSERACT_STREAMING_RESPONSE", opt.streaming_response);
 
     // address
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
-
     // flush
     let flush_secret = env::var("TESSERACT_FLUSH_SECRET").ok();
-
     // Database
     let db_url_full = env::var("TESSERACT_DATABASE_URL")
         .or(opt.database_url.ok_or(format_err!("")))
@@ -102,13 +75,6 @@ fn main() -> Result<(), Error> {
 
     // NOTE: Local schema is the only supported SchemaSource for now
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
-
-    let mut schema = schema_config::read_schema(&schema_path)?;
-    schema.validate()?;
-    let mut has_unique_levels_properties = schema.has_unique_levels_properties();
-    let schema_arc = Arc::new(RwLock::new(schema.clone()));
-
-    // Env
     let env_vars = EnvVars {
         database_url: db_url.clone(),
         schema_source,
@@ -116,6 +82,10 @@ fn main() -> Result<(), Error> {
     };
 
     // Logic Layer Config
+    let mut schema = schema_config::read_schema(&schema_path)?;
+    schema.validate()?;
+    let mut has_unique_levels_properties = schema.has_unique_levels_properties();
+
     let logic_layer_config = match env::var("TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH") {
         Ok(config_path) => {
             match logic_layer::read_config(&config_path) {
@@ -128,7 +98,6 @@ fn main() -> Result<(), Error> {
         },
         Err(_) => None
     };
-
     // Initialize actix system
     let mut sys = actix::System::new("tesseract");
 
@@ -147,35 +116,43 @@ fn main() -> Result<(), Error> {
         None => None
     };
 
-    // Initialize Server
-    server::new(
-        move|| create_app(
-                debug,
-                db.clone(),
-                db_type.clone(),
-                env_vars.clone(),
-                schema_arc.clone(),
-                cache_arc.clone(),
-                logic_layer_config.clone(),
-                streaming_response,
-                has_unique_levels_properties,
-            )
-        )
-        .bind(&server_addr)
-        .expect(&format!("cannot bind to {}", server_addr))
-        .start();
+    let mut schema = schema_config::read_schema(&schema_path)?;
+    schema.validate()?;
+    let schema_arc = Arc::new(RwLock::new(schema.clone()));
 
     println!("Tesseract listening on: {}", server_addr);
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
-    if debug {
-        println!("Tesseract debug mode: ON");
-    }
-    if streaming_response {
-        println!("Tesseract streaming mode: ON");
-    }
 
-    sys.run();
+    HttpServer::new(move || {
+        App::new()
+            .data(AppState {
+                debug,
+                backend: db.clone(),
+                db_type: db_type.clone(),
+                env_vars: env_vars.clone(),
+                schema: schema_arc.clone(),
+                logic_layer_config: logic_layer_config.clone(),
+                cache: cache_arc.clone(),
+            })
+            .wrap(middleware::Logger::default())
+            .configure(base_config)
+            .configure(match streaming_response {
+                true => streaming_agg_config,
+                false => standard_agg_config
+            })
+            .configure(match has_unique_levels_properties {
+                true => unique_levels_config,
+                false => non_unique_levels_config
+            })
+    })
+    .bind(&server_addr)?
+    .start();
+
+    let actix_sys_res = sys.run();
+    if let Err(err) = actix_sys_res {
+        println!("Error starting Tesseract Actix System: {:?}", err);
+    }
 
     Ok(())
 }
