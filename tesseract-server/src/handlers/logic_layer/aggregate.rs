@@ -2,14 +2,13 @@ use std::collections::HashMap;
 use std::convert::{TryInto};
 
 use actix_web::{
-    AsyncResponder,
-    FutureResponse,
     HttpRequest,
     HttpResponse,
-    Path,
+    web::Path,
 };
-use actix_web::http::header::ContentType;
-use futures::future::{Future};
+use failure::Error;
+
+use futures::future::{Future, Either};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
@@ -18,7 +17,7 @@ use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time, boxed_error};
+use crate::handlers::logic_layer::shared::{LogicLayerQueryOpt, Time, error_helper};
 use crate::errors::ServerError;
 use crate::logic_layer::LogicLayerConfig;
 use super::super::util;
@@ -26,17 +25,13 @@ use super::super::util;
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub fn logic_layer_default_handler(
-    (req, _cube): (HttpRequest<AppState>, Path<()>)
-) -> FutureResponse<HttpResponse>
+pub fn logic_layer_default_handler(req: HttpRequest, _cube: Path<()>) -> impl Future<Item=HttpResponse, Error=Error>
 {
     logic_layer_aggregation(req, "jsonrecords".to_owned())
 }
 
 /// Handles aggregation when a format is specified.
-pub fn logic_layer_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String)>)
-) -> FutureResponse<HttpResponse>
+pub fn logic_layer_handler(req: HttpRequest, cube_format: Path<(String)>) -> impl Future<Item=HttpResponse, Error=Error>
 {
     logic_layer_aggregation(req, cube_format.to_owned())
 }
@@ -44,25 +39,24 @@ pub fn logic_layer_handler(
 
 /// Performs data aggregation.
 pub fn logic_layer_aggregation(
-    req: HttpRequest<AppState>,
+    req: HttpRequest,
     format: String,
-) -> FutureResponse<HttpResponse>
+) -> impl Future<Item=HttpResponse, Error=Error>
 {
-    let format_str = format.clone();
-
     let format = format.parse::<FormatType>();
     let format = match format {
         Ok(f) => f,
-        Err(err) => return boxed_error(err.to_string()),
+        Err(err) => return Either::A(error_helper(err.to_string())),
     };
 
     info!("format: {:?}", format);
+    let app_state = req.app_data::<AppState>().unwrap();
 
     let query = req.query_string();
-    let schema = req.state().schema.read().unwrap();
-    let debug = req.state().debug;
+    let schema = app_state.schema.read().unwrap();
+    let debug = app_state.debug;
 
-    let logic_layer_config: Option<LogicLayerConfig> = match &req.state().logic_layer_config {
+    let logic_layer_config: Option<LogicLayerConfig> = match &app_state.logic_layer_config {
         Some(llc) => Some(llc.read().unwrap().clone()),
         None => None
     };
@@ -89,10 +83,10 @@ pub fn logic_layer_aggregation(
 
             let cube = match schema.get_cube_by_name(&cube_name) {
                 Ok(c) => c.clone(),
-                Err(err) => return boxed_error(err.to_string())
+                Err(err) => return Either::A(error_helper(err.to_string()))
             };
 
-            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name).clone();
+            let cube_cache = app_state.cache.read().unwrap().find_cube_info(&cube_name).clone();
 
             println!(" ");
             println!("{:?}", cube_cache);
@@ -105,13 +99,13 @@ pub fn logic_layer_aggregation(
             q.schema = Some(schema.clone());
             q
         },
-        Err(err) => return boxed_error(err.to_string())
+        Err(err) => return Either::A(error_helper(err.to_string()))
     };
 
     // Process `time` param (latest/oldest)
     match &agg_query.time {
         Some(s) => {
-            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name);
+            let cube_cache = app_state.cache.read().unwrap().find_cube_info(&cube_name);
 
             let time_cuts: Vec<String> = s.split(",").map(|s| s.to_string()).collect();
 
@@ -119,19 +113,19 @@ pub fn logic_layer_aggregation(
                 let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
 
                 if tc.len() != 2 {
-                    return boxed_error("Malformatted time cut".to_string());
+                    return Either::A(error_helper("Malformatted time cut".to_string()));
                 }
 
                 let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
                     Ok(time) => time,
-                    Err(err) => return boxed_error(err.to_string())
+                    Err(err) => return Either::A(error_helper(err.to_string()))
                 };
 
                 match cube_cache.clone() {
                     Some(cache) => {
                         let (cut, cut_value) = match cache.get_time_cut(time) {
                             Ok(cut) => cut,
-                            Err(err) => return boxed_error(err.to_string())
+                            Err(err) => return Either::A(error_helper(err.to_string()))
                         };
 
                         agg_query.cuts = match agg_query.cuts {
@@ -159,30 +153,29 @@ pub fn logic_layer_aggregation(
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = match ts_query {
         Ok(q) => q,
-        Err(err) => return boxed_error(err.to_string())
+        Err(err) => return Either::A(error_helper(err.to_string()))
     };
 
     info!("Tesseract query: {:?}", ts_query);
 
-    let query_ir_headers = req
-        .state()
+    let query_ir_headers = app_state
         .schema.read().unwrap()
         .sql_query(&cube_name, &ts_query);
     let (query_ir, headers) = match query_ir_headers {
         Ok(x) => x,
-        Err(err) => return boxed_error(err.to_string())
+        Err(err) => return Either::A(error_helper(err.to_string()))
     };
 
     info!("Query IR: {:?}", query_ir);
 
-    let sql = req.state()
+    let sql = app_state
         .backend
         .generate_sql(query_ir);
 
     info!("SQL query: {}", sql);
     info!("Headers: {:?}", headers);
 
-    req.state()
+    Either::B(app_state
         .backend
         .exec_sql(sql)
         .and_then(move |df| {
@@ -203,6 +196,5 @@ pub fn logic_layer_aggregation(
             } else {
                 ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
             }
-        })
-        .responder()
+        }))
 }

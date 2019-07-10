@@ -1,12 +1,10 @@
 use actix_web::{
-    AsyncResponder,
-    FutureResponse,
     HttpRequest,
     HttpResponse,
-    Path,
+    web::Path,
 };
 use failure::Error;
-use futures::future::{self, Future};
+use futures::future::{self, Future, Either};
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
@@ -21,35 +19,32 @@ use super::util;
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub fn aggregate_default_handler(
-    (req, cube): (HttpRequest<AppState>, Path<String>)
-    ) -> FutureResponse<HttpResponse>
+pub fn aggregate_default_handler(req: HttpRequest, cube: Path<String>) -> impl Future<Item=HttpResponse, Error=Error>
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
     do_aggregate(req, cube_format)
 }
 
 /// Handles aggregation when a format is specified.
-pub fn aggregate_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
-    ) -> FutureResponse<HttpResponse>
+pub fn aggregate_handler(req: HttpRequest, cube_format: Path<(String, String)>) -> impl Future<Item=HttpResponse, Error=Error>
 {
     do_aggregate(req, cube_format.into_inner())
 }
 
 /// Performs data aggregation.
 pub fn do_aggregate(
-    req: HttpRequest<AppState>,
+    req: HttpRequest,
     cube_format: (String, String),
-    ) -> FutureResponse<HttpResponse>
+    ) -> impl Future<Item=HttpResponse, Error=Error>
 {
     let (cube, format) = cube_format;
+    let app_state = req.app_data::<AppState>().unwrap();
 
     let format = format.parse::<FormatType>();
     let format = match format {
         Ok(f) => f,
         Err(err) => {
-            return Box::new(
+            return Either::A(
                 future::result(
                     Ok(HttpResponse::NotFound().json(err.to_string()))
                 )
@@ -67,7 +62,7 @@ pub fn do_aggregate(
     let agg_query = match agg_query_res {
         Ok(q) => q,
         Err(err) => {
-            return Box::new(
+            return Either::A(
                 future::result(
                     Ok(HttpResponse::NotFound().json(err.to_string()))
                 )
@@ -81,7 +76,7 @@ pub fn do_aggregate(
     let ts_query = match ts_query {
         Ok(q) => q,
         Err(err) => {
-            return Box::new(
+            return Either::A(
                 future::result(
                     Ok(HttpResponse::NotFound().json(err.to_string()))
                 )
@@ -89,15 +84,14 @@ pub fn do_aggregate(
         },
     };
 
-    let query_ir_headers = req
-        .state()
+    let query_ir_headers = app_state
         .schema.read().unwrap()
         .sql_query(&cube, &ts_query);
 
     let (query_ir, headers) = match query_ir_headers {
         Ok(x) => x,
         Err(err) => {
-            return Box::new(
+            return Either::A(
                 future::result(
                     Ok(HttpResponse::NotFound().json(err.to_string()))
                 )
@@ -105,14 +99,14 @@ pub fn do_aggregate(
         },
     };
 
-    let sql = req.state()
+    let sql = app_state
         .backend
         .generate_sql(query_ir);
 
     info!("Sql query: {}", sql);
     info!("Headers: {:?}", headers);
-
-    req.state()
+    let debug_mode = app_state.debug;
+    let result = app_state
         .backend
         .exec_sql(sql)
         .and_then(move |df| {
@@ -128,13 +122,13 @@ pub fn do_aggregate(
             }
         })
         .map_err(move |e| {
-            if req.state().debug {
+            if debug_mode {
                 ServerError::Db { cause: e.to_string() }.into()
             } else {
                 ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
             }
-        })
-        .responder()
+        });
+    Either::B(result)
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

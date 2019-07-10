@@ -1,12 +1,11 @@
 use actix_web::{
-    AsyncResponder,
-    FutureResponse,
+    // Error,
     HttpRequest,
     HttpResponse,
-    Path,
-    Result as ActixResult
+    web::Path,
 };
-
+use failure::Error;
+use futures::future::Either;
 use futures::future::{self, Future};
 use lazy_static::lazy_static;
 use log::*;
@@ -17,48 +16,43 @@ use tesseract_core::names::LevelName;
 
 use crate::app::AppState;
 
-pub fn metadata_handler(
-    (req, cube): (HttpRequest<AppState>, Path<String>)
-    ) -> ActixResult<HttpResponse>
+pub fn metadata_handler(req: HttpRequest, cube: Path<String>) -> HttpResponse
 {
     info!("Metadata for cube: {}", cube);
+    let app_state = req.app_data::<AppState>().unwrap();
 
     // currently, we do not check that cube names are distinct
     // TODO fix this
-    match req.state().schema.read().unwrap().cube_metadata(&cube) {
-        Some(cube) => Ok(HttpResponse::Ok().json(cube)),
-        None => Ok(HttpResponse::NotFound().finish()),
+    match app_state.schema.read().unwrap().cube_metadata(&cube) {
+        Some(cube) => HttpResponse::Ok().json(cube),
+        None => HttpResponse::NotFound().finish(),
     }
 }
 
-pub fn metadata_all_handler(
-    req: HttpRequest<AppState>
-    ) -> ActixResult<HttpResponse>
+pub fn metadata_all_handler(req: HttpRequest) -> HttpResponse
 {
-    info!("Metadata for all");
+    info!("Metadata for all cubes");
+    let app_state = req.app_data::<AppState>().unwrap();
 
-    Ok(HttpResponse::Ok().json(req.state().schema.read().unwrap().metadata()))
+    HttpResponse::Ok().json(app_state.schema.read().unwrap().metadata())
 }
 
-pub fn members_default_handler(
-    (req, cube): (HttpRequest<AppState>, Path<String>)
-    ) -> FutureResponse<HttpResponse>
+pub fn members_default_handler(req: HttpRequest, cube: Path<String>) -> impl Future<Item=HttpResponse, Error=Error>
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
     do_members(req, cube_format)
 }
 
-pub fn members_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
-    ) -> FutureResponse<HttpResponse>
+pub fn members_handler(req: HttpRequest, cube_format: Path<(String, String)>) -> impl Future<Item=HttpResponse, Error=Error>
 {
     do_members(req, cube_format.into_inner())
 }
 
+
 pub fn do_members(
-    req: HttpRequest<AppState>,
+    req: HttpRequest,
     cube_format: (String, String),
-    ) -> FutureResponse<HttpResponse>
+    ) -> impl Future<Item=HttpResponse, Error=Error>
 {
     let (cube, format) = cube_format;
 
@@ -66,7 +60,7 @@ pub fn do_members(
     let format = match format {
         Ok(f) => f,
         Err(err) => {
-            return Box::new(
+            return Either::A(
                 future::result(
                     Ok(HttpResponse::NotFound().json(err.to_string()))
                 )
@@ -78,11 +72,12 @@ pub fn do_members(
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
+
     let query_res = QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(&query);
     let query = match query_res {
         Ok(q) => q,
         Err(err) => {
-            return Box::new(
+            return Either::A(
                 future::result(
                     Ok(HttpResponse::BadRequest().json(err.to_string()))
                 )
@@ -93,30 +88,30 @@ pub fn do_members(
     let level: LevelName = match query.level.parse() {
         Ok(q) => q,
         Err(err) => {
-            return Box::new(
+            return Either::A(
                 future::result(
                     Ok(HttpResponse::BadRequest().json(err.to_string()))
                 )
             );
         },
     };
-
     info!("Members for cube: {}, level: {}", cube, level);
+    let app_state = req.app_data::<AppState>().unwrap();
 
-    let members_sql_and_headers = req.state().schema.read().unwrap()
+    let members_sql_and_headers = app_state.schema.read().unwrap()
         .members_sql(&cube, &level);
-    let (members_sql, header) = match members_sql_and_headers {
-        Ok(s) => s,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::BadRequest().json(err.to_string()))
-                )
-            );
-        },
-    };
+        let (members_sql, header) = match members_sql_and_headers {
+            Ok(s) => s,
+            Err(err) => {
+                return Either::A(
+                    future::result(
+                        Ok(HttpResponse::BadRequest().json(err.to_string()))
+                    )
+                );
+            },
+        };
 
-    req.state()
+    let res = app_state
         .backend
         .exec_sql(members_sql)
         .from_err()
@@ -125,8 +120,9 @@ pub fn do_members(
                 Ok(res) => Ok(HttpResponse::Ok().body(res)),
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }
-        })
-        .responder()
+        });
+
+    return Either::B(res);
 }
 
 #[derive(Debug, Deserialize)]
