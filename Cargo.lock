@@ -2121,7 +2121,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tesseract-olap2"
+name = "tesseract-olap"
 version = "0.14.0-alpha"
 dependencies = [
  "actix 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",

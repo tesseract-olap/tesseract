@@ -20,8 +20,8 @@ assets = [
 maintainer-scripts = "pkg/deb/maintainer-scripts"
 
 [dependencies]
-actix = "0.7.7"
-actix-web = "0.7.18"
+actix = "0.8.3"
+actix-web = "1.0.3"
 clickhouse-rs = "0.1.1"
 dotenv = "0.13.0"
 failure = "0.1.2"
