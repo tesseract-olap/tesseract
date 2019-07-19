@@ -257,6 +257,20 @@ impl Cube {
         Err(format_err!("'{}' not found", property_name))
     }
 
+    /// Returns a Hierarchy object corresponding to a provided LevelName.
+    pub fn get_hierarchy(&self, level_name: &LevelName) -> Option<Hierarchy> {
+        for dimension in &self.dimensions {
+            if dimension.name == level_name.dimension {
+                for hierarchy in &dimension.hierarchies {
+                    if hierarchy.name == level_name.hierarchy {
+                        return Some(hierarchy.clone())
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Returns a Level object corresponding to a provided LevelName.
     pub fn get_level(&self, level_name: &LevelName) -> Option<Level> {
         for dimension in &self.dimensions {
@@ -273,6 +287,32 @@ impl Cube {
             }
         }
         None
+    }
+
+    pub fn get_child_level(&self, level_name: &LevelName) -> Result<Option<Level>, Error> {
+        let hierarchy =  match self.get_hierarchy(level_name) {
+            Some(h) => h,
+            None => {
+                return Err(format_err!("Could not find parent hierarchy for level: {}", level_name.level))
+            }
+        };
+
+        let mut child_level: Option<Level> = None;
+        let mut is_next: bool = false;
+
+        for level in &hierarchy.levels {
+            if is_next {
+                child_level = Some(level.clone());
+                break;
+            }
+
+            if level.name == level_name.level {
+                is_next = true;
+                continue;
+            }
+        }
+
+        Ok(child_level)
     }
 }
 

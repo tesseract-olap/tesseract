@@ -429,17 +429,32 @@ pub fn generate_ts_queries(agg_query_opt: LogicLayerQueryOpt) -> Result<Vec<TsQu
             None => break
         };
 
-        // TODO: Consider moving just the operation part outside
         match operation {
             Some(operation) => {
                 if operation == "children".to_string() {
 
-                    // Continent=1,children
-                    // - [ ] Identify Country as the child level
-                    // - [ ] Add Country drilldown
-                    // - [ ] Keep Continent cut
-                    // - [ ] Might also need two queries here
+                    // TODO: Add support for double query when children and self are requested
 
+                    // Identify child level
+                    let child_level =  match cube.get_child_level(level_name)? {
+                        Some(cl) => cl,
+                        None => bail!("Could not find child level for `{}`", level_name.level)
+                    };
+
+                    // Add a child level drilldown
+                    let drilldown = Drilldown::new(
+                        level_name.dimension.clone(),
+                        level_name.hierarchy.clone(),
+                        child_level.name.clone()
+                    );
+
+                    drilldowns.push(drilldown);
+
+                    // Add captions for this level
+                    let new_captions = level.get_captions(&level_name, &locales);
+                    captions.extend_from_slice(&new_captions);
+
+                    // Add a cut on this level
                     let (mask, for_match, _cut_val) = Cut::parse_cut(&cut_val);
 
                     let cut = Cut::new(
@@ -459,6 +474,8 @@ pub fn generate_ts_queries(agg_query_opt: LogicLayerQueryOpt) -> Result<Vec<TsQu
                     // - [ ] Add a cut for that Continent:
                     //   - e.g. Continent=1
                     // - [ ] Perform two queries and join the result
+
+                    // This is done all the way up so it will require much more than 2 queries
 
                     return Err(format_err!("`parent` operation not currently supported."));
 
