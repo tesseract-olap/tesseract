@@ -60,27 +60,27 @@ impl CubeCache {
         let (val_res, ln_res) = match time.precision {
             TimePrecision::Year => {
                 let v = self.get_value(&time, self.year_values.clone());
-                let l = self.get_level_name(&time, self.year_level.clone());
+                let l = self.get_level_name(self.year_level.clone());
                 (v, l)
             },
             TimePrecision::Quarter => {
                 let v = self.get_value(&time, self.quarter_values.clone());
-                let l = self.get_level_name(&time, self.quarter_level.clone());
+                let l = self.get_level_name(self.quarter_level.clone());
                 (v, l)
             },
             TimePrecision::Month => {
                 let v = self.get_value(&time, self.month_values.clone());
-                let l = self.get_level_name(&time, self.month_level.clone());
+                let l = self.get_level_name(self.month_level.clone());
                 (v, l)
             },
             TimePrecision::Week => {
                 let v = self.get_value(&time, self.week_values.clone());
-                let l = self.get_level_name(&time, self.week_level.clone());
+                let l = self.get_level_name(self.week_level.clone());
                 (v, l)
             },
             TimePrecision::Day => {
                 let v = self.get_value(&time, self.day_values.clone());
-                let l = self.get_level_name(&time, self.day_level.clone());
+                let l = self.get_level_name(self.day_level.clone());
                 (v, l)
             }
         };
@@ -98,7 +98,7 @@ impl CubeCache {
         Ok((ln, val))
     }
 
-    pub fn get_level_name(&self, time: &Time, level: Option<Level>) -> Option<String> {
+    pub fn get_level_name(&self, level: Option<Level>) -> Option<String> {
         match level {
             Some(l) => Some(l.name),
             None => None

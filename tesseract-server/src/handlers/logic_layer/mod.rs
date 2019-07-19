@@ -3,7 +3,7 @@ pub mod shared;
 
 pub use self::aggregate::logic_layer_handler;
 pub use self::aggregate::logic_layer_default_handler;
-pub use self::shared::{Time, TimePrecision, TimeValue, LogicLayerQueryOpt, boxed_error};
+pub use self::shared::{Time, TimePrecision, TimeValue, boxed_error};
 
 use actix_web::{HttpRequest, HttpResponse, Path};
 use crate::app::AppState;
