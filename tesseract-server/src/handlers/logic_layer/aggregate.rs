@@ -94,10 +94,6 @@ pub fn logic_layer_aggregation(
 
             let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name).clone();
 
-            println!(" ");
-            println!("{:?}", cube_cache);
-            println!(" ");
-
             // Hack for now since can't provide extra arguments on try_into
             q.cube_obj = Some(cube.clone());
             q.cube_cache = cube_cache;

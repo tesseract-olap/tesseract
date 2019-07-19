@@ -214,7 +214,7 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
 
         let parents = agg_query_opt.parents.unwrap_or(false);
 
-        let drilldowns: Vec<_> = agg_query_opt.drilldowns
+        let mut drilldowns: Vec<_> = agg_query_opt.drilldowns
             .map(|ds| {
                 let mut drilldowns: Vec<Drilldown> = vec![];
 
@@ -235,13 +235,11 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                         None => level_value.clone()
                     };
 
-                    // TODO: Break or bail?
                     let level_name = match level_map.get(&level_key) {
                         Some(l) => l,
                         None => break
                     };
 
-                    // TODO: Break or bail?
                     let level = match cube.get_level(level_name) {
                         Some(l) => l,
                         None => break
@@ -256,28 +254,8 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                     drilldowns.push(drilldown);
 
                     // Check for captions for this level
-                    if let Some(props) = level.properties {
-                        for prop in props {
-                            if let Some(cap) = prop.caption_set {
-                                for locale in locales.clone() {
-                                    if locale == cap {
-                                        captions.push(
-                                            Property::new(
-                                                level_name.dimension.clone(),
-                                                level_name.hierarchy.clone(),
-                                                level_name.level.clone(),
-                                                prop.name.clone()
-                                            )
-                                        )
-                                    }
-                                }
-                            } else {
-                                continue
-                            }
-                        }
-                    } else {
-                        continue
-                    }
+                    let new_captions = level.get_captions(&level_name, &locales);
+                    captions.extend_from_slice(&new_captions);
 
                     // if parents, check captions for parent levels
                     // Same logic as above, for checking captions for a level
@@ -328,23 +306,98 @@ impl TryFrom<LogicLayerQueryOpt> for TsQuery {
                 None => cut_value.clone()
             };
 
-            // TODO: Break or bail?
+            // Identify members and special operations
+            let supported_operations = vec![
+                "parent".to_string(),
+                "children".to_string(),
+                "neighbors".to_string()
+            ];
+
+            let members: Vec<String> = cut_val.split(",").map(|s| s.to_string()).collect();
+            let mut final_members: Vec<String> = vec![];
+            let mut operation: Option<String> = None;
+
+            for member in &members {
+                if supported_operations.contains(&member) {
+                    // Check that no supported operations have been set yet
+                    if operation.is_some() {
+                        return Err(format_err!("Multiple cut operations are not supported."));
+                    } else {
+                        operation = Some(member.clone());
+                    }
+                } else {
+                    final_members.push(member.clone());
+                }
+            }
+
             let level_name = match level_map.get(level_key) {
                 Some(l) => l,
                 None => break
             };
 
-            let (mask, for_match, cut_val) = Cut::parse_cut(&cut_val);
+            let level = match cube.get_level(level_name) {
+                Some(l) => l,
+                None => break
+            };
 
-            let cut = Cut::new(
-                level_name.dimension.clone(),
-                level_name.hierarchy.clone(),
-                level_name.level.clone(),
-                cut_val.split(",").map(|s| s.to_string()).collect(),
-                mask, for_match
-            );
+            match operation {
+                Some(operation) => {
+                    if operation == "children".to_string() {
 
-            cuts.push(cut);
+                        // Country=1,parent
+                        // - 1. Identify Country as the child level
+                        // - 2. Add Country drilldown
+                        // - 3. Keep Continent cut
+                        // - 4. Might also need two queries here
+                        return Err(format_err!("`{}` operation not currently supported.", operation));
+
+                    } else if operation == "parent".to_string() {
+
+                        // Continent=1,children
+                        // - 1. Identify Continent as the parent level
+                        // - 2. Somehow find EXACTLY which continent is the parent of this country
+                        // - 3. Add a cut for that Continent:
+                        //   - e.g. Continent=1
+                        // - 4. Perform two queries and join the result
+                        return Err(format_err!("`{}` operation not currently supported.", operation));
+
+                    } else if operation == "neighbors".to_string() {
+
+                        if level_name.level == "Geography".to_string() {
+                            // TODO: Add a better way to identify geography levels in the schema
+                            // TODO: Wait for geoservice API
+                            return Err(format_err!("Geoservice not currently supported."));
+                        } else {
+                            let drilldown = Drilldown::new(
+                                level_name.dimension.clone(),
+                                level_name.hierarchy.clone(),
+                                level_name.level.clone()
+                            );
+
+                            drilldowns.push(drilldown);
+
+                            // Add captions for this level
+                            let new_captions = level.get_captions(&level_name, &locales);
+                            captions.extend_from_slice(&new_captions);
+                        }
+
+                    } else {
+                        return Err(format_err!("Unrecognized operation: `{}`.", operation));
+                    }
+                },
+                None => {
+                    let (mask, for_match, cut_val) = Cut::parse_cut(&cut_val);
+
+                    let cut = Cut::new(
+                        level_name.dimension.clone(),
+                        level_name.hierarchy.clone(),
+                        level_name.level.clone(),
+                        final_members, mask, for_match
+                    );
+
+                    cuts.push(cut);
+                }
+            }
         }
 
         let measures: Vec<_> = agg_query_opt.measures

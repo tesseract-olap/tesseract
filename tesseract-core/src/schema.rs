@@ -28,7 +28,7 @@ pub use crate::schema::{
     xml::TableConfigXML,
     xml::PropertyConfigXML,
 };
-use crate::names::{LevelName, Measure as MeasureName};
+use crate::names::{LevelName, Measure as MeasureName, Property as TsProperty};
 use crate::query_ir::MemberType;
 pub use self::aggregator::Aggregator;
 
@@ -495,6 +495,33 @@ pub struct Level {
     pub properties: Option<Vec<Property>>,
     pub key_type: Option<MemberType>,
     pub annotations: Option<Vec<Annotation>>,
+}
+
+impl Level {
+    pub fn get_captions(&self, level_name: &LevelName, locales: &Vec<String>) -> Vec<TsProperty> {
+        let mut captions: Vec<TsProperty> = vec![];
+
+        if let Some(props) = self.properties.clone() {
+            for prop in props {
+                if let Some(cap) = prop.caption_set {
+                    for locale in locales.clone() {
+                        if locale == cap {
+                            captions.push(
+                                TsProperty::new(
+                                    level_name.dimension.clone(),
+                                    level_name.hierarchy.clone(),
+                                    level_name.level.clone(),
+                                    prop.name.clone()
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        captions
+    }
 }
 
 impl From<LevelConfigJson> for Level {
