@@ -137,7 +137,10 @@ fn main() -> Result<(), Error> {
         schema.clone(), &logic_layer_config, db.clone(), &mut sys
     ) {
         Ok(cache) => cache,
-        Err(_) => panic!("Cache population failed."),
+        Err(err) => {
+            println!("{:?}", err);
+            panic!("Cache population failed.")
+        },
     };
     let cache_arc = Arc::new(RwLock::new(cache));
 
