@@ -5,9 +5,9 @@ use log::info;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::{Schema, Backend, ColumnData};
+use tesseract_core::{Schema, Backend, ColumnData, DataFrame, Column};
 use tesseract_core::names::{LevelName, Property};
-use tesseract_core::schema::{Level, Cube};
+use tesseract_core::schema::{Level, Cube, InlineTable};
 
 use super::super::handlers::logic_layer::shared::{Time, TimePrecision, TimeValue};
 use crate::logic_layer::LogicLayerConfig;
@@ -53,6 +53,8 @@ pub struct CubeCache {
 
     pub level_map: HashMap<String, LevelName>,
     pub property_map: HashMap<String, Property>,
+
+    pub level_caches: HashMap<String, LevelCache>,
 }
 
 impl CubeCache {
@@ -129,6 +131,11 @@ impl CubeCache {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct LevelCache {
+    pub parent_map: Option<HashMap<String, String>>,
+    pub children_map: Option<HashMap<String, Vec<String>>>,
+}
 
 /// Populates a `Cache` object that will be shared through `AppState`.
 pub fn populate_cache(
@@ -161,44 +168,112 @@ pub fn populate_cache(
         let mut day_level: Option<Level> = None;
         let mut day_values: Option<Vec<String>> = None;
 
-        for dimension in cube.dimensions.clone() {
-            for hierarchy in dimension.hierarchies.clone() {
-                let table = match hierarchy.table {
-                    Some(t) => t.name,
-                    None => cube.table.name.clone()
+        let mut level_caches: HashMap<String, LevelCache> = HashMap::new();
+
+        for dimension in &cube.dimensions {
+            for hierarchy in &dimension.hierarchies {
+                let table = match &hierarchy.table {
+                    Some(t) => &t.name,
+                    None => &cube.table.name
                 };
 
-                for level in hierarchy.levels.clone() {
+                for level in &hierarchy.levels {
                     if time_column_names.contains(&level.name) {
                         let values_res = get_time_values(
-                            level.key_column.clone(),
-                            table.clone(),
-                            backend.clone(),
-                            sys
+                            &level.key_column, &table,
+                            backend.clone(), sys
                         );
 
                         match values_res {
                             Ok(val) => {
                                 if level.name == "Year" {
-                                    year_level = Some(level);
+                                    year_level = Some(level.clone());
                                     year_values = Some(val);
                                 } else if level.name == "Quarter" {
-                                    quarter_level = Some(level);
+                                    quarter_level = Some(level.clone());
                                     quarter_values = Some(val);
                                 } else if level.name == "Month" {
-                                    month_level = Some(level);
+                                    month_level = Some(level.clone());
                                     month_values = Some(val);
                                 } else if level.name == "Week" {
-                                    week_level = Some(level);
+                                    week_level = Some(level.clone());
                                     week_values = Some(val);
                                 } else if level.name == "Day" {
-                                    day_level = Some(level);
+                                    day_level = Some(level.clone());
                                     day_values = Some(val);
                                 }
                             },
                             Err(err) => return Err(err)
                         };
                     }
+
+                    // Get unique name for this level
+                    let unique_name = match get_unique_level_name(&cube, ll_config, &level)? {
+                        Some(name) => name,
+                        None => return Err(format_err!("Couldn't find unique name for {}", level.name.clone()))
+                    };
+
+                    let level_name = LevelName::new(
+                        dimension.name.clone(),
+                        hierarchy.name.clone(),
+                        level.name.clone()
+                    );
+
+                    let mut parent_map: Option<HashMap<String, String>> = None;
+                    let mut children_map: Option<HashMap<String, Vec<String>>> = None;
+
+                    let parent_levels = cube.get_level_parents(&level_name)?;
+                    let child_level = cube.get_child_level(&level_name)?;
+
+                    if hierarchy.inline_table.is_some() {
+                        // Inline table
+
+                        let inline_table = match &hierarchy.inline_table {
+                            Some(t) => t,
+                            None => return Err(format_err!("Could not get inline table for {}", level.name.clone()))
+                        };
+
+                        if parent_levels.len() == 0 {
+                            // No parents
+                        } else {
+                            parent_map = Some(get_inline_parent_data(
+                                &parent_levels[parent_levels.len() - 1], &level,
+                                &inline_table
+                            ));
+                        }
+
+                        match child_level {
+                            Some(child_level) => {
+                                children_map = Some(get_inline_children_data(
+                                    &level, &child_level, &inline_table
+                                ));
+                            },
+                            None => ()
+                        }
+                    } else {
+                        // Database table
+
+                        if parent_levels.len() == 0 {
+                            // No parents
+                        } else {
+                            parent_map = Some(get_parent_data(
+                                &parent_levels[parent_levels.len() - 1], &level,
+                                table, backend.clone(), sys
+                            )?);
+                        }
+
+                        match child_level {
+                            Some(child_level) => {
+                                children_map = Some(get_children_data(
+                                    &level, &child_level,
+                                    table, backend.clone(), sys
+                                )?);
+                            },
+                            None => ()
+                        }
+                    }
+
+                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map });
                 }
             }
         }
@@ -219,7 +294,8 @@ pub fn populate_cache(
             day_level,
             day_values,
             level_map,
-            property_map
+            property_map,
+            level_caches,
         })
     }
 
@@ -228,6 +304,45 @@ pub fn populate_cache(
     Ok(Cache { cubes })
 }
 
+pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, level: &Level) -> Result<Option<String>, Error> {
+    for dimension in &cube.dimensions {
+        for hierarchy in &dimension.hierarchies {
+            for curr_level in &hierarchy.levels {
+                if curr_level == level {
+                    let level_name = LevelName::new(
+                        dimension.name.clone(),
+                        hierarchy.name.clone(),
+                        curr_level.name.clone()
+                    );
+
+                    let unique_level_name = match ll_config {
+                        Some(ll_config) => {
+                            let unique_level_name_opt = if dimension.is_shared {
+                                ll_config.find_unique_shared_dimension_level_name(
+                                    &dimension.name, &cube.name, &level_name
+                                )?
+                            } else {
+                                ll_config.find_unique_cube_level_name(
+                                    &cube.name, &level_name
+                                )?
+                            };
+
+                            match unique_level_name_opt {
+                                Some(unique_level_name) => unique_level_name,
+                                None => curr_level.name.clone()
+                            }
+                        },
+                        None => curr_level.name.clone()
+                    };
+
+                    return Ok(Some(unique_level_name))
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
 
 pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, LevelName>, Error> {
     let mut level_name_map = HashMap::new();
@@ -320,11 +435,169 @@ pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Re
     Ok(property_map)
 }
 
+pub fn get_inline_parent_data(
+        parent_level: &Level,
+        current_level: &Level,
+        inline_table: &InlineTable,
+) -> HashMap<String, String> {
+    let mut parent_data: HashMap<String, String> = HashMap::new();
+
+    let mut parent_column: Vec<String> = vec![];
+    let mut current_column: Vec<String> = vec![];
+
+    for row in &inline_table.rows {
+        for row_value in &row.row_values {
+            if row_value.column == parent_level.key_column {
+                parent_column.push(row_value.value.clone());
+            } else if row_value.column == current_level.key_column {
+                current_column.push(row_value.value.clone());
+            }
+        }
+    }
+
+    for i in 0..current_column.len() {
+        parent_data.insert(current_column[i].clone(), parent_column[i].clone());
+    }
+
+    parent_data
+}
+
+pub fn get_inline_children_data(
+        current_level: &Level,
+        child_level: &Level,
+        inline_table: &InlineTable,
+) -> HashMap<String, Vec<String>> {
+    let mut children_data: HashMap<String, Vec<String>> = HashMap::new();
+
+    let mut current_column: Vec<String> = vec![];
+    let mut children_column: Vec<String> = vec![];
+
+    for row in &inline_table.rows {
+        for row_value in &row.row_values {
+            if row_value.column == current_level.key_column {
+                current_column.push(row_value.value.clone());
+            } else if row_value.column == child_level.key_column {
+                children_column.push(row_value.value.clone());
+            }
+        }
+    }
+
+    let mut current_value: String = "".to_string();
+    let mut current_children: Vec<String> = vec![];
+
+    for i in 0..current_column.len() {
+        if current_value == "".to_string() {
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        } else {
+            if current_column[i].clone() != current_value {
+                children_data.insert(current_value.clone(), current_children.clone());
+                current_children = vec![];
+            }
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        }
+    }
+
+    // Add last set of IDs
+    children_data.insert(current_value, current_children);
+
+    children_data
+}
+
+pub fn get_parent_data(
+        parent_level: &Level,
+        current_level: &Level,
+        table: &str,
+        backend: Box<dyn Backend + Sync + Send>,
+        sys: &mut SystemRunner
+) -> Result<HashMap<String, String>, Error> {
+    let mut parent_data: HashMap<String, String> = HashMap::new();
+
+    let future = backend
+        .exec_sql(
+            format!(
+                "select distinct {}, {} from {} group by {}, {} order by {}, {}",
+                parent_level.key_column, current_level.key_column, table,
+                parent_level.key_column, current_level.key_column,
+                parent_level.key_column, current_level.key_column,
+            ).to_string()
+        );
+
+    let df = match sys.block_on(future) {
+        Ok(df) => df,
+        Err(err) => {
+            return Err(format_err!("Error populating cache with backend data: {}", err));
+        }
+    };
+
+    let parent_column = format_column_data(&df.columns[0]);
+    let current_column = format_column_data(&df.columns[1]);
+
+    for i in 0..current_column.len() {
+        parent_data.insert(current_column[i].clone(), parent_column[i].clone());
+    }
+
+    Ok(parent_data)
+}
+
+pub fn get_children_data(
+        current_level: &Level,
+        child_level: &Level,
+        table: &str,
+        backend: Box<dyn Backend + Sync + Send>,
+        sys: &mut SystemRunner
+) -> Result<HashMap<String, Vec<String>>, Error> {
+    let mut children_data: HashMap<String, Vec<String>> = HashMap::new();
+
+    let future = backend
+        .exec_sql(
+            format!(
+                "select distinct {}, {} from {} group by {}, {} order by {}, {}",
+                current_level.key_column, child_level.key_column, table,
+                current_level.key_column, child_level.key_column,
+                current_level.key_column, child_level.key_column,
+            ).to_string()
+        );
+
+    let df = match sys.block_on(future) {
+        Ok(df) => df,
+        Err(err) => {
+            return Err(format_err!("Error populating cache with backend data: {}", err));
+        }
+    };
+
+    let current_column = format_column_data(&df.columns[0]);
+    let children_column = format_column_data(&df.columns[1]);
+
+    let mut current_value: String = "".to_string();
+    let mut current_children: Vec<String> = vec![];
+
+    for i in 0..current_column.len() {
+        if current_value == "".to_string() {
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        } else {
+            if current_column[i].clone() != current_value {
+                children_data.insert(current_value.clone(), current_children.clone());
+                current_children = vec![];
+            }
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        }
+    }
+
+    // Add last set of IDs
+    children_data.insert(current_value, current_children);
+
+    Ok(children_data)
+}
+
 
 /// Queries the database to get all the distinct values for a given time level.
 pub fn get_time_values(
-        column: String,
-        table: String,
+        column: &str,
+        table: &str,
         backend: Box<dyn Backend + Sync + Send>,
         sys: &mut SystemRunner
 ) -> Result<Vec<String>, Error> {
@@ -332,6 +605,7 @@ pub fn get_time_values(
         .exec_sql(
             format!("select distinct {} from {}", column, table).to_string()
         );
+
     let df = match sys.block_on(future) {
         Ok(df) => df,
         Err(err) => {
@@ -340,121 +614,127 @@ pub fn get_time_values(
     };
 
     if df.columns.len() >= 1 {
-        let values: Vec<String> = match &df.columns[0].column_data {
-            ColumnData::Int8(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int16(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int32(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int64(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt8(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt16(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt32(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt64(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Float32(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Float64(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Text(v) => {
-                let mut t = v.to_vec();
-                t.sort();
-                t
-            },
-            ColumnData::NullableInt8(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableInt16(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableInt32(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableInt64(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt8(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt16(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt32(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt64(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableFloat32(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableFloat64(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableText(v) => {
-                let mut t: Vec<_> = v.into_iter().filter_map(|e| e.clone()).collect();
-                t.sort();
-                t
-            },
-        };
-
+        let values: Vec<String> = format_column_data(&df.columns[0]);
         return Ok(values);
     }
 
     return Ok(vec![]);
+}
+
+
+/// DataFrame columns can come in many different types. This function converts
+/// all data to a common type (String).
+pub fn format_column_data(col: &Column) -> Vec<String> {
+    return match &col.column_data {
+        ColumnData::Int8(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::Int16(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::Int32(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::Int64(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::UInt8(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::UInt16(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::UInt32(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::UInt64(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::Float32(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::Float64(v) => {
+            let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::Text(v) => {
+            let mut t = v.to_vec();
+            t.sort();
+            t
+        },
+        ColumnData::NullableInt8(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableInt16(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableInt32(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableInt64(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableUInt8(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableUInt16(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableUInt32(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableUInt64(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableFloat32(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableFloat64(v) => {
+            let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
+            t.sort();
+            t.iter().map(|&e| e.to_string()).collect()
+        },
+        ColumnData::NullableText(v) => {
+            let mut t: Vec<_> = v.into_iter().filter_map(|e| e.clone()).collect();
+            t.sort();
+            t
+        },
+    }
 }
