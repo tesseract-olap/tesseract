@@ -46,11 +46,6 @@ pub fn logic_layer_handler(
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerQueryOpt {
-    pub cube_obj: Option<Cube>,
-    pub cube_cache: Option<CubeCache>,
-    pub config: Option<LogicLayerConfig>,
-    pub schema: Option<Schema>,
-
     pub cube: String,
     pub drilldowns: Option<String>,
     #[serde(flatten)]
@@ -135,44 +130,36 @@ pub fn logic_layer_aggregation(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
-    let mut cube_name;
-
     let mut agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
-        Ok(mut q) => {
-            // Check to see if the logic layer config has a alias with the
-            // provided cube name
-            cube_name = match logic_layer_config.clone() {
-                Some(llc) => {
-                    match llc.sub_cube_name(q.cube.clone()) {
-                        Ok(cn) => cn,
-                        Err(_) => q.cube.clone()
-                    }
-                },
-                None => q.cube.clone()
-            };
-
-            let cube = match schema.get_cube_by_name(&cube_name) {
-                Ok(c) => c.clone(),
-                Err(err) => return boxed_error(err.to_string())
-            };
-
-            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name).clone();
-
-            // Hack for now since can't provide extra arguments on try_into
-            q.cube_obj = Some(cube.clone());
-            q.cube_cache = cube_cache;
-            q.config = logic_layer_config;
-            q.schema = Some(schema.clone());
-            q
-        },
+        Ok(mut q) => q,
         Err(err) => return boxed_error(err.to_string())
+    };
+
+    // Check to see if the logic layer config has a alias with the
+    // provided cube name
+    let cube_name = match logic_layer_config.clone() {
+        Some(llc) => {
+            match llc.sub_cube_name(agg_query.cube.clone()) {
+                Ok(cn) => cn,
+                Err(_) => agg_query.cube.clone()
+            }
+        },
+        None => agg_query.cube.clone()
+    };
+
+    let cube = match schema.get_cube_by_name(&cube_name) {
+        Ok(c) => c.clone(),
+        Err(err) => return boxed_error(err.to_string())
+    };
+
+    let cube_cache = match req.state().cache.read().unwrap().find_cube_info(&cube_name) {
+        Some(cube_cache) => cube_cache,
+        None => return boxed_error("Unable to access cube cache".to_string())
     };
 
     // Process `time` param (latest/oldest)
     match &agg_query.time {
         Some(s) => {
-            let cube_cache = req.state().cache.read().unwrap().find_cube_info(&cube_name);
-
             let time_cuts: Vec<String> = s.split(",").map(|s| s.to_string()).collect();
 
             for time_cut in time_cuts {
@@ -187,27 +174,22 @@ pub fn logic_layer_aggregation(
                     Err(err) => return boxed_error(err.to_string())
                 };
 
-                match cube_cache.clone() {
-                    Some(cache) => {
-                        let (cut, cut_value) = match cache.get_time_cut(time) {
-                            Ok(cut) => cut,
-                            Err(err) => return boxed_error(err.to_string())
-                        };
-
-                        agg_query.cuts = match agg_query.cuts {
-                            Some(mut cuts) => {
-                                cuts.insert(cut, cut_value);
-                                Some(cuts)
-                            },
-                            None => {
-                                let mut m: HashMap<String, String> = HashMap::new();
-                                m.insert(cut, cut_value);
-                                Some(m)
-                            },
-                        }
-                    },
-                    None => (),
+                let (cut, cut_value) = match cube_cache.get_time_cut(time) {
+                    Ok(cut) => cut,
+                    Err(err) => return boxed_error(err.to_string())
                 };
+
+                agg_query.cuts = match agg_query.cuts {
+                    Some(mut cuts) => {
+                        cuts.insert(cut, cut_value);
+                        Some(cuts)
+                    },
+                    None => {
+                        let mut m: HashMap<String, String> = HashMap::new();
+                        m.insert(cut, cut_value);
+                        Some(m)
+                    },
+                }
             }
         },
         None => (),
@@ -215,10 +197,13 @@ pub fn logic_layer_aggregation(
 
     info!("Aggregate query: {:?}", agg_query);
 
-    // TODO: Create TsQuery from here
+    // TODO: Run multiple TsQuery and concatenate their results
 
     // Turn AggregateQueryOpt into TsQuery
-    let ts_query: Result<Vec<TsQuery>, _> = generate_ts_queries(agg_query.clone());
+    let ts_query: Result<Vec<TsQuery>, _> = generate_ts_queries(
+        agg_query.clone(), &cube, &cube_cache,
+        &logic_layer_config
+    );
     let ts_query = match ts_query {
         Ok(q) => q[0].clone(),
         Err(err) => return boxed_error(err.to_string())
@@ -269,22 +254,19 @@ pub fn logic_layer_aggregation(
         .responder()
 }
 
-pub fn generate_ts_queries(agg_query_opt: LogicLayerQueryOpt) -> Result<Vec<TsQuery>, Error> {
+pub fn generate_ts_queries(
+        agg_query_opt: LogicLayerQueryOpt,
+        cube: &Cube,
+        cube_cache: &CubeCache,
+        ll_config: &Option<LogicLayerConfig>,
+) -> Result<Vec<TsQuery>, Error> {
 
-    let cube = match agg_query_opt.clone().cube_obj {
-        Some(c) => c,
-        None => bail!("No cubes found with the given name")
-    };
+    // TODO: Figure out how to populate this
+    let mut queries: Vec<TsQuery> = vec![];
 
-    let level_map = match agg_query_opt.clone().cube_cache {
-        Some(cc) => cc.level_map,
-        None => bail!("Unable to construct unique level name map")
-    };
 
-    let property_map = match agg_query_opt.clone().cube_cache {
-        Some(cc) => cc.property_map,
-        None => bail!("Unable to construct unique property name map")
-    };
+    let level_map = &cube_cache.level_map;
+    let property_map = &cube_cache.property_map;
 
     let mut captions: Vec<Property> = vec![];
     let locales: Vec<String> = match agg_query_opt.locale {
@@ -298,8 +280,6 @@ pub fn generate_ts_queries(agg_query_opt: LogicLayerQueryOpt) -> Result<Vec<TsQu
         Some(c) => c.clone(),
         None => HashMap::new()
     };
-
-    let ll_config = agg_query_opt.config.clone();
 
     let parents = agg_query_opt.parents.unwrap_or(false);
 
@@ -387,38 +367,6 @@ pub fn generate_ts_queries(agg_query_opt: LogicLayerQueryOpt) -> Result<Vec<TsQu
             continue;
         }
 
-        // Check logic layer config for any cut substitutions
-        let cut_val = match ll_config.clone() {
-            Some(ll_conf) => {
-                ll_conf.substitute_cut(level_key.clone(), cut_value.clone())
-            },
-            None => cut_value.clone()
-        };
-
-        // Identify members and special operations
-        let supported_operations = vec![
-            "parent".to_string(),
-            "children".to_string(),
-            "neighbors".to_string()
-        ];
-
-        let members: Vec<String> = cut_val.split(",").map(|s| s.to_string()).collect();
-        let mut final_members: Vec<String> = vec![];
-        let mut operation: Option<String> = None;
-
-        for member in &members {
-            if supported_operations.contains(&member) {
-                // Check that no supported operations have been set yet
-                if operation.is_some() {
-                    return Err(format_err!("Multiple cut operations are not supported."));
-                } else {
-                    operation = Some(member.clone());
-                }
-            } else {
-                final_members.push(member.clone());
-            }
-        }
-
         let level_name = match level_map.get(level_key) {
             Some(l) => l,
             None => break
@@ -429,53 +377,42 @@ pub fn generate_ts_queries(agg_query_opt: LogicLayerQueryOpt) -> Result<Vec<TsQu
             None => break
         };
 
-        match operation {
-            Some(operation) => {
+        // Check logic layer config for any cut substitutions
+        let cut_val = match ll_config.clone() {
+            Some(ll_conf) => {
+                ll_conf.substitute_cut(level_key.clone(), cut_value.clone())
+            },
+            None => cut_value.clone()
+        };
+
+        let members: Vec<String> = cut_val.split(",").map(|s| s.to_string()).collect();
+
+        let mut regular_cut_members: Vec<String> = vec![];
+
+        for member in &members {
+            let elements: Vec<String> = member.clone().split(":").map(|s| s.to_string()).collect();
+
+            if elements.len() == 1 {
+                // Regular cut
+                regular_cut_members.push(elements[0].clone());
+            } else if elements.len() == 2 {
+                let operation = elements[1].clone();
+
+                // TODO: Regular cut + operation
                 if operation == "children".to_string() {
 
-                    // TODO: Add support for double query when children and self are requested
+                    // TODO: Access children ID from the cache
 
-                    // Identify child level
-                    let child_level =  match cube.get_child_level(level_name)? {
-                        Some(cl) => cl,
-                        None => bail!("Could not find child level for `{}`", level_name.level)
-                    };
-
-                    // Add a child level drilldown
-                    let drilldown = Drilldown::new(
-                        level_name.dimension.clone(),
-                        level_name.hierarchy.clone(),
-                        child_level.name.clone()
-                    );
-
-                    drilldowns.push(drilldown);
-
-                    // Add captions for this level
-                    let new_captions = level.get_captions(&level_name, &locales);
-                    captions.extend_from_slice(&new_captions);
-
-                    // Add a cut on this level
-                    let (mask, for_match, _cut_val) = Cut::parse_cut(&cut_val);
-
-                    let cut = Cut::new(
-                        level_name.dimension.clone(),
-                        level_name.hierarchy.clone(),
-                        level_name.level.clone(),
-                        final_members, mask, for_match
-                    );
-
-                    cuts.push(cut);
+                    // TODO: Add those values as cuts on next query
+                    //       What happens to the current set of drilldowns already created?
 
                 } else if operation == "parent".to_string() {
 
-                    // Country=1,parent
-                    // - [ ] Identify Continent as the parent level
-                    // - [ ] Somehow find EXACTLY which continent is the parent of this country
-                    // - [ ] Add a cut for that Continent:
-                    //   - e.g. Continent=1
-                    // - [ ] Perform two queries and join the result
+                    // TODO: Get all parent levels
 
-                    // This is done all the way up so it will require much more than 2 queries
+                    // TODO: Get their cut IDs from the cache
+
+                    // TODO: Add queries for each...
 
                     return Err(format_err!("`parent` operation not currently supported."));
 
@@ -484,38 +421,34 @@ pub fn generate_ts_queries(agg_query_opt: LogicLayerQueryOpt) -> Result<Vec<TsQu
                     if level_name.level == "Geography".to_string() {
                         // TODO: Add a better way to identify geography levels in the schema
                         // TODO: Wait for geoservice API
-                        return Err(format_err!("Geoservice not currently supported."));
+                        return Err(format_err!("Geoservice neighbors not currently supported."));
                     } else {
-                        let drilldown = Drilldown::new(
-                            level_name.dimension.clone(),
-                            level_name.hierarchy.clone(),
-                            level_name.level.clone()
-                        );
-
-                        drilldowns.push(drilldown);
-
-                        // Add captions for this level
-                        let new_captions = level.get_captions(&level_name, &locales);
-                        captions.extend_from_slice(&new_captions);
+                        // TODO: Perhaps this should be before and after IDs
+                        //       Would need to add this information to the cache
+                        return Err(format_err!("`neighbors` operation not currently supported."));
                     }
 
                 } else {
                     return Err(format_err!("Unrecognized operation: `{}`.", operation));
                 }
-            },
-            None => {
-                let (mask, for_match, _cut_val) = Cut::parse_cut(&cut_val);
 
-                let cut = Cut::new(
-                    level_name.dimension.clone(),
-                    level_name.hierarchy.clone(),
-                    level_name.level.clone(),
-                    final_members, mask, for_match
-                );
-
-                cuts.push(cut);
+                regular_cut_members.push(elements[0].clone());
+            } else {
+                return Err(format_err!("Multiple cut operations are not supported on the same element."));
             }
         }
+
+        // Add regular cuts to one single query
+        let (mask, for_match, _cut_val) = Cut::parse_cut(&cut_val);
+
+        let cut = Cut::new(
+            level_name.dimension.clone(),
+            level_name.hierarchy.clone(),
+            level_name.level.clone(),
+            regular_cut_members, mask, for_match
+        );
+
+        cuts.push(cut);
     }
 
     let measures: Vec<_> = agg_query_opt.measures
