@@ -14,10 +14,10 @@ use log::*;
 use serde_qs as qs;
 use serde_derive::Deserialize;
 
-use tesseract_core::names::{Cut, Drilldown, Property, Measure};
+use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
-use tesseract_core::{Query as TsQuery, Schema, MeaOrCalc};
+use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension};
 use tesseract_core::schema::{Cube};
 
 use crate::app::AppState;
@@ -25,6 +25,10 @@ use crate::handlers::logic_layer::shared::{Time, boxed_error};
 use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache};
 use super::super::util;
+
+use itertools::Itertools;
+use std::hash::Hash;
+//use itertools::interleave;
 
 
 /// Handles default aggregation when a format is not specified.
@@ -131,7 +135,7 @@ pub fn logic_layer_aggregation(
     }
 
     let mut agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
-        Ok(mut q) => q,
+        Ok(q) => q,
         Err(err) => return boxed_error(err.to_string())
     };
 
@@ -254,16 +258,14 @@ pub fn logic_layer_aggregation(
         .responder()
 }
 
+/// Generates a series of Tesseract queries from a single LogicLayerQueryOpt.
+/// This function contains the bulk of the logic layer logic.
 pub fn generate_ts_queries(
         agg_query_opt: LogicLayerQueryOpt,
         cube: &Cube,
         cube_cache: &CubeCache,
         ll_config: &Option<LogicLayerConfig>,
 ) -> Result<Vec<TsQuery>, Error> {
-
-    // TODO: Figure out how to populate this
-    let mut queries: Vec<TsQuery> = vec![];
-
 
     let level_map = &cube_cache.level_map;
     let property_map = &cube_cache.property_map;
@@ -283,7 +285,7 @@ pub fn generate_ts_queries(
 
     let parents = agg_query_opt.parents.unwrap_or(false);
 
-    let mut drilldowns: Vec<_> = agg_query_opt.drilldowns
+    let drilldowns: Vec<_> = agg_query_opt.drilldowns
         .map(|ds| {
             let mut drilldowns: Vec<Drilldown> = vec![];
 
@@ -360,96 +362,6 @@ pub fn generate_ts_queries(
             drilldowns
         })
         .unwrap_or(vec![]);
-
-    let mut cuts: Vec<Cut> = vec![];
-    for (level_key, cut_value) in agg_query_opt_cuts.iter() {
-        if cut_value.is_empty() {
-            continue;
-        }
-
-        let level_name = match level_map.get(level_key) {
-            Some(l) => l,
-            None => break
-        };
-
-        let level = match cube.get_level(level_name) {
-            Some(l) => l,
-            None => break
-        };
-
-        // Check logic layer config for any cut substitutions
-        let cut_val = match ll_config.clone() {
-            Some(ll_conf) => {
-                ll_conf.substitute_cut(level_key.clone(), cut_value.clone())
-            },
-            None => cut_value.clone()
-        };
-
-        let members: Vec<String> = cut_val.split(",").map(|s| s.to_string()).collect();
-
-        let mut regular_cut_members: Vec<String> = vec![];
-
-        for member in &members {
-            let elements: Vec<String> = member.clone().split(":").map(|s| s.to_string()).collect();
-
-            if elements.len() == 1 {
-                // Regular cut
-                regular_cut_members.push(elements[0].clone());
-            } else if elements.len() == 2 {
-                let operation = elements[1].clone();
-
-                // TODO: Regular cut + operation
-                if operation == "children".to_string() {
-
-                    // TODO: Access children ID from the cache
-
-                    // TODO: Add those values as cuts on next query
-                    //       What happens to the current set of drilldowns already created?
-
-                } else if operation == "parent".to_string() {
-
-                    // TODO: Get all parent levels
-
-                    // TODO: Get their cut IDs from the cache
-
-                    // TODO: Add queries for each...
-
-                    return Err(format_err!("`parent` operation not currently supported."));
-
-                } else if operation == "neighbors".to_string() {
-
-                    if level_name.level == "Geography".to_string() {
-                        // TODO: Add a better way to identify geography levels in the schema
-                        // TODO: Wait for geoservice API
-                        return Err(format_err!("Geoservice neighbors not currently supported."));
-                    } else {
-                        // TODO: Perhaps this should be before and after IDs
-                        //       Would need to add this information to the cache
-                        return Err(format_err!("`neighbors` operation not currently supported."));
-                    }
-
-                } else {
-                    return Err(format_err!("Unrecognized operation: `{}`.", operation));
-                }
-
-                regular_cut_members.push(elements[0].clone());
-            } else {
-                return Err(format_err!("Multiple cut operations are not supported on the same element."));
-            }
-        }
-
-        // Add regular cuts to one single query
-        let (mask, for_match, _cut_val) = Cut::parse_cut(&cut_val);
-
-        let cut = Cut::new(
-            level_name.dimension.clone(),
-            level_name.hierarchy.clone(),
-            level_name.level.clone(),
-            regular_cut_members, mask, for_match
-        );
-
-        cuts.push(cut);
-    }
 
     let measures: Vec<_> = agg_query_opt.measures
         .map(|ms| {
@@ -609,24 +521,239 @@ pub fn generate_ts_queries(
     let sparse = agg_query_opt.sparse.unwrap_or(false);
     let exclude_default_members = agg_query_opt.exclude_default_members.unwrap_or(false);
 
-    Ok(vec![TsQuery {
-        drilldowns,
-        cuts,
-        measures,
-        parents,
-        properties,
-        captions,
-        top,
-        top_where,
-        sort,
-        limit,
-        rca,
-        growth,
-        debug,
-        exclude_default_members,
-        filters,
-        rate,
-        sparse,
-    }])
+
+    // This is where all the different queries are ACTUALLY generated.
+    // Everything before this is common to all queries being generated.
+
+    // First String is a Dimension name
+    let mut master_map: HashMap<String, HashMap<LevelName, Vec<String>>> = HashMap::new();
+
+    for (cut_key, cut_values) in agg_query_opt_cuts.iter() {
+        if cut_values.is_empty() {
+            continue;
+        }
+
+        // Each of these cut_values needs to be matched to a `LevelName` object
+        let cut_values: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
+
+        for cut_value in &cut_values {
+            let elements: Vec<String> = cut_value.clone().split(":").map(|s| s.to_string()).collect();
+
+            // Check to see if this matches any dimension names
+            // Get LevelName based on cut_key and element
+            let level_name = match cube_cache.dimension_caches.get(cut_key) {
+                Some(dimension_cache) => {
+                    match dimension_cache.id_map.get(&elements[0]) {
+                        Some(level_names) => {
+                            if level_names.len() > 1 {
+                                return Err(format_err!("{} matches multiple levels in this dimension.", elements[0]))
+                            }
+                            &level_names[0]
+                        },
+                        None => {
+                            // Failing silently for now, but may want to return an error here
+                            continue
+                        }
+                    }
+                },
+                None => {
+                    match level_map.get(cut_key) {
+                        Some(level_name) => level_name,
+                        None => continue
+                    }
+                }
+            };
+
+            // TODO: Add logic/support for operations
+
+            master_map.entry(level_name.dimension.clone()).or_insert(HashMap::new());
+            let map_entry = master_map.get_mut(&level_name.dimension).unwrap();
+            map_entry.entry(level_name.clone()).or_insert(vec![]);
+            let level_cuts = map_entry.get_mut(&level_name).unwrap();
+            level_cuts.push(elements[0].clone());
+        }
+    }
+
+    let mut combined_cuts: Vec<Vec<Cut>> = vec![];
+
+    // TODO: Add support for these
+    let mask = Mask::Include;
+    let for_match = false;
+
+    for (dimension_name, level_cuts_map) in master_map.iter() {
+        let mut inner_cuts: Vec<Cut> = vec![];
+
+        for (level_name, level_cuts) in level_cuts_map.iter() {
+            let cut = Cut::new(
+                level_name.dimension.clone(),
+                level_name.hierarchy.clone(),
+                level_name.level.clone(),
+                level_cuts.clone(), mask.clone(), for_match.clone()
+            );
+            inner_cuts.push(cut);
+        }
+
+        combined_cuts.push(inner_cuts);
+    }
+
+    let cut_combinations: Vec<Vec<Cut>> = cartesian_product(combined_cuts);
+
+    let mut queries: Vec<TsQuery> = vec![];
+
+    for cut_combination in &cut_combinations {
+        // Populate queries vector
+        queries.push(TsQuery {
+            drilldowns: drilldowns.clone(),
+            cuts: cut_combination.clone(),
+            measures: measures.clone(),
+            parents: parents.clone(),
+            properties: properties.clone(),
+            captions: captions.clone(),
+            top: top.clone(),
+            top_where: top_where.clone(),
+            sort: sort.clone(),
+            limit: limit.clone(),
+            rca: rca.clone(),
+            growth: growth.clone(),
+            debug: debug.clone(),
+            exclude_default_members: exclude_default_members.clone(),
+            filters: filters.clone(),
+            rate: rate.clone(),
+            sparse: sparse.clone(),
+        });
+    }
+
+    Ok(queries)
 
 }
+
+
+/// Given a vector containing a partial Cartesian product, and a list of items,
+/// return a vector adding the list of items to the partial Cartesian product.
+/// From: https://gist.github.com/kylewlacy/115965b40e02a3325558
+pub fn partial_cartesian<T: Clone>(a: Vec<Vec<T>>, b: Vec<T>) -> Vec<Vec<T>> {
+    a.into_iter().flat_map(|xs| {
+        b.iter().cloned().map(|y| {
+            let mut vec = xs.clone();
+            vec.push(y);
+            vec
+        }).collect::<Vec<_>>()
+    }).collect()
+}
+
+/// Computes the Cartesian product of lists[0] * lists[1] * ... * lists[n].
+/// From: https://gist.github.com/kylewlacy/115965b40e02a3325558
+pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    match lists.split_first() {
+        Some((first, rest)) => {
+            let init: Vec<Vec<T>> = first.iter().cloned().map(|n| vec![n]).collect();
+
+            rest.iter().cloned().fold(init, |vec, list| {
+                partial_cartesian(vec, list)
+            })
+        },
+        None => {
+            vec![]
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//            let level = match cube.get_level(level_name) {
+//                Some(level) => level,
+//                None => break
+//            };
+
+//            if elements.len() == 1 {
+//                // Regular cut
+//
+//            } else if elements.len() == 2 {
+//                // Regular cut with operation
+//
+//            } else {
+//                return Err(format_err!("Multiple cut operations are not supported on the same element."));
+//            }
+
+//            // TODO: Fix cut substitutions
+//            // Check logic layer config for any cut substitutions
+//            let cut_val = match ll_config.clone() {
+//                Some(ll_conf) => {
+//                    ll_conf.substitute_cut(cut_key.clone(), cut_values.clone())
+//                },
+//                None => cut_values.clone()
+//            };
+
+
+
+//                let operation = elements[1].clone();
+//
+//                if operation == "children".to_string() {
+//
+//                    // Get children IDs from the cache
+//                    let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+//                        Some(level_cache) => level_cache,
+//                        None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+//                    };
+//
+//                    let children_ids = match &level_cache.children_map {
+//                        Some(children_map) => {
+//                            match children_map.get(&elements[0]) {
+//                                Some(children_ids) => children_ids.clone(),
+//                                None => vec![]
+//                            }
+//                        },
+//                        None => vec![]
+//                    };
+//
+//                    if children_ids.is_empty() {
+//                        return Err(format_err!("Empty cached children entries for {}.", level_name.level))
+//                    }
+//
+//                    let child_level = match cube.get_child_level(&level_name)? {
+//                        Some(child_level) => child_level,
+//                        None => return Err(format_err!("Could not find child level for {}.", level_name.level))
+//                    };
+//
+//                    // TODO: What to do with this?
+//
+//                } else if operation == "parent".to_string() {
+//
+//                    // TODO: Get all parent levels
+//
+//                    // TODO: Get their cut IDs from the cache
+//
+//                    // TODO: Add queries for each...
+//
+//                    return Err(format_err!("`parent` operation not currently supported."));
+//
+//                } else if operation == "neighbors".to_string() {
+//
+//                    if level_name.level == "Geography".to_string() {
+//                        // TODO: Add a better way to identify geography levels in the schema
+//                        // TODO: Wait for geoservice API to be ready
+//                        return Err(format_err!("Geoservice neighbors not currently supported."));
+//                    } else {
+//                        // TODO: Get 2 IDs before and after in the cache somewhere
+//                        return Err(format_err!("`neighbors` operation not currently supported."));
+//                    }
+//
+//                } else {
+//                    return Err(format_err!("Unrecognized operation: `{}`.", operation));
+//                }
