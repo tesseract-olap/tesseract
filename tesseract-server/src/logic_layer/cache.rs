@@ -5,7 +5,7 @@ use log::info;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::{Schema, Backend, ColumnData, DataFrame, Column};
+use tesseract_core::{Schema, Backend, ColumnData, Column};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::{Level, Cube, InlineTable};
 
@@ -19,6 +19,7 @@ pub struct Cache {
     pub cubes: Vec<CubeCache>,
 }
 
+
 impl Cache {
     /// Finds the `CubeCache` object for a cube with a given name.
     pub fn find_cube_info(&self, cube: &String) -> Option<CubeCache> {
@@ -30,6 +31,7 @@ impl Cache {
         None
     }
 }
+
 
 /// Holds cache information for a given cube.
 #[derive(Debug, Clone, Deserialize)]
@@ -54,8 +56,13 @@ pub struct CubeCache {
     pub level_map: HashMap<String, LevelName>,
     pub property_map: HashMap<String, Property>,
 
+    // Maps a level name to a `LevelCache` object
     pub level_caches: HashMap<String, LevelCache>,
+
+    // Maps a dimension name to a `DimensionCache` object
+    pub dimension_caches: HashMap<String, DimensionCache>,
 }
+
 
 impl CubeCache {
     pub fn get_time_cut(&self, time: Time) -> Result<(String, String), Error> {
@@ -131,11 +138,19 @@ impl CubeCache {
     }
 }
 
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct LevelCache {
     pub parent_map: Option<HashMap<String, String>>,
     pub children_map: Option<HashMap<String, Vec<String>>>,
 }
+
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DimensionCache {
+    pub id_map: HashMap<String, Vec<LevelName>>,
+}
+
 
 /// Populates a `Cache` object that will be shared through `AppState`.
 pub fn populate_cache(
@@ -169,8 +184,11 @@ pub fn populate_cache(
         let mut day_values: Option<Vec<String>> = None;
 
         let mut level_caches: HashMap<String, LevelCache> = HashMap::new();
+        let mut dimension_caches: HashMap<String, DimensionCache> = HashMap::new();
 
         for dimension in &cube.dimensions {
+            let mut id_map: HashMap<String, Vec<LevelName>> = HashMap::new();
+
             for hierarchy in &dimension.hierarchies {
                 let table = match &hierarchy.table {
                     Some(t) => &t.name,
@@ -179,32 +197,26 @@ pub fn populate_cache(
 
                 for level in &hierarchy.levels {
                     if time_column_names.contains(&level.name) {
-                        let values_res = get_time_values(
-                            &level.key_column, &table,
-                            backend.clone(), sys
-                        );
+                        let val = get_distinct_values(
+                            &level.key_column, &table, backend.clone(), sys
+                        )?;
 
-                        match values_res {
-                            Ok(val) => {
-                                if level.name == "Year" {
-                                    year_level = Some(level.clone());
-                                    year_values = Some(val);
-                                } else if level.name == "Quarter" {
-                                    quarter_level = Some(level.clone());
-                                    quarter_values = Some(val);
-                                } else if level.name == "Month" {
-                                    month_level = Some(level.clone());
-                                    month_values = Some(val);
-                                } else if level.name == "Week" {
-                                    week_level = Some(level.clone());
-                                    week_values = Some(val);
-                                } else if level.name == "Day" {
-                                    day_level = Some(level.clone());
-                                    day_values = Some(val);
-                                }
-                            },
-                            Err(err) => return Err(err)
-                        };
+                        if level.name == "Year" {
+                            year_level = Some(level.clone());
+                            year_values = Some(val);
+                        } else if level.name == "Quarter" {
+                            quarter_level = Some(level.clone());
+                            quarter_values = Some(val);
+                        } else if level.name == "Month" {
+                            month_level = Some(level.clone());
+                            month_values = Some(val);
+                        } else if level.name == "Week" {
+                            week_level = Some(level.clone());
+                            week_values = Some(val);
+                        } else if level.name == "Day" {
+                            day_level = Some(level.clone());
+                            day_values = Some(val);
+                        }
                     }
 
                     // Get unique name for this level
@@ -224,6 +236,8 @@ pub fn populate_cache(
 
                     let parent_levels = cube.get_level_parents(&level_name)?;
                     let child_level = cube.get_child_level(&level_name)?;
+
+                    let mut distinct_ids: Vec<String> = vec![];
 
                     if hierarchy.inline_table.is_some() {
                         // Inline table
@@ -250,6 +264,15 @@ pub fn populate_cache(
                             },
                             None => ()
                         }
+
+                        // Get all IDs for this level
+                        for row in &inline_table.rows {
+                            for row_value in &row.row_values {
+                                if row_value.column == level.key_column {
+                                    distinct_ids.push(row_value.value.clone());
+                                }
+                            }
+                        }
                     } else {
                         // Database table
 
@@ -271,11 +294,25 @@ pub fn populate_cache(
                             },
                             None => ()
                         }
+
+                        // Get all IDs for this level
+                        distinct_ids = get_distinct_values(
+                            &level.key_column, &table, backend.clone(), sys
+                        )?;
+                    }
+
+                    // Add each distinct ID to the id_map HashMap
+                    for distinct_id in distinct_ids {
+                        id_map.entry(distinct_id.clone()).or_insert(vec![]);
+                        let map_entry = id_map.get_mut(&distinct_id).unwrap();
+                        map_entry.push(level_name.clone());
                     }
 
                     level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map });
                 }
             }
+
+            dimension_caches.insert(dimension.name.clone(), DimensionCache { id_map });
         }
 
         let level_map = get_level_map(&cube, ll_config)?;
@@ -296,6 +333,7 @@ pub fn populate_cache(
             level_map,
             property_map,
             level_caches,
+            dimension_caches,
         })
     }
 
@@ -594,8 +632,8 @@ pub fn get_children_data(
 }
 
 
-/// Queries the database to get all the distinct values for a given time level.
-pub fn get_time_values(
+/// Queries the database to get all the distinct values for a given level.
+pub fn get_distinct_values(
         column: &str,
         table: &str,
         backend: Box<dyn Backend + Sync + Send>,
