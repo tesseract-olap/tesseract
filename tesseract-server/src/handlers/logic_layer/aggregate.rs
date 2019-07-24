@@ -212,9 +212,7 @@ pub fn logic_layer_aggregation(
     let mut records: Vec<String> = vec![];
 
     println!(" ");
-    println!(" ");
     println!("{:?}", ts_queries.len());
-    println!(" ");
     println!(" ");
 
     let sql_strings: Vec<Result<String, Error>> = ts_queries.iter()
@@ -568,14 +566,14 @@ pub fn generate_ts_queries(
 
             // Check to see if this matches any dimension names
             // Get LevelName based on cut_key and element
-            let level_name = match cube_cache.dimension_caches.get(cut_key) {
+            let mut level_name = match cube_cache.dimension_caches.get(cut_key) {
                 Some(dimension_cache) => {
                     match dimension_cache.id_map.get(&elements[0]) {
                         Some(level_names) => {
                             if level_names.len() > 1 {
                                 return Err(format_err!("{} matches multiple levels in this dimension.", elements[0]))
                             }
-                            &level_names[0]
+                            level_names[0].clone()
                         },
                         None => {
                             // Failing silently for now, but may want to return an error here
@@ -585,7 +583,7 @@ pub fn generate_ts_queries(
                 },
                 None => {
                     match level_map.get(cut_key) {
-                        Some(level_name) => level_name,
+                        Some(level_name) => level_name.clone(),
                         None => continue
                     }
                 }
@@ -599,6 +597,20 @@ pub fn generate_ts_queries(
 
                 if operation == "children".to_string() {
 
+                    let child_level = match cube.get_child_level(&level_name)? {
+                        Some(child_level) => child_level,
+                        None => {
+                            // This level has no child
+                            continue
+                        }
+                    };
+
+                    let child_level_name = LevelName {
+                        dimension: level_name.dimension.clone(),
+                        hierarchy: level_name.hierarchy.clone(),
+                        level: child_level.name.clone()
+                    };
+
                     // Get children IDs from the cache
                     let level_cache = match cube_cache.level_caches.get(&level_name.level) {
                         Some(level_cache) => level_cache,
@@ -609,32 +621,57 @@ pub fn generate_ts_queries(
                         Some(children_map) => {
                             match children_map.get(&elements[0]) {
                                 Some(children_ids) => children_ids.clone(),
-                                None => vec![]
+                                None => continue
                             }
                         },
-                        None => vec![]
-                    };
-
-                    if children_ids.is_empty() {
-                        // Ignore this cut
-                        continue;
-                    }
-
-                    let child_level = match cube.get_child_level(&level_name)? {
-                        Some(child_level) => child_level,
-                        None => return Err(format_err!("Could not find child level for {}.", level_name.level))
-                    };
-
-                    let child_level_name = LevelName {
-                        dimension: level_name.dimension.clone(),
-                        hierarchy: level_name.hierarchy.clone(),
-                        level: child_level.name.clone()
+                        None => continue
                     };
 
                     // Add children IDs to the `master_map`
                     master_map = add_cut_entries(master_map, &child_level_name, children_ids);
 
                 } else if operation == "parents".to_string() {
+
+                    let parent_levels = cube.get_level_parents(&level_name)?;
+
+                    if parent_levels.is_empty() {
+                        // This level has no parents
+                        continue;
+                    }
+
+                    for parent_level in (parent_levels.iter()).rev() {
+                        let parent_level_name = LevelName {
+                            dimension: level_name.dimension.clone(),
+                            hierarchy: level_name.hierarchy.clone(),
+                            level: parent_level.name.clone()
+                        };
+
+                        // Get parent IDs from the cache
+                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                            Some(level_cache) => level_cache,
+                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                        };
+
+                        let parent_id = match &level_cache.parent_map {
+                            Some(parent_map) => {
+                                match parent_map.get(&elements[0]) {
+                                    Some(parent_id) => parent_id.clone(),
+                                    None => continue
+                                }
+                            },
+                            None => continue
+                        };
+
+                        // Add parent ID to the `master_map`
+                        master_map = add_cut_entries(master_map, &parent_level_name, vec![parent_id]);
+
+                        // Update current level_name for the next iteration
+                        level_name = LevelName {
+                            dimension: level_name.dimension.clone(),
+                            hierarchy: level_name.hierarchy.clone(),
+                            level: parent_level.name.clone()
+                        };
+                    }
 
                 } else if operation == "neighbors".to_string() {
 
@@ -761,18 +798,6 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
