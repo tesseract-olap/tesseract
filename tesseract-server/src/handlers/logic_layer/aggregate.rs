@@ -26,10 +26,6 @@ use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache};
 use super::super::util;
 
-use itertools::Itertools;
-use std::hash::Hash;
-//use itertools::interleave;
-
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
@@ -208,55 +204,84 @@ pub fn logic_layer_aggregation(
         agg_query.clone(), &cube, &cube_cache,
         &logic_layer_config
     );
-    let ts_query = match ts_query {
-        Ok(q) => q[0].clone(),
+    let ts_queries = match ts_query {
+        Ok(q) => q,
         Err(err) => return boxed_error(err.to_string())
     };
 
-    info!("Tesseract query: {:?}", ts_query);
+    let mut records: Vec<String> = vec![];
 
-    let query_ir_headers = req
-        .state()
-        .schema.read().unwrap()
-        .sql_query(&cube_name, &ts_query);
-    let (query_ir, headers) = match query_ir_headers {
-        Ok(x) => x,
-        Err(err) => return boxed_error(err.to_string())
-    };
+    println!(" ");
+    println!(" ");
+    println!("{:?}", ts_queries.len());
+    println!(" ");
+    println!(" ");
 
-    info!("Query IR: {:?}", query_ir);
+    let sql_strings: Vec<Result<String, Error>> = ts_queries.iter()
+        .map(|ts_query| {
+//            info!("Tesseract query: {:?}", ts_query);
 
-    let sql = req.state()
-        .backend
-        .generate_sql(query_ir);
+            let query_ir_headers = req
+                .state()
+                .schema.read().unwrap()
+                .sql_query(&cube_name, &ts_query);
 
-    info!("SQL query: {}", sql);
-    info!("Headers: {:?}", headers);
+            let (query_ir, headers) = match query_ir_headers {
+                Ok(x) => x,
+                Err(err) => return Err(format_err!("{}", err.to_string()))
+            };
 
-    req.state()
-        .backend
-        .exec_sql(sql)
-        .and_then(move |df| {
-            let content_type = util::format_to_content_type(&format);
+//            info!("Query IR: {:?}", query_ir);
 
-            match format_records(&headers, df, format) {
-                Ok(res) => {
-                    Ok(HttpResponse::Ok()
-                        .set(content_type)
-                        .body(res))
-                },
-                Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
-            }
+            let sql = req.state()
+                .backend
+                .generate_sql(query_ir);
+
+//            info!("SQL query: {}", sql);
+//            info!("Headers: {:?}", headers);
+
+            // TODO: If more than 2 queries, headers needs to be overridden
+
+            Ok(sql)
         })
-        .map_err(move |e| {
-            if debug {
-                ServerError::Db { cause: e.to_string() }.into()
-            } else {
-                ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
-            }
-        })
-        .responder()
+        .collect();
+
+//    println!(" ");
+//    println!("{:?}", sql_strings);
+//    println!(" ");
+
+    // TODO: Populate master data frame
+    // TODO: Format output
+
+//    for ts_query in ts_queries {
+////        return req.state()
+////            .backend
+////            .exec_sql(sql)
+////            .and_then(move |df| {
+////                let content_type = util::format_to_content_type(&format);
+////
+////                match format_records(&headers, df, format) {
+////                    Ok(res) => {
+////                        Ok(HttpResponse::Ok()
+////                            .set(content_type)
+////                            .body(res))
+////                    },
+////                    Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+////                }
+////            })
+////            .map_err(move |e| {
+////                if debug {
+////                    ServerError::Db { cause: e.to_string() }.into()
+////                } else {
+////                    ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
+////                }
+////            })
+////            .responder();
+//    }
+
+    return boxed_error("Something went wrong".to_string())
 }
+
 
 /// Generates a series of Tesseract queries from a single LogicLayerQueryOpt.
 /// This function contains the bulk of the logic layer logic.
@@ -533,6 +558,8 @@ pub fn generate_ts_queries(
             continue;
         }
 
+        // TODO: Add substitutions to `cut_values` before splitting
+
         // Each of these cut_values needs to be matched to a `LevelName` object
         let cut_values: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
 
@@ -564,21 +591,72 @@ pub fn generate_ts_queries(
                 }
             };
 
-            // TODO: Add logic/support for operations
+            if elements.len() == 1 {
+                // Simply add this cut to the map
+                master_map = add_cut_entries(master_map, &level_name, vec![elements[0].clone()]);
+            } else if elements.len() == 2 {
+                let operation = elements[1].clone();
 
-            master_map.entry(level_name.dimension.clone()).or_insert(HashMap::new());
-            let map_entry = master_map.get_mut(&level_name.dimension).unwrap();
-            map_entry.entry(level_name.clone()).or_insert(vec![]);
-            let level_cuts = map_entry.get_mut(&level_name).unwrap();
-            level_cuts.push(elements[0].clone());
+                if operation == "children".to_string() {
+
+                    // Get children IDs from the cache
+                    let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                        Some(level_cache) => level_cache,
+                        None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                    };
+
+                    let children_ids = match &level_cache.children_map {
+                        Some(children_map) => {
+                            match children_map.get(&elements[0]) {
+                                Some(children_ids) => children_ids.clone(),
+                                None => vec![]
+                            }
+                        },
+                        None => vec![]
+                    };
+
+                    if children_ids.is_empty() {
+                        // Ignore this cut
+                        continue;
+                    }
+
+                    let child_level = match cube.get_child_level(&level_name)? {
+                        Some(child_level) => child_level,
+                        None => return Err(format_err!("Could not find child level for {}.", level_name.level))
+                    };
+
+                    let child_level_name = LevelName {
+                        dimension: level_name.dimension.clone(),
+                        hierarchy: level_name.hierarchy.clone(),
+                        level: child_level.name.clone()
+                    };
+
+                    // Add children IDs to the `master_map`
+                    master_map = add_cut_entries(master_map, &child_level_name, children_ids);
+
+                } else if operation == "parents".to_string() {
+
+                } else if operation == "neighbors".to_string() {
+
+                    if level_name.level == "Geography".to_string() {
+                        // TODO: Add a better way to identify geography levels in the schema
+                        // TODO: Wait for geoservice API to be ready
+                        return Err(format_err!("Geoservice neighbors not currently supported."));
+                    } else {
+                        // TODO: Get 2 IDs before and after in the cache somewhere
+                        return Err(format_err!("`neighbors` operation not currently supported."));
+                    }
+
+                } else {
+                    return Err(format_err!("Unrecognized operation: `{}`.", operation));
+                }
+            } else {
+                return Err(format_err!("Multiple cut operations are not supported on the same element."));
+            }
         }
     }
 
-    let mut combined_cuts: Vec<Vec<Cut>> = vec![];
-
-    // TODO: Add support for these
-    let mask = Mask::Include;
-    let for_match = false;
+    let mut dimension_cuts: Vec<Vec<Cut>> = vec![];
 
     for (dimension_name, level_cuts_map) in master_map.iter() {
         let mut inner_cuts: Vec<Cut> = vec![];
@@ -588,17 +666,20 @@ pub fn generate_ts_queries(
                 level_name.dimension.clone(),
                 level_name.hierarchy.clone(),
                 level_name.level.clone(),
-                level_cuts.clone(), mask.clone(), for_match.clone()
+                level_cuts.clone(),
+                Mask::Include, false
             );
             inner_cuts.push(cut);
         }
 
-        combined_cuts.push(inner_cuts);
+        dimension_cuts.push(inner_cuts);
     }
 
-    let cut_combinations: Vec<Vec<Cut>> = cartesian_product(combined_cuts);
-
     let mut queries: Vec<TsQuery> = vec![];
+
+    // Get all combinations of cuts across dimensions and create a separate
+    // `TsQuery` for each
+    let cut_combinations: Vec<Vec<Cut>> = cartesian_product(dimension_cuts);
 
     for cut_combination in &cut_combinations {
         // Populate queries vector
@@ -628,6 +709,28 @@ pub fn generate_ts_queries(
 }
 
 
+/// Adds cut entries to the master_map
+pub fn add_cut_entries(
+        mut master_map: HashMap<String, HashMap<LevelName, Vec<String>>>,
+        level_name: &LevelName,
+        elements: Vec<String>
+) -> HashMap<String, HashMap<LevelName, Vec<String>>> {
+
+    master_map.entry(level_name.dimension.clone()).or_insert(HashMap::new());
+    let map_entry = master_map.get_mut(&level_name.dimension).unwrap();
+    map_entry.entry(level_name.clone()).or_insert(vec![]);
+    let level_cuts = map_entry.get_mut(&level_name).unwrap();
+
+    // Add each element to the map
+    for element in &elements {
+        level_cuts.push(element.clone());
+    }
+
+    master_map
+
+}
+
+
 /// Given a vector containing a partial Cartesian product, and a list of items,
 /// return a vector adding the list of items to the partial Cartesian product.
 /// From: https://gist.github.com/kylewlacy/115965b40e02a3325558
@@ -640,6 +743,7 @@ pub fn partial_cartesian<T: Clone>(a: Vec<Vec<T>>, b: Vec<T>) -> Vec<Vec<T>> {
         }).collect::<Vec<_>>()
     }).collect()
 }
+
 
 /// Computes the Cartesian product of lists[0] * lists[1] * ... * lists[n].
 /// From: https://gist.github.com/kylewlacy/115965b40e02a3325558
@@ -681,16 +785,6 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
 //                None => break
 //            };
 
-//            if elements.len() == 1 {
-//                // Regular cut
-//
-//            } else if elements.len() == 2 {
-//                // Regular cut with operation
-//
-//            } else {
-//                return Err(format_err!("Multiple cut operations are not supported on the same element."));
-//            }
-
 //            // TODO: Fix cut substitutions
 //            // Check logic layer config for any cut substitutions
 //            let cut_val = match ll_config.clone() {
@@ -700,40 +794,7 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
 //                None => cut_values.clone()
 //            };
 
-
-
-//                let operation = elements[1].clone();
-//
-//                if operation == "children".to_string() {
-//
-//                    // Get children IDs from the cache
-//                    let level_cache = match cube_cache.level_caches.get(&level_name.level) {
-//                        Some(level_cache) => level_cache,
-//                        None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
-//                    };
-//
-//                    let children_ids = match &level_cache.children_map {
-//                        Some(children_map) => {
-//                            match children_map.get(&elements[0]) {
-//                                Some(children_ids) => children_ids.clone(),
-//                                None => vec![]
-//                            }
-//                        },
-//                        None => vec![]
-//                    };
-//
-//                    if children_ids.is_empty() {
-//                        return Err(format_err!("Empty cached children entries for {}.", level_name.level))
-//                    }
-//
-//                    let child_level = match cube.get_child_level(&level_name)? {
-//                        Some(child_level) => child_level,
-//                        None => return Err(format_err!("Could not find child level for {}.", level_name.level))
-//                    };
-//
-//                    // TODO: What to do with this?
-//
-//                } else if operation == "parent".to_string() {
+//                else if operation == "parent".to_string() {
 //
 //                    // TODO: Get all parent levels
 //
@@ -743,17 +804,4 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
 //
 //                    return Err(format_err!("`parent` operation not currently supported."));
 //
-//                } else if operation == "neighbors".to_string() {
-//
-//                    if level_name.level == "Geography".to_string() {
-//                        // TODO: Add a better way to identify geography levels in the schema
-//                        // TODO: Wait for geoservice API to be ready
-//                        return Err(format_err!("Geoservice neighbors not currently supported."));
-//                    } else {
-//                        // TODO: Get 2 IDs before and after in the cache somewhere
-//                        return Err(format_err!("`neighbors` operation not currently supported."));
-//                    }
-//
-//                } else {
-//                    return Err(format_err!("Unrecognized operation: `{}`.", operation));
 //                }
