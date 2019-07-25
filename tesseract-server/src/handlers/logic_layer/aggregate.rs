@@ -8,7 +8,7 @@ use actix_web::{
     Path,
 };
 use failure::{Error, format_err, bail};
-use futures::future::{Future, join_all};
+use futures::future::*;
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
@@ -17,13 +17,13 @@ use serde_derive::Deserialize;
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
-use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame};
+use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame, Column, ColumnData};
 use tesseract_core::schema::{Cube};
 
 use crate::app::AppState;
 use crate::handlers::logic_layer::shared::{Time, boxed_error};
 use crate::errors::ServerError;
-use crate::logic_layer::{LogicLayerConfig, CubeCache};
+use crate::logic_layer::{LogicLayerConfig, CubeCache, format_column_data};
 use super::super::util;
 
 
@@ -205,11 +205,12 @@ pub fn logic_layer_aggregation(
         &logic_layer_config
     );
     let (ts_queries, header_map) = match ts_queries {
-        Ok(q) => q,
+        Ok((ts_queries, header_map)) => (ts_queries, header_map),
         Err(err) => return boxed_error(err.to_string())
     };
 
     let mut sql_strings: Vec<String> = vec![];
+    let mut final_headers: Vec<String> = vec![];
 
     for ts_query in &ts_queries {
         info!("Tesseract query: {:?}", ts_query);
@@ -231,59 +232,81 @@ pub fn logic_layer_aggregation(
             .generate_sql(query_ir);
 
         info!("SQL query: {}", sql);
-        info!("Headers: {:?}", headers);
+
+        // Only need to do this once
+        if final_headers.len() == 0 {
+            for header in &headers {
+                let mut new_header = header.clone();
+
+                for (k, v) in header_map.iter() {
+                    if header.contains(k) {
+                        new_header = new_header.replace(k, v);
+                    }
+                }
+
+                final_headers.push(new_header);
+            }
+        }
 
         sql_strings.push(sql);
     }
 
-    let mut final_df: DataFrame = DataFrame::new();
+    info!("Headers: {:?}", final_headers);
 
-//    let it = join_all(sql_strings
-//        .iter()
-//        .map(|sql| {
-//            req.state()
-//                .backend
-//                .exec_sql(sql.clone())
-//        })
-//        .collect()
-//    );
-//
-//    let it = it.then(|block| {
-//            block.df()
-//        });
+    let futures: JoinAll<Vec<Box<Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
+            .iter()
+            .map(|sql| {
+                req.state()
+                    .backend
+                    .exec_sql(sql.clone())
+            })
+            .collect()
+        );
 
-    println!(" ");
-    println!("{:?}", ts_queries.len());
-    println!("{:?}", header_map);
-    println!(" ");
+    futures
+        .and_then(move |dfs| {
+            let mut final_columns: Vec<Column> = vec![];
+            let num_cols = dfs[0].columns.len();
 
-//    for ts_query in ts_queries {
-////        return req.state()
-////            .backend
-////            .exec_sql(sql)
-////            .and_then(move |df| {
-////                let content_type = util::format_to_content_type(&format);
-////
-////                match format_records(&headers, df, format) {
-////                    Ok(res) => {
-////                        Ok(HttpResponse::Ok()
-////                            .set(content_type)
-////                            .body(res))
-////                    },
-////                    Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
-////                }
-////            })
-////            .map_err(move |e| {
-////                if debug {
-////                    ServerError::Db { cause: e.to_string() }.into()
-////                } else {
-////                    ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
-////                }
-////            })
-////            .responder();
-//    }
+            for col_i in 0..num_cols {
+                // TODO: Identify whether this is a dimension or measure
+                //       If it's a measure, we will want to use a vector or integers or floats
 
-    return boxed_error("Something went wrong".to_string())
+                let mut col_data: Vec<String> = vec![];
+
+                for df in &dfs {
+                    let c = &df.columns[col_i];
+                    let rows = format_column_data(&c);
+                    col_data = [&col_data[..], &rows[..]].concat()
+                }
+
+                final_columns.push(Column {
+                    name: "Test".to_string(),
+                    column_data: ColumnData::Text(col_data)
+                });
+            }
+
+            let final_df = DataFrame { columns: final_columns };
+
+            let content_type = util::format_to_content_type(&format);
+
+            match format_records(&final_headers, final_df, format) {
+                Ok(res) => {
+                    Ok(HttpResponse::Ok()
+                        .set(content_type)
+                        .body(res))
+                },
+                Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+            }
+        })
+        .map_err(move |e| {
+            if debug {
+                ServerError::Db { cause: e.to_string() }.into()
+            } else {
+                ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
+            }
+        })
+        .responder()
 }
 
 
