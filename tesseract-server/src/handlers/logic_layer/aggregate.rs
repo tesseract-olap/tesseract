@@ -8,7 +8,7 @@ use actix_web::{
     Path,
 };
 use failure::{Error, format_err, bail};
-use futures::future::{Future};
+use futures::future::{Future, join_all};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
@@ -17,7 +17,7 @@ use serde_derive::Deserialize;
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
-use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension};
+use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame};
 use tesseract_core::schema::{Cube};
 
 use crate::app::AppState;
@@ -209,47 +209,52 @@ pub fn logic_layer_aggregation(
         Err(err) => return boxed_error(err.to_string())
     };
 
-    let mut records: Vec<String> = vec![];
+    let mut sql_strings: Vec<String> = vec![];
+
+    for ts_query in &ts_queries {
+        info!("Tesseract query: {:?}", ts_query);
+
+        let query_ir_headers = req
+            .state()
+            .schema.read().unwrap()
+            .sql_query(&cube_name, &ts_query);
+
+        let (query_ir, headers) = match query_ir_headers {
+            Ok(x) => x,
+            Err(err) => return boxed_error(err.to_string())
+        };
+
+        info!("Query IR: {:?}", query_ir);
+
+        let sql = req.state()
+            .backend
+            .generate_sql(query_ir);
+
+        info!("SQL query: {}", sql);
+        info!("Headers: {:?}", headers);
+
+        sql_strings.push(sql);
+    }
+
+    let mut final_df: DataFrame = DataFrame::new();
+
+//    let it = join_all(sql_strings
+//        .iter()
+//        .map(|sql| {
+//            req.state()
+//                .backend
+//                .exec_sql(sql.clone())
+//        })
+//        .collect()
+//    );
+//
+//    let it = it.then(|block| {
+//            block.df()
+//        });
 
     println!(" ");
     println!("{:?}", ts_queries.len());
     println!(" ");
-
-    let sql_strings: Vec<Result<String, Error>> = ts_queries.iter()
-        .map(|ts_query| {
-//            info!("Tesseract query: {:?}", ts_query);
-
-            let query_ir_headers = req
-                .state()
-                .schema.read().unwrap()
-                .sql_query(&cube_name, &ts_query);
-
-            let (query_ir, headers) = match query_ir_headers {
-                Ok(x) => x,
-                Err(err) => return Err(format_err!("{}", err.to_string()))
-            };
-
-//            info!("Query IR: {:?}", query_ir);
-
-            let sql = req.state()
-                .backend
-                .generate_sql(query_ir);
-
-//            info!("SQL query: {}", sql);
-//            info!("Headers: {:?}", headers);
-
-            // TODO: If more than 2 queries, headers needs to be overridden
-
-            Ok(sql)
-        })
-        .collect();
-
-//    println!(" ");
-//    println!("{:?}", sql_strings);
-//    println!(" ");
-
-    // TODO: Populate master data frame
-    // TODO: Format output
 
 //    for ts_query in ts_queries {
 ////        return req.state()
@@ -680,8 +685,18 @@ pub fn generate_ts_queries(
                         // TODO: Wait for geoservice API to be ready
                         return Err(format_err!("Geoservice neighbors not currently supported."));
                     } else {
-                        // TODO: Get 2 IDs before and after in the cache somewhere
-                        return Err(format_err!("`neighbors` operation not currently supported."));
+                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                            Some(level_cache) => level_cache,
+                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                        };
+
+                        let neighbors_ids = match level_cache.neighbors_map.get(&elements[0]) {
+                            Some(neighbors_ids) => neighbors_ids.clone(),
+                            None => continue
+                        };
+
+                        // Add neighbors IDs to the `master_map`
+                        master_map = add_cut_entries(master_map, &level_name, neighbors_ids);
                     }
 
                 } else {

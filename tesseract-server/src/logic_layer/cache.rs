@@ -143,6 +143,7 @@ impl CubeCache {
 pub struct LevelCache {
     pub parent_map: Option<HashMap<String, String>>,
     pub children_map: Option<HashMap<String, Vec<String>>>,
+    pub neighbors_map: HashMap<String, Vec<String>>,
 }
 
 
@@ -233,6 +234,7 @@ pub fn populate_cache(
 
                     let mut parent_map: Option<HashMap<String, String>> = None;
                     let mut children_map: Option<HashMap<String, Vec<String>>> = None;
+                    let mut neighbors_map: HashMap<String, Vec<String>> = HashMap::new();
 
                     let parent_levels = cube.get_level_parents(&level_name)?;
                     let child_level = cube.get_child_level(&level_name)?;
@@ -301,6 +303,47 @@ pub fn populate_cache(
                         )?;
                     }
 
+                    // Populate neighbors map
+                    let mut prev = 0;
+                    let mut curr = 0;
+                    let mut next = 2;
+
+                    let max_index = distinct_ids.len();
+
+                    let mut done = false; // mut done: bool
+
+                    while !done {
+                        // Before
+                        let mut before: Vec<String> = vec![];
+
+                        if prev == 0 && curr <= 1 {
+                            before = distinct_ids[0..curr].to_vec();
+                        } else {
+                            before = distinct_ids[prev..curr].to_vec();
+                        }
+
+                        // After
+                        let mut after: Vec<String> = vec![];
+
+                        if next >= max_index {
+                            after = distinct_ids[curr+1..].to_vec();
+                        } else {
+                            after = distinct_ids[curr+1..next+1].to_vec();
+                        }
+
+                        neighbors_map.insert(distinct_ids[curr].clone(), [&before[..], &after[..]].concat());
+
+                        if curr >= 2 {
+                            prev += 1;
+                        }
+                        curr += 1;
+                        next += 1;
+
+                        if curr == max_index {
+                            done = true;
+                        }
+                    }
+
                     // Add each distinct ID to the id_map HashMap
                     for distinct_id in distinct_ids {
                         id_map.entry(distinct_id.clone()).or_insert(vec![]);
@@ -308,7 +351,7 @@ pub fn populate_cache(
                         map_entry.push(level_name.clone());
                     }
 
-                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map });
+                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map, neighbors_map });
                 }
             }
 
