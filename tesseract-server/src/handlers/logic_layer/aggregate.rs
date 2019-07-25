@@ -200,11 +200,11 @@ pub fn logic_layer_aggregation(
     // TODO: Run multiple TsQuery and concatenate their results
 
     // Turn AggregateQueryOpt into TsQuery
-    let ts_query: Result<Vec<TsQuery>, _> = generate_ts_queries(
+    let ts_queries = generate_ts_queries(
         agg_query.clone(), &cube, &cube_cache,
         &logic_layer_config
     );
-    let ts_queries = match ts_query {
+    let (ts_queries, header_map) = match ts_queries {
         Ok(q) => q,
         Err(err) => return boxed_error(err.to_string())
     };
@@ -254,6 +254,7 @@ pub fn logic_layer_aggregation(
 
     println!(" ");
     println!("{:?}", ts_queries.len());
+    println!("{:?}", header_map);
     println!(" ");
 
 //    for ts_query in ts_queries {
@@ -293,7 +294,7 @@ pub fn generate_ts_queries(
         cube: &Cube,
         cube_cache: &CubeCache,
         ll_config: &Option<LogicLayerConfig>,
-) -> Result<Vec<TsQuery>, Error> {
+) -> Result<(Vec<TsQuery>, HashMap<String, String>), Error> {
 
     let level_map = &cube_cache.level_map;
     let property_map = &cube_cache.property_map;
@@ -556,6 +557,9 @@ pub fn generate_ts_queries(
     // First String is a Dimension name
     let mut master_map: HashMap<String, HashMap<LevelName, Vec<String>>> = HashMap::new();
 
+    // Helps convert DF column names to their equivalent dimension names
+    let mut header_map: HashMap<String, String> = HashMap::new();
+
     for (cut_key, cut_values) in agg_query_opt_cuts.iter() {
         if cut_values.is_empty() {
             continue;
@@ -594,6 +598,8 @@ pub fn generate_ts_queries(
                 }
             };
 
+            header_map.entry(level_name.level.clone()).or_insert(level_name.dimension.clone());
+
             if elements.len() == 1 {
                 // Simply add this cut to the map
                 master_map = add_cut_entries(master_map, &level_name, vec![elements[0].clone()]);
@@ -615,6 +621,8 @@ pub fn generate_ts_queries(
                         hierarchy: level_name.hierarchy.clone(),
                         level: child_level.name.clone()
                     };
+
+                    header_map.entry(child_level_name.level.clone()).or_insert(child_level_name.dimension.clone());
 
                     // Get children IDs from the cache
                     let level_cache = match cube_cache.level_caches.get(&level_name.level) {
@@ -650,6 +658,8 @@ pub fn generate_ts_queries(
                             hierarchy: level_name.hierarchy.clone(),
                             level: parent_level.name.clone()
                         };
+
+                        header_map.entry(parent_level_name.level.clone()).or_insert(parent_level_name.dimension.clone());
 
                         // Get parent IDs from the cache
                         let level_cache = match cube_cache.level_caches.get(&level_name.level) {
@@ -756,7 +766,7 @@ pub fn generate_ts_queries(
         });
     }
 
-    Ok(queries)
+    Ok((queries, header_map))
 
 }
 
@@ -833,15 +843,3 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
 //                },
 //                None => cut_values.clone()
 //            };
-
-//                else if operation == "parent".to_string() {
-//
-//                    // TODO: Get all parent levels
-//
-//                    // TODO: Get their cut IDs from the cache
-//
-//                    // TODO: Add queries for each...
-//
-//                    return Err(format_err!("`parent` operation not currently supported."));
-//
-//                }
