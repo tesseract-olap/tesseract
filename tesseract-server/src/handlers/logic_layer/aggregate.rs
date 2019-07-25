@@ -197,8 +197,6 @@ pub fn logic_layer_aggregation(
 
     info!("Aggregate query: {:?}", agg_query);
 
-    // TODO: Run multiple TsQuery and concatenate their results
-
     // Turn AggregateQueryOpt into TsQuery
     let ts_queries = generate_ts_queries(
         agg_query.clone(), &cube, &cube_cache,
@@ -213,7 +211,7 @@ pub fn logic_layer_aggregation(
     let mut final_headers: Vec<String> = vec![];
 
     for ts_query in &ts_queries {
-        info!("Tesseract query: {:?}", ts_query);
+//        info!("Tesseract query: {:?}", ts_query);
 
         let query_ir_headers = req
             .state()
@@ -225,13 +223,13 @@ pub fn logic_layer_aggregation(
             Err(err) => return boxed_error(err.to_string())
         };
 
-        info!("Query IR: {:?}", query_ir);
+//        info!("Query IR: {:?}", query_ir);
 
         let sql = req.state()
             .backend
             .generate_sql(query_ir);
 
-        info!("SQL query: {}", sql);
+//        info!("SQL query: {}", sql);
 
         // Only need to do this once
         if final_headers.len() == 0 {
@@ -251,6 +249,7 @@ pub fn logic_layer_aggregation(
         sql_strings.push(sql);
     }
 
+    // TODO: Add logic for when to convert headers...
     info!("Headers: {:?}", final_headers);
 
     let futures: JoinAll<Vec<Box<Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
@@ -281,7 +280,7 @@ pub fn logic_layer_aggregation(
                 }
 
                 final_columns.push(Column {
-                    name: "Test".to_string(),
+                    name: "placeholder".to_string(),
                     column_data: ColumnData::Text(col_data)
                 });
             }
@@ -743,8 +742,12 @@ pub fn generate_ts_queries(
 
     let mut dimension_cuts: Vec<Vec<Cut>> = vec![];
 
+    let mut added_drilldowns: Vec<LevelName> = vec![];
+
     for (dimension_name, level_cuts_map) in master_map.iter() {
         let mut inner_cuts: Vec<Cut> = vec![];
+
+        let num_level_cuts = level_cuts_map.len();
 
         for (level_name, level_cuts) in level_cuts_map.iter() {
             let cut = Cut::new(
@@ -754,7 +757,13 @@ pub fn generate_ts_queries(
                 level_cuts.clone(),
                 Mask::Include, false
             );
-            inner_cuts.push(cut);
+
+            inner_cuts.push(cut.clone());
+
+            if num_level_cuts > 1 {
+                // We're doing multiple cuts on this dimension
+                added_drilldowns.push(cut.level_name.clone());
+            }
         }
 
         dimension_cuts.push(inner_cuts);
@@ -767,14 +776,32 @@ pub fn generate_ts_queries(
     let cut_combinations: Vec<Vec<Cut>> = cartesian_product(dimension_cuts);
 
     for cut_combination in &cut_combinations {
+        let mut drills = drilldowns.clone();
+        let mut caps = captions.clone();
+
+        for cut in cut_combination.clone() {
+            if added_drilldowns.contains(&cut.level_name) {
+                drills.push(Drilldown(cut.level_name.clone()));
+
+                let level = match cube.get_level(&cut.level_name) {
+                    Some(l) => l,
+                    None => break
+                };
+
+                // Add captions for this level
+                let new_captions = level.get_captions(&cut.level_name, &locales);
+                caps.extend_from_slice(&new_captions);
+            }
+        }
+
         // Populate queries vector
         queries.push(TsQuery {
-            drilldowns: drilldowns.clone(),
+            drilldowns: drills.clone(),
             cuts: cut_combination.clone(),
             measures: measures.clone(),
             parents: parents.clone(),
             properties: properties.clone(),
-            captions: captions.clone(),
+            captions: caps.clone(),
             top: top.clone(),
             top_where: top_where.clone(),
             sort: sort.clone(),

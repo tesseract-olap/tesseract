@@ -5,7 +5,7 @@ use log::info;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::{Schema, Backend, ColumnData, Column};
+use tesseract_core::{Schema, Backend};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::{Level, Cube, InlineTable};
 
