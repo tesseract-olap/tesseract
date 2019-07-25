@@ -157,44 +157,6 @@ pub fn logic_layer_aggregation(
         None => return boxed_error("Unable to access cube cache".to_string())
     };
 
-    // Process `time` param (latest/oldest)
-    match &agg_query.time {
-        Some(s) => {
-            let time_cuts: Vec<String> = s.split(",").map(|s| s.to_string()).collect();
-
-            for time_cut in time_cuts {
-                let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
-
-                if tc.len() != 2 {
-                    return boxed_error("Malformatted time cut".to_string());
-                }
-
-                let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
-                    Ok(time) => time,
-                    Err(err) => return boxed_error(err.to_string())
-                };
-
-                let (cut, cut_value) = match cube_cache.get_time_cut(time) {
-                    Ok(cut) => cut,
-                    Err(err) => return boxed_error(err.to_string())
-                };
-
-                agg_query.cuts = match agg_query.cuts {
-                    Some(mut cuts) => {
-                        cuts.insert(cut, cut_value);
-                        Some(cuts)
-                    },
-                    None => {
-                        let mut m: HashMap<String, String> = HashMap::new();
-                        m.insert(cut, cut_value);
-                        Some(m)
-                    },
-                }
-            }
-        },
-        None => (),
-    }
-
     info!("Aggregate query: {:?}", agg_query);
 
     // Turn AggregateQueryOpt into TsQuery
@@ -211,7 +173,7 @@ pub fn logic_layer_aggregation(
     let mut final_headers: Vec<String> = vec![];
 
     for ts_query in &ts_queries {
-//        info!("Tesseract query: {:?}", ts_query);
+        info!("Tesseract query: {:?}", ts_query);
 
         let query_ir_headers = req
             .state()
@@ -223,15 +185,15 @@ pub fn logic_layer_aggregation(
             Err(err) => return boxed_error(err.to_string())
         };
 
-//        info!("Query IR: {:?}", query_ir);
+        info!("Query IR: {:?}", query_ir);
 
         let sql = req.state()
             .backend
             .generate_sql(query_ir);
 
-//        info!("SQL query: {}", sql);
+        info!("SQL query: {}", sql);
 
-        // Only need to do this once
+        // Substitute header names (only need to do this once)
         if final_headers.len() == 0 {
             for header in &headers {
                 let mut new_header = header.clone();
@@ -249,7 +211,6 @@ pub fn logic_layer_aggregation(
         sql_strings.push(sql);
     }
 
-    // TODO: Add logic for when to convert headers...
     info!("Headers: {:?}", final_headers);
 
     let futures: JoinAll<Vec<Box<Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
@@ -323,7 +284,7 @@ pub fn generate_ts_queries(
 
     let mut captions: Vec<Property> = vec![];
     let locales: Vec<String> = match agg_query_opt.locale {
-        Some(l) => l.split(",").map(|s| s.to_string()).collect(),
+        Some(locale) => locale.split(",").map(|s| s.to_string()).collect(),
         None => vec![]
     };
 
@@ -333,6 +294,34 @@ pub fn generate_ts_queries(
         Some(c) => c.clone(),
         None => HashMap::new()
     };
+
+    // Process `time` param (latest/oldest)
+    match agg_query_opt.time {
+        Some(time_param) => {
+            let time_cuts: Vec<String> = time_param.split(",").map(|s| s.to_string()).collect();
+
+            for time_cut in time_cuts {
+                let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
+
+                if tc.len() != 2 {
+                    return Err(format_err!("Malformatted time cut"));
+                }
+
+                let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
+                    Ok(time) => time,
+                    Err(err) => return Err(format_err!("{}", err.to_string()))
+                };
+
+                let (cut, cut_value) = match cube_cache.get_time_cut(time) {
+                    Ok(cut) => cut,
+                    Err(err) => return Err(format_err!("{}", err.to_string()))
+                };
+
+                agg_query_opt_cuts.insert(cut, cut_value);
+            }
+        },
+        None => ()
+    }
 
     let parents = agg_query_opt.parents.unwrap_or(false);
 
@@ -588,6 +577,13 @@ pub fn generate_ts_queries(
         }
 
         // TODO: Add substitutions to `cut_values` before splitting
+//      // Check logic layer config for any cut substitutions
+//            let cut_val = match ll_config.clone() {
+//                Some(ll_conf) => {
+//                    ll_conf.substitute_cut(cut_key.clone(), cut_values.clone())
+//                },
+//                None => cut_values.clone()
+//            };
 
         // Each of these cut_values needs to be matched to a `LevelName` object
         let cut_values: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
@@ -873,23 +869,3 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
         }
     }
 }
-
-
-
-
-
-
-
-//            let level = match cube.get_level(level_name) {
-//                Some(level) => level,
-//                None => break
-//            };
-
-//            // TODO: Fix cut substitutions
-//            // Check logic layer config for any cut substitutions
-//            let cut_val = match ll_config.clone() {
-//                Some(ll_conf) => {
-//                    ll_conf.substitute_cut(cut_key.clone(), cut_values.clone())
-//                },
-//                None => cut_values.clone()
-//            };
