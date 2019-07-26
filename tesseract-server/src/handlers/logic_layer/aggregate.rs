@@ -375,55 +375,25 @@ pub fn generate_ts_queries(
                 };
 
                 let level_name = match level_map.get(&level_key) {
-                    Some(l) => l,
+                    Some(level_name) => level_name,
                     None => break
                 };
 
                 let level = match cube.get_level(level_name) {
-                    Some(l) => l,
+                    Some(level) => level,
                     None => break
                 };
 
-                let drilldown = Drilldown::new(
-                    level_name.dimension.clone(),
-                    level_name.hierarchy.clone(),
-                    level_name.level.clone()
-                );
-
-                drilldowns.push(drilldown);
+                drilldowns.push(Drilldown(level_name.clone()));
 
                 // Check for captions for this level
                 let new_captions = level.get_captions(&level_name, &locales);
                 captions.extend_from_slice(&new_captions);
 
-                // if parents, check captions for parent levels
-                // Same logic as above, for checking captions for a level
+                // If `parents`, check captions for parent levels
                 if parents {
-                    let level_parents = cube.get_level_parents(level_name).unwrap_or(vec![]);
-                    for parent_level in level_parents {
-                        if let Some(ref props) = parent_level.properties {
-                            for prop in props {
-                                if let Some(ref cap) = prop.caption_set {
-                                    for locale in &locales {
-                                        if locale == cap {
-                                            captions.push(
-                                                Property::new(
-                                                    level_name.dimension.clone(),
-                                                    level_name.hierarchy.clone(),
-                                                    parent_level.name.clone(),
-                                                    prop.name.clone(),
-                                                )
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    continue
-                                }
-                            }
-                        } else {
-                            continue
-                        }
-                    }
+                     let new_captions = get_parent_captions(&cube, &level_name, &locales);
+                     captions = [&captions[..], &new_captions[..]].concat();
                 }
             }
 
@@ -646,7 +616,7 @@ pub fn generate_ts_queries(
                 drills.push(Drilldown(cut.level_name.clone()));
 
                 let level = match cube.get_level(&cut.level_name) {
-                    Some(l) => l,
+                    Some(level) => level,
                     None => break
                 };
 
@@ -975,4 +945,37 @@ pub fn resolve_cuts(
     }
 
     Ok((master_map, header_map))
+}
+
+
+pub fn get_parent_captions(cube: &Cube, level_name: &LevelName, locales: &Vec<String>) -> Vec<Property> {
+    let mut captions: Vec<Property> = vec![];
+
+    let level_parents = cube.get_level_parents(level_name).unwrap_or(vec![]);
+    for parent_level in level_parents {
+        if let Some(ref props) = parent_level.properties {
+            for prop in props {
+                if let Some(ref cap) = prop.caption_set {
+                    for locale in locales {
+                        if locale == cap {
+                            captions.push(
+                                Property::new(
+                                    level_name.dimension.clone(),
+                                    level_name.hierarchy.clone(),
+                                    parent_level.name.clone(),
+                                    prop.name.clone(),
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    continue
+                }
+            }
+        } else {
+            continue
+        }
+    }
+
+    captions
 }
