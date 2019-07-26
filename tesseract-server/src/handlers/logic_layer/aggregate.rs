@@ -115,7 +115,7 @@ pub fn logic_layer_aggregation(
         Err(err) => return boxed_error(err.to_string()),
     };
 
-    info!("format: {:?}", format);
+    info!("Format: {:?}", format);
 
     let query = req.query_string();
     let schema = req.state().schema.read().unwrap();
@@ -213,6 +213,7 @@ pub fn logic_layer_aggregation(
 
     info!("Headers: {:?}", final_headers);
 
+    // Joins all the futures for each TsQuery
     let futures: JoinAll<Vec<Box<Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
             .iter()
             .map(|sql| {
@@ -223,6 +224,7 @@ pub fn logic_layer_aggregation(
             .collect()
         );
 
+    // Process data received once all futures are resolved and return response
     futures
         .and_then(move |dfs| {
             let mut final_columns: Vec<Column> = vec![];
@@ -283,45 +285,12 @@ pub fn generate_ts_queries(
     let property_map = &cube_cache.property_map;
 
     let mut captions: Vec<Property> = vec![];
-    let locales: Vec<String> = match agg_query_opt.locale {
+    let locales: Vec<String> = match &agg_query_opt.locale {
         Some(locale) => locale.split(",").map(|s| s.to_string()).collect(),
         None => vec![]
     };
 
-    // Moving this out of the cut resolution because drills will need to
-    // insert to this hashmap in case it receives a named set value.
-    let mut agg_query_opt_cuts = match agg_query_opt.cuts {
-        Some(c) => c.clone(),
-        None => HashMap::new()
-    };
-
-    // Process `time` param (latest/oldest)
-    match agg_query_opt.time {
-        Some(time_param) => {
-            let time_cuts: Vec<String> = time_param.split(",").map(|s| s.to_string()).collect();
-
-            for time_cut in time_cuts {
-                let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
-
-                if tc.len() != 2 {
-                    return Err(format_err!("Malformatted time cut"));
-                }
-
-                let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
-                    Ok(time) => time,
-                    Err(err) => return Err(format_err!("{}", err.to_string()))
-                };
-
-                let (cut, cut_value) = match cube_cache.get_time_cut(time) {
-                    Ok(cut) => cut,
-                    Err(err) => return Err(format_err!("{}", err.to_string()))
-                };
-
-                agg_query_opt_cuts.insert(cut, cut_value);
-            }
-        },
-        None => ()
-    }
+    let mut cuts_map = clean_cuts_map(&agg_query_opt, &cube_cache, &ll_config)?;
 
     let parents = agg_query_opt.parents.unwrap_or(false);
 
@@ -335,7 +304,7 @@ pub fn generate_ts_queries(
                     Some(ll_conf) => {
                         match ll_conf.substitute_drill_value(level_value.clone()) {
                             Some(ln) => {
-                                agg_query_opt_cuts
+                                cuts_map
                                     .entry(ln.clone())
                                     .or_insert(level_value.clone());
                                 ln
@@ -561,222 +530,34 @@ pub fn generate_ts_queries(
     let sparse = agg_query_opt.sparse.unwrap_or(false);
     let exclude_default_members = agg_query_opt.exclude_default_members.unwrap_or(false);
 
-
     // This is where all the different queries are ACTUALLY generated.
     // Everything before this is common to all queries being generated.
 
-    // First String is a Dimension name
-    let mut master_map: HashMap<String, HashMap<LevelName, Vec<String>>> = HashMap::new();
+    let (mut master_map, mut header_map) = resolve_cuts(
+        &cuts_map, &cube, &cube_cache, &level_map, &property_map
+    )?;
 
-    // Helps convert DF column names to their equivalent dimension names
-    let mut header_map: HashMap<String, String> = HashMap::new();
-
-    for (cut_key, cut_values) in agg_query_opt_cuts.clone().iter() {
-        if cut_values.is_empty() {
-            continue;
-        }
-
-        let mut final_cuts: Vec<String> = vec![];
-
-        let cut_values_split: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
-
-        for cut_value in &cut_values_split {
-            match ll_config.clone() {
-                Some(ll_conf) => {
-                    let new_cut_values = ll_conf.substitute_cut(cut_key.clone(), cut_value.clone());
-
-                    if &new_cut_values != cut_value {
-                        let new_cut_values_split: Vec<String> = new_cut_values.split(",").map(|s| s.to_string()).collect();
-
-                        final_cuts = [&final_cuts[..], &new_cut_values_split[..]].concat();
-                    } else {
-                        final_cuts.push(new_cut_values.clone());
-                    }
-                },
-                None => {
-                    final_cuts.push(cut_value.clone());
-                }
-            };
-
-            println!("{:?}", final_cuts);
-        }
-
-        *agg_query_opt_cuts.get_mut(cut_key).unwrap() = final_cuts.join(",");
-    }
-
-    for (cut_key, cut_values) in agg_query_opt_cuts.iter() {
-        if cut_values.is_empty() {
-            continue;
-        }
-
-        // Each of these cut_values needs to be matched to a `LevelName` object
-        let cut_values: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
-
-        for cut_value in &cut_values {
-            let elements: Vec<String> = cut_value.clone().split(":").map(|s| s.to_string()).collect();
-
-            // Check to see if this matches any dimension names
-            // Get LevelName based on cut_key and element
-            let mut level_name = match cube_cache.dimension_caches.get(cut_key) {
-                Some(dimension_cache) => {
-                    match dimension_cache.id_map.get(&elements[0]) {
-                        Some(level_names) => {
-                            if level_names.len() > 1 {
-                                return Err(format_err!("{} matches multiple levels in this dimension.", elements[0]))
-                            }
-                            level_names[0].clone()
-                        },
-                        None => {
-                            // Failing silently for now, but may want to return an error here
-                            continue
-                        }
-                    }
-                },
-                None => {
-                    match level_map.get(cut_key) {
-                        Some(level_name) => level_name.clone(),
-                        None => continue
-                    }
-                }
-            };
-
-            header_map.entry(level_name.level.clone()).or_insert(level_name.dimension.clone());
-
-            if elements.len() == 1 {
-                // Simply add this cut to the map
-                master_map = add_cut_entries(master_map, &level_name, vec![elements[0].clone()]);
-            } else if elements.len() == 2 {
-                let operation = elements[1].clone();
-
-                if operation == "children".to_string() {
-
-                    let child_level = match cube.get_child_level(&level_name)? {
-                        Some(child_level) => child_level,
-                        None => {
-                            // This level has no child
-                            continue
-                        }
-                    };
-
-                    let child_level_name = LevelName {
-                        dimension: level_name.dimension.clone(),
-                        hierarchy: level_name.hierarchy.clone(),
-                        level: child_level.name.clone()
-                    };
-
-                    header_map.entry(child_level_name.level.clone()).or_insert(child_level_name.dimension.clone());
-
-                    // Get children IDs from the cache
-                    let level_cache = match cube_cache.level_caches.get(&level_name.level) {
-                        Some(level_cache) => level_cache,
-                        None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
-                    };
-
-                    let children_ids = match &level_cache.children_map {
-                        Some(children_map) => {
-                            match children_map.get(&elements[0]) {
-                                Some(children_ids) => children_ids.clone(),
-                                None => continue
-                            }
-                        },
-                        None => continue
-                    };
-
-                    // Add children IDs to the `master_map`
-                    master_map = add_cut_entries(master_map, &child_level_name, children_ids);
-
-                } else if operation == "parents".to_string() {
-
-                    let parent_levels = cube.get_level_parents(&level_name)?;
-
-                    if parent_levels.is_empty() {
-                        // This level has no parents
-                        continue;
-                    }
-
-                    for parent_level in (parent_levels.iter()).rev() {
-                        let parent_level_name = LevelName {
-                            dimension: level_name.dimension.clone(),
-                            hierarchy: level_name.hierarchy.clone(),
-                            level: parent_level.name.clone()
-                        };
-
-                        header_map.entry(parent_level_name.level.clone()).or_insert(parent_level_name.dimension.clone());
-
-                        // Get parent IDs from the cache
-                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
-                            Some(level_cache) => level_cache,
-                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
-                        };
-
-                        let parent_id = match &level_cache.parent_map {
-                            Some(parent_map) => {
-                                match parent_map.get(&elements[0]) {
-                                    Some(parent_id) => parent_id.clone(),
-                                    None => continue
-                                }
-                            },
-                            None => continue
-                        };
-
-                        // Add parent ID to the `master_map`
-                        master_map = add_cut_entries(master_map, &parent_level_name, vec![parent_id]);
-
-                        // Update current level_name for the next iteration
-                        level_name = LevelName {
-                            dimension: level_name.dimension.clone(),
-                            hierarchy: level_name.hierarchy.clone(),
-                            level: parent_level.name.clone()
-                        };
-                    }
-
-                } else if operation == "neighbors".to_string() {
-
-                    if level_name.level == "Geography".to_string() {
-                        // TODO: Add a better way to identify geography levels in the schema
-                        // TODO: Wait for geoservice API to be ready
-                        return Err(format_err!("Geoservice neighbors not currently supported."));
-                    } else {
-                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
-                            Some(level_cache) => level_cache,
-                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
-                        };
-
-                        let neighbors_ids = match level_cache.neighbors_map.get(&elements[0]) {
-                            Some(neighbors_ids) => neighbors_ids.clone(),
-                            None => continue
-                        };
-
-                        // Add neighbors IDs to the `master_map`
-                        master_map = add_cut_entries(master_map, &level_name, neighbors_ids);
-                    }
-
-                } else {
-                    return Err(format_err!("Unrecognized operation: `{}`.", operation));
-                }
-            } else {
-                return Err(format_err!("Multiple cut operations are not supported on the same element."));
-            }
-        }
-    }
-
+    // Groups together cuts for the same dimension
+    // This is needed so we can generate all the possible cut combinations in the next step
     let mut dimension_cuts: Vec<Vec<Cut>> = vec![];
 
+    // Need to add drilldowns for cuts on these levels
+    // This will be done in the next step
     let mut added_drilldowns: Vec<LevelName> = vec![];
 
+    // Populate the vectors above
     for (dimension_name, level_cuts_map) in master_map.iter() {
         let mut inner_cuts: Vec<Cut> = vec![];
 
         let num_level_cuts = level_cuts_map.len();
 
         for (level_name, level_cuts) in level_cuts_map.iter() {
-            let cut = Cut::new(
-                level_name.dimension.clone(),
-                level_name.hierarchy.clone(),
-                level_name.level.clone(),
-                level_cuts.clone(),
-                Mask::Include, false
-            );
+            let cut = Cut {
+                level_name: level_name.clone(),
+                members: level_cuts.clone(),
+                mask: Mask::Include,
+                for_match: false
+            };
 
             inner_cuts.push(cut.clone());
 
@@ -789,17 +570,19 @@ pub fn generate_ts_queries(
         dimension_cuts.push(inner_cuts);
     }
 
+    // All the different TsQuery's that need to be performed
     let mut queries: Vec<TsQuery> = vec![];
 
-    // Get all combinations of cuts across dimensions and create a separate
-    // `TsQuery` for each
+    // Get all possible combinations of cuts across dimensions
     let cut_combinations: Vec<Vec<Cut>> = cartesian_product(dimension_cuts);
 
+    // Create a TsQuery for each cut combination
     for cut_combination in &cut_combinations {
         let mut drills = drilldowns.clone();
         let mut caps = captions.clone();
 
         for cut in cut_combination.clone() {
+            // Look for drilldowns that might need to be added
             if added_drilldowns.contains(&cut.level_name) {
                 drills.push(Drilldown(cut.level_name.clone()));
 
@@ -816,12 +599,12 @@ pub fn generate_ts_queries(
 
         // Populate queries vector
         queries.push(TsQuery {
-            drilldowns: drills.clone(),
+            drilldowns: drills,
             cuts: cut_combination.clone(),
             measures: measures.clone(),
             parents: parents.clone(),
             properties: properties.clone(),
-            captions: caps.clone(),
+            captions: caps,
             top: top.clone(),
             top_where: top_where.clone(),
             sort: sort.clone(),
@@ -892,4 +675,245 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
             vec![]
         }
     }
+}
+
+
+/// Performs named set and time substitutions
+pub fn clean_cuts_map(
+        agg_query_opt: &LogicLayerQueryOpt,
+        cube_cache: &CubeCache,
+        ll_config: &Option<LogicLayerConfig>
+) -> Result<HashMap<String, String>, Error> {
+    // Holds a mapping from cut keys (dimensions or levels) to values
+    let mut agg_query_opt_cuts = match &agg_query_opt.cuts {
+        Some(c) => c.clone(),
+        None => HashMap::new()
+    };
+
+    // Process `time` param (latest/oldest)
+    match &agg_query_opt.time {
+        Some(time_param) => {
+            let time_cuts: Vec<String> = time_param.split(",").map(|s| s.to_string()).collect();
+
+            for time_cut in time_cuts {
+                let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
+
+                if tc.len() != 2 {
+                    return Err(format_err!("Malformatted time cut"));
+                }
+
+                let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
+                    Ok(time) => time,
+                    Err(err) => return Err(format_err!("{}", err.to_string()))
+                };
+
+                let (cut, cut_value) = match cube_cache.get_time_cut(time) {
+                    Ok(cut) => cut,
+                    Err(err) => return Err(format_err!("{}", err.to_string()))
+                };
+
+                agg_query_opt_cuts.insert(cut, cut_value);
+            }
+        },
+        None => ()
+    };
+
+    // Find and perform any named set substitutions
+    for (cut_key, cut_values) in agg_query_opt_cuts.clone().iter() {
+        if cut_values.is_empty() {
+            continue;
+        }
+
+        let mut final_cuts: Vec<String> = vec![];
+
+        let cut_values_split: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
+
+        for cut_value in &cut_values_split {
+            match ll_config.clone() {
+                Some(ll_conf) => {
+                    let new_cut_values = ll_conf.substitute_cut(cut_key.clone(), cut_value.clone());
+
+                    if &new_cut_values != cut_value {
+                        let new_cut_values_split: Vec<String> = new_cut_values.split(",").map(|s| s.to_string()).collect();
+
+                        final_cuts = [&final_cuts[..], &new_cut_values_split[..]].concat();
+                    } else {
+                        final_cuts.push(new_cut_values.clone());
+                    }
+                },
+                None => {
+                    final_cuts.push(cut_value.clone());
+                }
+            };
+        }
+
+        *agg_query_opt_cuts.get_mut(cut_key).unwrap() = final_cuts.join(",");
+    }
+
+    Ok(agg_query_opt_cuts)
+}
+
+
+/// Implements logic to resolve cuts, including those with operations.
+pub fn resolve_cuts(
+        cuts_map: &HashMap<String, String>,
+        cube: &Cube,
+        cube_cache: &CubeCache,
+        level_map: &HashMap<String, LevelName>,
+        property_map: &HashMap<String, Property>
+) -> Result<(HashMap<String, HashMap<LevelName, Vec<String>>>, HashMap<String, String>), Error> {
+    // TODO: Think about ways to refactor this
+    // First String is a Dimension name
+    let mut master_map: HashMap<String, HashMap<LevelName, Vec<String>>> = HashMap::new();
+
+    // Helps convert DF column names to their equivalent dimension names
+    let mut header_map: HashMap<String, String> = HashMap::new();
+
+    for (cut_key, cut_values) in cuts_map.iter() {
+        if cut_values.is_empty() {
+            continue;
+        }
+
+        // Each of these cut_values needs to be matched to a `LevelName` object
+        let cut_values: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
+
+        for cut_value in &cut_values {
+            let elements: Vec<String> = cut_value.clone().split(":").map(|s| s.to_string()).collect();
+
+            // Check to see if this matches any dimension names
+            // Get LevelName based on cut_key and element
+            let mut level_name = match cube_cache.dimension_caches.get(cut_key) {
+                Some(dimension_cache) => {
+                    match dimension_cache.id_map.get(&elements[0]) {
+                        Some(level_names) => {
+                            if level_names.len() > 1 {
+                                return Err(format_err!("{} matches multiple levels in this dimension.", elements[0]))
+                            }
+                            level_names[0].clone()
+                        },
+                        None => continue
+                    }
+                },
+                None => {
+                    match level_map.get(cut_key) {
+                        Some(level_name) => level_name.clone(),
+                        None => continue
+                    }
+                }
+            };
+
+            header_map.entry(level_name.level.clone()).or_insert(level_name.dimension.clone());
+
+            if elements.len() == 1 {
+                // Simply add this cut to the map
+                master_map = add_cut_entries(master_map, &level_name, vec![elements[0].clone()]);
+            } else if elements.len() == 2 {
+                let operation = elements[1].clone();
+
+                if operation == "children".to_string() {
+
+                    let child_level = match cube.get_child_level(&level_name)? {
+                        Some(child_level) => child_level,
+                        None => continue  // This level has no child
+                    };
+
+                    let child_level_name = LevelName {
+                        dimension: level_name.dimension.clone(),
+                        hierarchy: level_name.hierarchy.clone(),
+                        level: child_level.name.clone()
+                    };
+
+                    header_map.entry(child_level_name.level.clone()).or_insert(child_level_name.dimension.clone());
+
+                    // Get children IDs from the cache
+                    let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                        Some(level_cache) => level_cache,
+                        None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                    };
+
+                    let children_ids = match &level_cache.children_map {
+                        Some(children_map) => {
+                            match children_map.get(&elements[0]) {
+                                Some(children_ids) => children_ids.clone(),
+                                None => continue
+                            }
+                        },
+                        None => continue
+                    };
+
+                    // Add children IDs to the `master_map`
+                    master_map = add_cut_entries(master_map, &child_level_name, children_ids);
+
+                } else if operation == "parents".to_string() {
+
+                    let parent_levels = cube.get_level_parents(&level_name)?;
+
+                    if parent_levels.is_empty() {
+                        // This level has no parents
+                        continue;
+                    }
+
+                    for parent_level in (parent_levels.iter()).rev() {
+                        let parent_level_name = LevelName {
+                            dimension: level_name.dimension.clone(),
+                            hierarchy: level_name.hierarchy.clone(),
+                            level: parent_level.name.clone()
+                        };
+
+                        header_map.entry(parent_level_name.level.clone()).or_insert(parent_level_name.dimension.clone());
+
+                        // Get parent IDs from the cache
+                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                            Some(level_cache) => level_cache,
+                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                        };
+
+                        let parent_id = match &level_cache.parent_map {
+                            Some(parent_map) => {
+                                match parent_map.get(&elements[0]) {
+                                    Some(parent_id) => parent_id.clone(),
+                                    None => continue
+                                }
+                            },
+                            None => continue
+                        };
+
+                        // Add parent ID to the `master_map`
+                        master_map = add_cut_entries(master_map, &parent_level_name, vec![parent_id]);
+
+                        // Update current level_name for the next iteration
+                        level_name = parent_level_name.clone();
+                    }
+
+                } else if operation == "neighbors".to_string() {
+
+                    if level_name.level == "Geography".to_string() {
+                        // TODO: Add a better way to identify geography levels in the schema
+                        // TODO: Wait for geoservice API to be ready
+                        return Err(format_err!("Geoservice neighbors not currently supported."));
+                    } else {
+                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                            Some(level_cache) => level_cache,
+                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                        };
+
+                        let neighbors_ids = match level_cache.neighbors_map.get(&elements[0]) {
+                            Some(neighbors_ids) => neighbors_ids.clone(),
+                            None => continue
+                        };
+
+                        // Add neighbors IDs to the `master_map`
+                        master_map = add_cut_entries(master_map, &level_name, neighbors_ids);
+                    }
+
+                } else {
+                    return Err(format_err!("Unrecognized operation: `{}`.", operation));
+                }
+            } else {
+                return Err(format_err!("Multiple cut operations are not supported on the same element."));
+            }
+        }
+    }
+
+    Ok((master_map, header_map))
 }
