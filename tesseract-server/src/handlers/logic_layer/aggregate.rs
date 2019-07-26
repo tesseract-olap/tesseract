@@ -130,7 +130,7 @@ pub fn logic_layer_aggregation(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
-    let mut agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
+    let agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
         Ok(q) => q,
         Err(err) => return boxed_error(err.to_string())
     };
@@ -571,19 +571,43 @@ pub fn generate_ts_queries(
     // Helps convert DF column names to their equivalent dimension names
     let mut header_map: HashMap<String, String> = HashMap::new();
 
-    for (cut_key, cut_values) in agg_query_opt_cuts.iter() {
+    for (cut_key, cut_values) in agg_query_opt_cuts.clone().iter() {
         if cut_values.is_empty() {
             continue;
         }
 
-        // TODO: Add substitutions to `cut_values` before splitting
-//      // Check logic layer config for any cut substitutions
-//            let cut_val = match ll_config.clone() {
-//                Some(ll_conf) => {
-//                    ll_conf.substitute_cut(cut_key.clone(), cut_values.clone())
-//                },
-//                None => cut_values.clone()
-//            };
+        let mut final_cuts: Vec<String> = vec![];
+
+        let cut_values_split: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();
+
+        for cut_value in &cut_values_split {
+            match ll_config.clone() {
+                Some(ll_conf) => {
+                    let new_cut_values = ll_conf.substitute_cut(cut_key.clone(), cut_value.clone());
+
+                    if &new_cut_values != cut_value {
+                        let new_cut_values_split: Vec<String> = new_cut_values.split(",").map(|s| s.to_string()).collect();
+
+                        final_cuts = [&final_cuts[..], &new_cut_values_split[..]].concat();
+                    } else {
+                        final_cuts.push(new_cut_values.clone());
+                    }
+                },
+                None => {
+                    final_cuts.push(cut_value.clone());
+                }
+            };
+
+            println!("{:?}", final_cuts);
+        }
+
+        *agg_query_opt_cuts.get_mut(cut_key).unwrap() = final_cuts.join(",");
+    }
+
+    for (cut_key, cut_values) in agg_query_opt_cuts.iter() {
+        if cut_values.is_empty() {
+            continue;
+        }
 
         // Each of these cut_values needs to be matched to a `LevelName` object
         let cut_values: Vec<String> = cut_values.split(",").map(|s| s.to_string()).collect();

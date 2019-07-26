@@ -159,7 +159,7 @@ impl Schema {
                             for property in props {
                                 if !properties.insert(&property.name) {
                                     println!(
-                                        "Found repeated property name: {}.{}.{}.{}",
+                                        "Found repeated property name: {}.{}.{}.{}.{}",
                                         cube.name, dimension.name, hierarchy.name, level.name, property.name
                                     );
                                     return false
