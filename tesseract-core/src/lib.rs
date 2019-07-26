@@ -148,12 +148,20 @@ impl Schema {
                     // Check each cube for unique level and property names
                     for level in &hierarchy.levels {
                         if !levels.insert(&level.name) {
+                            println!(
+                                "Found repeated level name: {}.{}.{}.{}",
+                                cube.name, dimension.name, hierarchy.name, level.name
+                            );
                             return false
                         }
 
                         if let Some(ref props) = level.properties {
                             for property in props {
                                 if !properties.insert(&property.name) {
+                                    println!(
+                                        "Found repeated property name: {}.{}.{}.{}",
+                                        cube.name, dimension.name, hierarchy.name, level.name, property.name
+                                    );
                                     return false
                                 }
                             }
