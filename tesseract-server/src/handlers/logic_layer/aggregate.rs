@@ -231,8 +231,43 @@ pub fn logic_layer_aggregation(
             let num_cols = dfs[0].columns.len();
 
             for col_i in 0..num_cols {
-                // TODO: Identify whether this is a dimension or measure
-                //       If it's a measure, we will want to use a vector or integers or floats
+                let mut same_type = true;
+                let mut curr_type: i32 = -1;
+
+                for df in &dfs {
+                    let c = &df.columns[col_i];
+                    let i = match c.column_data {
+                        ColumnData::Int8(ref ns) => 0,
+                        ColumnData::Int16(ref ns) => 1,
+                        ColumnData::Int32(ref ns) => 2,
+                        ColumnData::Int64(ref ns) => 3,
+                        ColumnData::UInt8(ref ns) => 4,
+                        ColumnData::UInt16(ref ns) => 5,
+                        ColumnData::UInt32(ref ns) => 6,
+                        ColumnData::UInt64(ref ns) => 7,
+                        ColumnData::Float32(ref ns) => 8,
+                        ColumnData::Float64(ref ns) => 9,
+                        ColumnData::Text(ref ss) => 10,
+                        ColumnData::NullableInt8(ref ns) => 11,
+                        ColumnData::NullableInt16(ref ns) => 12,
+                        ColumnData::NullableInt32(ref ns) => 13,
+                        ColumnData::NullableInt64(ref ns) => 14,
+                        ColumnData::NullableUInt8(ref ns) => 15,
+                        ColumnData::NullableUInt16(ref ns) => 16,
+                        ColumnData::NullableUInt32(ref ns) => 17,
+                        ColumnData::NullableUInt64(ref ns) => 18,
+                        ColumnData::NullableFloat32(ref ns) => 19,
+                        ColumnData::NullableFloat64(ref ns) => 20,
+                        ColumnData::NullableText(ref ss) => 21,
+                    };
+
+                    if curr_type == -1 {
+                        curr_type = i;
+                    } else if curr_type != i {
+                        same_type = false;
+                        break
+                    }
+                }
 
                 let mut col_data: Vec<String> = vec![];
 
@@ -242,10 +277,34 @@ pub fn logic_layer_aggregation(
                     col_data = [&col_data[..], &rows[..]].concat()
                 }
 
-                final_columns.push(Column {
-                    name: "placeholder".to_string(),
-                    column_data: ColumnData::Text(col_data)
-                });
+                if same_type {
+                    let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
+
+                    // TODO: Process nullable columns
+                    match curr_type {
+                        0 => column_data = ColumnData::Int8(col_data.iter().map(|x| x.parse::<i8>().unwrap()).collect()),
+                        1 => column_data = ColumnData::Int16(col_data.iter().map(|x| x.parse::<i16>().unwrap()).collect()),
+                        2 => column_data = ColumnData::Int32(col_data.iter().map(|x| x.parse::<i32>().unwrap()).collect()),
+                        3 => column_data = ColumnData::Int64(col_data.iter().map(|x| x.parse::<i64>().unwrap()).collect()),
+                        4 => column_data = ColumnData::UInt8(col_data.iter().map(|x| x.parse::<u8>().unwrap()).collect()),
+                        5 => column_data = ColumnData::UInt16(col_data.iter().map(|x| x.parse::<u16>().unwrap()).collect()),
+                        6 => column_data = ColumnData::UInt32(col_data.iter().map(|x| x.parse::<u32>().unwrap()).collect()),
+                        7 => column_data = ColumnData::UInt64(col_data.iter().map(|x| x.parse::<u64>().unwrap()).collect()),
+                        8 => column_data = ColumnData::Float32(col_data.iter().map(|x| x.parse::<f32>().unwrap()).collect()),
+                        9 => column_data = ColumnData::Float64(col_data.iter().map(|x| x.parse::<f64>().unwrap()).collect()),
+                        _ => ()
+                    }
+
+                    final_columns.push(Column {
+                        name: "placeholder".to_string(),
+                        column_data
+                    });
+                } else {
+                    final_columns.push(Column {
+                        name: "placeholder".to_string(),
+                        column_data: ColumnData::Text(col_data)
+                    });
+                }
             }
 
             let final_df = DataFrame { columns: final_columns };
