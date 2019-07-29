@@ -133,15 +133,10 @@ fn main() -> Result<(), Error> {
     let mut sys = actix::System::new("tesseract");
 
     // Populate internal cache
-    let cache = match logic_layer::populate_cache(
+    let cache = logic_layer::populate_cache(
         schema.clone(), &logic_layer_config, db.clone(), &mut sys
-    ) {
-        Ok(cache) => cache,
-        Err(err) => {
-            println!("{:?}", err);
-            panic!("Cache population failed.")
-        },
-    };
+    ).map_err(|err| format_err!("Cache population error: {}", err))?;
+
     let cache_arc = Arc::new(RwLock::new(cache));
 
     // Create lock on logic layer config
