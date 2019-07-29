@@ -562,7 +562,7 @@ pub fn generate_ts_queries(
     // This is where all the different queries are ACTUALLY generated.
     // Everything before this is common to all queries being generated.
 
-    let (mut master_map, mut header_map) = resolve_cuts(
+    let (mut dimension_cuts_map, mut header_map) = resolve_cuts(
         &cuts_map, &cube, &cube_cache, &level_map, &property_map
     )?;
 
@@ -575,7 +575,7 @@ pub fn generate_ts_queries(
     let mut added_drilldowns: Vec<LevelName> = vec![];
 
     // Populate the vectors above
-    for (dimension_name, level_cuts_map) in master_map.iter() {
+    for (dimension_name, level_cuts_map) in dimension_cuts_map.iter() {
         let mut inner_cuts: Vec<Cut> = vec![];
 
         let num_level_cuts = level_cuts_map.len();
@@ -653,28 +653,6 @@ pub fn generate_ts_queries(
 }
 
 
-/// Adds cut entries to the master_map
-pub fn add_cut_entries(
-        mut master_map: HashMap<String, HashMap<LevelName, Vec<String>>>,
-        level_name: &LevelName,
-        elements: Vec<String>
-) -> HashMap<String, HashMap<LevelName, Vec<String>>> {
-
-    master_map.entry(level_name.dimension.clone()).or_insert(HashMap::new());
-    let map_entry = master_map.get_mut(&level_name.dimension).unwrap();
-    map_entry.entry(level_name.clone()).or_insert(vec![]);
-    let level_cuts = map_entry.get_mut(&level_name).unwrap();
-
-    // Add each element to the map
-    for element in &elements {
-        level_cuts.push(element.clone());
-    }
-
-    master_map
-
-}
-
-
 /// Given a vector containing a partial Cartesian product, and a list of items,
 /// return a vector adding the list of items to the partial Cartesian product.
 /// From: https://gist.github.com/kylewlacy/115965b40e02a3325558
@@ -707,7 +685,8 @@ pub fn cartesian_product<T: Clone>(lists: Vec<Vec<T>>) -> Vec<Vec<T>> {
 }
 
 
-/// Performs named set and time substitutions
+/// Performs named set and time substitutions in the original cuts HashMap
+/// deserialized from the query.
 pub fn clean_cuts_map(
         agg_query_opt: &LogicLayerQueryOpt,
         cube_cache: &CubeCache,
@@ -783,7 +762,11 @@ pub fn clean_cuts_map(
 }
 
 
-/// Implements logic to resolve cuts, including those with operations.
+/// Implements logic to resolve logic layer cuts (including those with operations)
+/// into a HashMap separating cuts for each dimension. Doing so helps generate all
+/// the possible cut combinations in the next step.
+/// This method also returns a HashMap of header name substitutions that will help
+/// with the naming of the final column names in the response.
 pub fn resolve_cuts(
         cuts_map: &HashMap<String, String>,
         cube: &Cube,
@@ -791,12 +774,21 @@ pub fn resolve_cuts(
         level_map: &HashMap<String, LevelName>,
         property_map: &HashMap<String, Property>
 ) -> Result<(HashMap<String, HashMap<LevelName, Vec<String>>>, HashMap<String, String>), Error> {
-    // TODO: Think about ways to refactor this
-    // First String is a Dimension name
-    let mut master_map: HashMap<String, HashMap<LevelName, Vec<String>>> = HashMap::new();
+    // HashMap of cuts for each dimension.
+    // In the outer HashMap, the keys are dimension names as string and the
+    // values are the inner hashmap. The inner HashMap's keys are level names
+    // and the values are cut values for a given level.
+    let mut dimension_cuts_map: HashMap<String, HashMap<LevelName, Vec<String>>> = HashMap::new();
 
-    // Helps convert DF column names to their equivalent dimension names
+    // Helps convert dataframe column names to their equivalent dimension names.
+    // The only exception to this logic is when there is a single cut for a
+    // given dimension. In that case, we want to preserve the level name as the
+    // final column name.
     let mut header_map: HashMap<String, String> = HashMap::new();
+
+    // Keep track of which level names were matched to a level as opposed to a
+    // dimension.
+    let mut level_matches: Vec<LevelName> = vec![];
 
     for (cut_key, cut_values) in cuts_map.iter() {
         if cut_values.is_empty() {
@@ -825,7 +817,10 @@ pub fn resolve_cuts(
                 },
                 None => {
                     match level_map.get(cut_key) {
-                        Some(level_name) => level_name.clone(),
+                        Some(level_name) => {
+                            level_matches.push(level_name.clone());
+                            level_name.clone()
+                        },
                         None => continue
                     }
                 }
@@ -835,7 +830,7 @@ pub fn resolve_cuts(
 
             if elements.len() == 1 {
                 // Simply add this cut to the map
-                master_map = add_cut_entries(master_map, &level_name, vec![elements[0].clone()]);
+                dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, vec![elements[0].clone()]);
             } else if elements.len() == 2 {
                 let operation = elements[1].clone();
 
@@ -870,8 +865,8 @@ pub fn resolve_cuts(
                         None => continue
                     };
 
-                    // Add children IDs to the `master_map`
-                    master_map = add_cut_entries(master_map, &child_level_name, children_ids);
+                    // Add children IDs to the `dimension_cuts_map`
+                    dimension_cuts_map = add_cut_entries(dimension_cuts_map, &child_level_name, children_ids);
 
                 } else if operation == "parents".to_string() {
 
@@ -907,8 +902,8 @@ pub fn resolve_cuts(
                             None => continue
                         };
 
-                        // Add parent ID to the `master_map`
-                        master_map = add_cut_entries(master_map, &parent_level_name, vec![parent_id]);
+                        // Add parent ID to the `dimension_cuts_map`
+                        dimension_cuts_map = add_cut_entries(dimension_cuts_map, &parent_level_name, vec![parent_id]);
 
                         // Update current level_name for the next iteration
                         level_name = parent_level_name.clone();
@@ -931,8 +926,8 @@ pub fn resolve_cuts(
                             None => continue
                         };
 
-                        // Add neighbors IDs to the `master_map`
-                        master_map = add_cut_entries(master_map, &level_name, neighbors_ids);
+                        // Add neighbors IDs to the `dimension_cuts_map`
+                        dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, neighbors_ids);
                     }
 
                 } else {
@@ -944,10 +939,44 @@ pub fn resolve_cuts(
         }
     }
 
-    Ok((master_map, header_map))
+    // Check if anything needs to be removed from the header_map
+    for (_k1, level_name_map) in dimension_cuts_map.iter() {
+        if level_name_map.len() == 1 {
+            for (level_name, _v2) in level_name_map.iter() {
+                if level_matches.contains(&level_name) {
+                    header_map.remove_entry(&level_name.level);
+                }
+            }
+        }
+    }
+
+    Ok((dimension_cuts_map, header_map))
 }
 
 
+/// Adds cut entries to the dimension_cuts_map HashMap.
+pub fn add_cut_entries(
+    mut dimension_cuts_map: HashMap<String, HashMap<LevelName, Vec<String>>>,
+    level_name: &LevelName,
+    elements: Vec<String>
+) -> HashMap<String, HashMap<LevelName, Vec<String>>> {
+
+    dimension_cuts_map.entry(level_name.dimension.clone()).or_insert(HashMap::new());
+    let map_entry = dimension_cuts_map.get_mut(&level_name.dimension).unwrap();
+    map_entry.entry(level_name.clone()).or_insert(vec![]);
+    let level_cuts = map_entry.get_mut(&level_name).unwrap();
+
+    // Add each element to the map
+    for element in &elements {
+        level_cuts.push(element.clone());
+    }
+
+    dimension_cuts_map
+
+}
+
+
+/// Helper to get all the relevant parent captions given a locales list.
 pub fn get_parent_captions(cube: &Cube, level_name: &LevelName, locales: &Vec<String>) -> Vec<Property> {
     let mut captions: Vec<Property> = vec![];
 
