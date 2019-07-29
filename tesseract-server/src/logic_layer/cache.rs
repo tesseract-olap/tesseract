@@ -9,8 +9,94 @@ use tesseract_core::{Schema, Backend};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::{Level, Cube, InlineTable};
 
-use super::super::handlers::logic_layer::shared::{Time, TimePrecision, TimeValue};
-use crate::logic_layer::{LogicLayerConfig, format_column_data};
+use crate::logic_layer::{LogicLayerConfig, stringify_column_data};
+
+
+#[derive(Debug, Clone)]
+pub enum TimeValue {
+    First,
+    Last,
+    Value(u32),
+}
+
+impl TimeValue {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        if raw == "latest" {
+            Ok(TimeValue::Last)
+        } else if raw == "oldest" {
+            Ok(TimeValue::First)
+        } else {
+            match raw.parse::<u32>() {
+                Ok(n) => Ok(TimeValue::Value(n)),
+                Err(_) => Err(format_err!("Wrong type for time argument."))
+            }
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub enum TimePrecision {
+    Year,
+    Quarter,
+    Month,
+    Week,
+    Day,
+}
+
+impl TimePrecision {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        match raw.as_ref() {
+            "year" => Ok(TimePrecision::Year),
+            "quarter" => Ok(TimePrecision::Quarter),
+            "month" => Ok(TimePrecision::Month),
+            "week" => Ok(TimePrecision::Week),
+            "day" => Ok(TimePrecision::Day),
+            _ => Err(format_err!("Wrong type for time precision argument."))
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct Time {
+    pub precision: TimePrecision,
+    pub value: TimeValue,
+}
+
+impl Time {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        let e: Vec<&str> = raw.split(".").collect();
+
+        if e.len() != 2 {
+            return Err(format_err!("Wrong format for time argument."));
+        }
+
+        let precision = match TimePrecision::from_str(e[0].to_string()) {
+            Ok(precision) => precision,
+            Err(err) => return Err(err),
+        };
+        let value = match TimeValue::from_str(e[1].to_string()) {
+            Ok(value) => value,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Time {precision, value})
+    }
+
+    pub fn from_key_value(key: String, value: String) -> Result<Self, Error> {
+        let precision = match TimePrecision::from_str( key) {
+            Ok(precision) => precision,
+            Err(err) => return Err(err),
+        };
+        let value = match TimeValue::from_str(value) {
+            Ok(value) => value,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Time {precision, value})
+    }
+}
 
 
 /// Holds cache information.
@@ -612,8 +698,8 @@ pub fn get_parent_data(
         }
     };
 
-    let parent_column = format_column_data(&df.columns[0]);
-    let current_column = format_column_data(&df.columns[1]);
+    let parent_column = stringify_column_data(&df.columns[0]);
+    let current_column = stringify_column_data(&df.columns[1]);
 
     for i in 0..current_column.len() {
         parent_data.insert(current_column[i].clone(), parent_column[i].clone());
@@ -648,8 +734,8 @@ pub fn get_children_data(
         }
     };
 
-    let current_column = format_column_data(&df.columns[0]);
-    let children_column = format_column_data(&df.columns[1]);
+    let current_column = stringify_column_data(&df.columns[0]);
+    let children_column = stringify_column_data(&df.columns[1]);
 
     let mut current_value: String = "".to_string();
     let mut current_children: Vec<String> = vec![];
@@ -695,7 +781,7 @@ pub fn get_distinct_values(
     };
 
     if df.columns.len() >= 1 {
-        let values: Vec<String> = format_column_data(&df.columns[0]);
+        let values: Vec<String> = stringify_column_data(&df.columns[0]);
         return Ok(values);
     }
 

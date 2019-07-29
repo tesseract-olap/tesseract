@@ -1,9 +1,25 @@
+use actix_web::{
+    FutureResponse,
+    HttpResponse,
+};
+use futures::future::{self};
+
 use tesseract_core::{ColumnData, Column};
+
+
+/// Helper method to return errors (FutureResponse<HttpResponse>).
+pub fn boxed_error(message: String) -> FutureResponse<HttpResponse> {
+    Box::new(
+        future::result(
+            Ok(HttpResponse::NotFound().json(message))
+        )
+    )
+}
 
 
 /// DataFrame columns can come in many different types. This function converts
 /// all data to a common type (String).
-pub fn format_column_data(col: &Column) -> Vec<String> {
+pub fn stringify_column_data(col: &Column) -> Vec<String> {
     // TODO: Fix rounding of numbers from xx.xx to xx
 
     return match &col.column_data {

@@ -21,9 +21,8 @@ use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame, Column, 
 use tesseract_core::schema::{Cube};
 
 use crate::app::AppState;
-use crate::handlers::logic_layer::shared::{Time, boxed_error};
 use crate::errors::ServerError;
-use crate::logic_layer::{LogicLayerConfig, CubeCache, format_column_data};
+use crate::logic_layer::{LogicLayerConfig, CubeCache, Time, stringify_column_data, boxed_error};
 use super::super::util;
 
 
@@ -36,6 +35,7 @@ pub fn logic_layer_default_handler(
     logic_layer_aggregation(req, "jsonrecords".to_owned())
 }
 
+
 /// Handles aggregation when a format is specified.
 pub fn logic_layer_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String)>)
@@ -43,6 +43,7 @@ pub fn logic_layer_handler(
 {
     logic_layer_aggregation(req, cube_format.to_owned())
 }
+
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerQueryOpt {
@@ -69,6 +70,7 @@ pub struct LogicLayerQueryOpt {
     sparse: Option<bool>,
     rate: Option<String>,
 }
+
 
 impl LogicLayerQueryOpt {
     pub fn deserialize_args(arg: String) -> Vec<String> {
@@ -102,6 +104,7 @@ impl LogicLayerQueryOpt {
         arg_vec
     }
 }
+
 
 /// Performs data aggregation.
 pub fn logic_layer_aggregation(
@@ -237,28 +240,28 @@ pub fn logic_layer_aggregation(
                 for df in &dfs {
                     let c = &df.columns[col_i];
                     let i = match c.column_data {
-                        ColumnData::Int8(ref ns) => 0,
-                        ColumnData::Int16(ref ns) => 1,
-                        ColumnData::Int32(ref ns) => 2,
-                        ColumnData::Int64(ref ns) => 3,
-                        ColumnData::UInt8(ref ns) => 4,
-                        ColumnData::UInt16(ref ns) => 5,
-                        ColumnData::UInt32(ref ns) => 6,
-                        ColumnData::UInt64(ref ns) => 7,
-                        ColumnData::Float32(ref ns) => 8,
-                        ColumnData::Float64(ref ns) => 9,
-                        ColumnData::Text(ref ss) => 10,
-                        ColumnData::NullableInt8(ref ns) => 11,
-                        ColumnData::NullableInt16(ref ns) => 12,
-                        ColumnData::NullableInt32(ref ns) => 13,
-                        ColumnData::NullableInt64(ref ns) => 14,
-                        ColumnData::NullableUInt8(ref ns) => 15,
-                        ColumnData::NullableUInt16(ref ns) => 16,
-                        ColumnData::NullableUInt32(ref ns) => 17,
-                        ColumnData::NullableUInt64(ref ns) => 18,
-                        ColumnData::NullableFloat32(ref ns) => 19,
-                        ColumnData::NullableFloat64(ref ns) => 20,
-                        ColumnData::NullableText(ref ss) => 21,
+                        ColumnData::Int8(_) => 0,
+                        ColumnData::Int16(_) => 1,
+                        ColumnData::Int32(_) => 2,
+                        ColumnData::Int64(_) => 3,
+                        ColumnData::UInt8(_) => 4,
+                        ColumnData::UInt16(_) => 5,
+                        ColumnData::UInt32(_) => 6,
+                        ColumnData::UInt64(_) => 7,
+                        ColumnData::Float32(_) => 8,
+                        ColumnData::Float64(_) => 9,
+                        ColumnData::Text(_) => 10,
+                        ColumnData::NullableInt8(_) => 11,
+                        ColumnData::NullableInt16(_) => 12,
+                        ColumnData::NullableInt32(_) => 13,
+                        ColumnData::NullableInt64(_) => 14,
+                        ColumnData::NullableUInt8(_) => 15,
+                        ColumnData::NullableUInt16(_) => 16,
+                        ColumnData::NullableUInt32(_) => 17,
+                        ColumnData::NullableUInt64(_) => 18,
+                        ColumnData::NullableFloat32(_) => 19,
+                        ColumnData::NullableFloat64(_) => 20,
+                        ColumnData::NullableText(_) => 21,
                     };
 
                     if curr_type == -1 {
@@ -273,7 +276,7 @@ pub fn logic_layer_aggregation(
 
                 for df in &dfs {
                     let c = &df.columns[col_i];
-                    let rows = format_column_data(&c);
+                    let rows = stringify_column_data(&c);
                     col_data = [&col_data[..], &rows[..]].concat()
                 }
 
@@ -562,7 +565,7 @@ pub fn generate_ts_queries(
     // This is where all the different queries are ACTUALLY generated.
     // Everything before this is common to all queries being generated.
 
-    let (mut dimension_cuts_map, mut header_map) = resolve_cuts(
+    let (dimension_cuts_map, header_map) = resolve_cuts(
         &cuts_map, &cube, &cube_cache, &level_map, &property_map
     )?;
 
@@ -575,7 +578,7 @@ pub fn generate_ts_queries(
     let mut added_drilldowns: Vec<LevelName> = vec![];
 
     // Populate the vectors above
-    for (dimension_name, level_cuts_map) in dimension_cuts_map.iter() {
+    for (_dimension_name, level_cuts_map) in dimension_cuts_map.iter() {
         let mut inner_cuts: Vec<Cut> = vec![];
 
         let num_level_cuts = level_cuts_map.len();
