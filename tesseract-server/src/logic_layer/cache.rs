@@ -19,6 +19,7 @@ pub enum TimeValue {
     Value(u32),
 }
 
+
 impl TimeValue {
     pub fn from_str(raw: String) -> Result<Self, Error> {
         if raw == "latest" {
@@ -44,6 +45,7 @@ pub enum TimePrecision {
     Day,
 }
 
+
 impl TimePrecision {
     pub fn from_str(raw: String) -> Result<Self, Error> {
         match raw.as_ref() {
@@ -63,6 +65,7 @@ pub struct Time {
     pub precision: TimePrecision,
     pub value: TimeValue,
 }
+
 
 impl Time {
     pub fn from_str(raw: String) -> Result<Self, Error> {
@@ -320,7 +323,6 @@ pub fn populate_cache(
 
                     let mut parent_map: Option<HashMap<String, String>> = None;
                     let mut children_map: Option<HashMap<String, Vec<String>>> = None;
-                    let mut neighbors_map: HashMap<String, Vec<String>> = HashMap::new();
 
                     let parent_levels = cube.get_level_parents(&level_name)?;
                     let child_level = cube.get_child_level(&level_name)?;
@@ -335,9 +337,7 @@ pub fn populate_cache(
                             None => return Err(format_err!("Could not get inline table for {}", level.name.clone()))
                         };
 
-                        if parent_levels.len() == 0 {
-                            // No parents
-                        } else {
+                        if parent_levels.len() >= 1 {
                             parent_map = Some(get_inline_parent_data(
                                 &parent_levels[parent_levels.len() - 1], &level,
                                 &inline_table
@@ -364,9 +364,7 @@ pub fn populate_cache(
                     } else {
                         // Database table
 
-                        if parent_levels.len() == 0 {
-                            // No parents
-                        } else {
+                        if parent_levels.len() >= 1 {
                             parent_map = Some(get_parent_data(
                                 &parent_levels[parent_levels.len() - 1], &level,
                                 table, backend.clone(), sys
@@ -389,46 +387,7 @@ pub fn populate_cache(
                         )?;
                     }
 
-                    // Populate neighbors map
-                    let mut prev = 0;
-                    let mut curr = 0;
-                    let mut next = 2;
-
-                    let max_index = distinct_ids.len();
-
-                    let mut done = false; // mut done: bool
-
-                    while !done {
-                        // Before
-                        let mut before: Vec<String> = vec![];
-
-                        if prev == 0 && curr <= 1 {
-                            before = distinct_ids[0..curr].to_vec();
-                        } else {
-                            before = distinct_ids[prev..curr].to_vec();
-                        }
-
-                        // After
-                        let mut after: Vec<String> = vec![];
-
-                        if next >= max_index {
-                            after = distinct_ids[curr+1..].to_vec();
-                        } else {
-                            after = distinct_ids[curr+1..next+1].to_vec();
-                        }
-
-                        neighbors_map.insert(distinct_ids[curr].clone(), [&before[..], &after[..]].concat());
-
-                        if curr >= 2 {
-                            prev += 1;
-                        }
-                        curr += 1;
-                        next += 1;
-
-                        if curr == max_index {
-                            done = true;
-                        }
-                    }
+                    let neighbors_map = get_neighbors_map(&distinct_ids);
 
                     // Add each distinct ID to the id_map HashMap
                     for distinct_id in distinct_ids {
@@ -471,6 +430,7 @@ pub fn populate_cache(
     Ok(Cache { cubes })
 }
 
+
 pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, level: &Level) -> Result<Option<String>, Error> {
     for dimension in &cube.dimensions {
         for hierarchy in &dimension.hierarchies {
@@ -510,6 +470,7 @@ pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, 
 
     Ok(None)
 }
+
 
 pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, LevelName>, Error> {
     let mut level_name_map = HashMap::new();
@@ -553,6 +514,7 @@ pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Resul
 
     Ok(level_name_map)
 }
+
 
 pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, Property>, Error> {
     let mut property_map = HashMap::new();
@@ -602,6 +564,7 @@ pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Re
     Ok(property_map)
 }
 
+
 pub fn get_inline_parent_data(
         parent_level: &Level,
         current_level: &Level,
@@ -628,6 +591,7 @@ pub fn get_inline_parent_data(
 
     parent_data
 }
+
 
 pub fn get_inline_children_data(
         current_level: &Level,
@@ -672,6 +636,7 @@ pub fn get_inline_children_data(
     children_data
 }
 
+
 pub fn get_parent_data(
         parent_level: &Level,
         current_level: &Level,
@@ -707,6 +672,7 @@ pub fn get_parent_data(
 
     Ok(parent_data)
 }
+
 
 pub fn get_children_data(
         current_level: &Level,
@@ -786,4 +752,52 @@ pub fn get_distinct_values(
     }
 
     return Ok(vec![]);
+}
+
+
+pub fn get_neighbors_map(distinct_ids: &Vec<String>) -> HashMap<String, Vec<String>> {
+    let mut neighbors_map: HashMap<String, Vec<String>> = HashMap::new();
+
+    // Populate neighbors map
+    let mut prev = 0;
+    let mut curr = 0;
+    let mut next = 2;
+
+    let max_index = distinct_ids.len();
+
+    let mut done = false; // mut done: bool
+
+    while !done {
+        // Before
+        let mut before: Vec<String> = vec![];
+
+        if prev == 0 && curr <= 1 {
+            before = distinct_ids[0..curr].to_vec();
+        } else {
+            before = distinct_ids[prev..curr].to_vec();
+        }
+
+        // After
+        let mut after: Vec<String> = vec![];
+
+        if next >= max_index {
+            after = distinct_ids[curr+1..].to_vec();
+        } else {
+            after = distinct_ids[curr+1..next+1].to_vec();
+        }
+
+        neighbors_map.insert(distinct_ids[curr].clone(), [&before[..], &after[..]].concat());
+
+        if curr >= 2 {
+            prev += 1;
+        }
+        curr += 1;
+        next += 1;
+
+        if curr == max_index {
+            done = true;
+        }
+    }
+
+    neighbors_map
 }
