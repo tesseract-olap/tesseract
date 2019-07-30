@@ -16,6 +16,10 @@ pub enum Aggregator {
     Count,
     #[serde(rename="avg")]
     Average,
+    #[serde(rename="max")]
+    Max,
+    #[serde(rename="min")]
+    Min,
     /// Median
     ///
     /// Needs two steps. It's slow because there won't be aggregation on the first step, only
