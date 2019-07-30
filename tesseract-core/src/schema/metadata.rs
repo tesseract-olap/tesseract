@@ -186,6 +186,8 @@ impl From<&Aggregator> for AggregatorMetadata {
             Aggregator::Sum => "sum".into(),
             Aggregator::Count => "count".into(),
             Aggregator::Average => "avg".into(),
+            Aggregator::Max => "max".into(),
+            Aggregator::Min => "min".into(),
             Aggregator::BasicGroupedMedian { .. } => "basic_grouped_median".into(),
             Aggregator::WeightedAverage { ..} => "weighted_average".into(),
             Aggregator::WeightedSum { ..} => "weighted_sum".into(),
