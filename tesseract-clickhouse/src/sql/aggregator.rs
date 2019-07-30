@@ -225,6 +225,38 @@ mod test {
     }
 
     #[test]
+    fn max_agg() {
+        assert_eq!(
+            agg_sql_string_pass_1("col_1".into(), &Aggregator::Max, 0),
+            "max(col_1) as m0".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_pass_2(&Aggregator::Max, 0),
+            "max(m0) as final_m0".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_select_mea(&Aggregator::Max, 0),
+            "m0".to_owned(),
+        );
+    }
+
+    #[test]
+    fn min_agg() {
+        assert_eq!(
+            agg_sql_string_pass_1("col_1".into(), &Aggregator::Min, 0),
+            "min(col_1) as m0".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_pass_2(&Aggregator::Min, 0),
+            "min(m0) as final_m0".to_owned(),
+        );
+        assert_eq!(
+            agg_sql_string_select_mea(&Aggregator::Min, 0),
+            "m0".to_owned(),
+        );
+    }
+
+    #[test]
     fn weighted_avg() {
         let agg = Aggregator::WeightedAverage {
             weight_column: "weight_col".into(),
