@@ -22,7 +22,7 @@ use tesseract_core::schema::{Cube};
 
 use crate::app::AppState;
 use crate::errors::ServerError;
-use crate::logic_layer::{LogicLayerConfig, CubeCache, Time, stringify_column_data, boxed_error};
+use crate::logic_layer::{LogicLayerConfig, CubeCache, Time, boxed_error};
 use super::super::util;
 
 
@@ -176,7 +176,7 @@ pub fn logic_layer_aggregation(
     let mut final_headers: Vec<String> = vec![];
 
     for ts_query in &ts_queries {
-        info!("Tesseract query: {:?}", ts_query);
+        debug!("Tesseract query: {:?}", ts_query);
 
         let query_ir_headers = req
             .state()
@@ -188,13 +188,13 @@ pub fn logic_layer_aggregation(
             Err(err) => return boxed_error(err.to_string())
         };
 
-        info!("Query IR: {:?}", query_ir);
+        debug!("Query IR: {:?}", query_ir);
 
         let sql = req.state()
             .backend
             .generate_sql(query_ir);
 
-        info!("SQL query: {}", sql);
+        debug!("SQL query: {}", sql);
 
         // Substitute header names (only need to do this once)
         if final_headers.len() == 0 {
@@ -214,10 +214,10 @@ pub fn logic_layer_aggregation(
         sql_strings.push(sql);
     }
 
-    info!("Headers: {:?}", final_headers);
+    debug!("Headers: {:?}", final_headers);
 
     // Joins all the futures for each TsQuery
-    let futures: JoinAll<Vec<Box<Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
+    let futs: JoinAll<Vec<Box<Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
             .iter()
             .map(|sql| {
                 req.state()
@@ -228,7 +228,7 @@ pub fn logic_layer_aggregation(
         );
 
     // Process data received once all futures are resolved and return response
-    futures
+    futs
         .and_then(move |dfs| {
             let mut final_columns: Vec<Column> = vec![];
             let num_cols = dfs[0].columns.len();
@@ -275,8 +275,8 @@ pub fn logic_layer_aggregation(
                 let mut col_data: Vec<String> = vec![];
 
                 for df in &dfs {
-                    let c = &df.columns[col_i];
-                    let rows = stringify_column_data(&c);
+                    let c: &Column = &df.columns[col_i];
+                    let rows = c.stringify_column_data();
                     col_data = [&col_data[..], &rows[..]].concat()
                 }
 

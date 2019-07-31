@@ -9,6 +9,7 @@ pub mod query;
 pub mod query_ir;
 
 use failure::{Error, format_err, bail};
+use log::*;
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
@@ -148,7 +149,7 @@ impl Schema {
                     // Check each cube for unique level and property names
                     for level in &hierarchy.levels {
                         if !levels.insert(&level.name) {
-                            println!(
+                            info!(
                                 "Found repeated level name: {}.{}.{}.{}",
                                 cube.name, dimension.name, hierarchy.name, level.name
                             );
@@ -158,7 +159,7 @@ impl Schema {
                         if let Some(ref props) = level.properties {
                             for property in props {
                                 if !properties.insert(&property.name) {
-                                    println!(
+                                    info!(
                                         "Found repeated property name: {}.{}.{}.{}.{}",
                                         cube.name, dimension.name, hierarchy.name, level.name, property.name
                                     );

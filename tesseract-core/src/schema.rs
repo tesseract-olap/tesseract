@@ -290,12 +290,8 @@ impl Cube {
     }
 
     pub fn get_child_level(&self, level_name: &LevelName) -> Result<Option<Level>, Error> {
-        let hierarchy =  match self.get_hierarchy(level_name) {
-            Some(h) => h,
-            None => {
-                return Err(format_err!("Could not find parent hierarchy for level: {}", level_name.level))
-            }
-        };
+        let hierarchy = self.get_hierarchy(level_name)
+            .ok_or_else(|| format_err!("Could not find parent hierarchy for level: {}", level_name.level))?;
 
         let mut child_level: Option<Level> = None;
         let mut is_next: bool = false;

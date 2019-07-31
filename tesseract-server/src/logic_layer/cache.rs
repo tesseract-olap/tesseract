@@ -9,7 +9,7 @@ use tesseract_core::{Schema, Backend};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::{Level, Cube, InlineTable};
 
-use crate::logic_layer::{LogicLayerConfig, stringify_column_data};
+use crate::logic_layer::{LogicLayerConfig};
 
 
 #[derive(Debug, Clone)]
@@ -663,8 +663,8 @@ pub fn get_parent_data(
         }
     };
 
-    let parent_column = stringify_column_data(&df.columns[0]);
-    let current_column = stringify_column_data(&df.columns[1]);
+    let parent_column = df.columns[0].stringify_column_data();
+    let current_column = df.columns[1].stringify_column_data();
 
     for i in 0..current_column.len() {
         parent_data.insert(current_column[i].clone(), parent_column[i].clone());
@@ -700,8 +700,8 @@ pub fn get_children_data(
         }
     };
 
-    let current_column = stringify_column_data(&df.columns[0]);
-    let children_column = stringify_column_data(&df.columns[1]);
+    let current_column = df.columns[0].stringify_column_data();
+    let children_column = df.columns[1].stringify_column_data();
 
     let mut current_value: String = "".to_string();
     let mut current_children: Vec<String> = vec![];
@@ -747,7 +747,7 @@ pub fn get_distinct_values(
     };
 
     if df.columns.len() >= 1 {
-        let values: Vec<String> = stringify_column_data(&df.columns[0]);
+        let values: Vec<String> = df.columns[0].stringify_column_data();
         return Ok(values);
     }
 
