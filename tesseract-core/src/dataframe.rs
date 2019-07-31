@@ -205,3 +205,141 @@ pub enum ColumnData {
     NullableFloat64(Vec<Option<f64>>),
     NullableText(Vec<Option<String>>),
 }
+
+
+pub fn is_same_columndata_type(col_1: &ColumnData, col_2: &ColumnData) -> bool {
+    match col_1 {
+        ColumnData::Int8(_) => {
+            match col_2 {
+                ColumnData::Int8(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::Int16(_) => {
+            match col_2 {
+                ColumnData::Int16(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::Int32(_) => {
+            match col_2 {
+                ColumnData::Int32(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::Int64(_) => {
+            match col_2 {
+                ColumnData::Int64(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::UInt8(_) => {
+            match col_2 {
+                ColumnData::UInt8(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::UInt16(_) => {
+            match col_2 {
+                ColumnData::UInt16(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::UInt32(_) => {
+            match col_2 {
+                ColumnData::UInt32(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::UInt64(_) => {
+            match col_2 {
+                ColumnData::UInt64(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::Float32(_) => {
+            match col_2 {
+                ColumnData::Float32(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::Float64(_) => {
+            match col_2 {
+                ColumnData::Float64(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::Text(_) => {
+            match col_2 {
+                ColumnData::Text(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableInt8(_) => {
+            match col_2 {
+                ColumnData::NullableInt8(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableInt16(_) => {
+            match col_2 {
+                ColumnData::NullableInt16(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableInt32(_) => {
+            match col_2 {
+                ColumnData::NullableInt32(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableInt64(_) => {
+            match col_2 {
+                ColumnData::NullableInt64(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableUInt8(_) => {
+            match col_2 {
+                ColumnData::NullableUInt8(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableUInt16(_) => {
+            match col_2 {
+                ColumnData::NullableUInt16(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableUInt32(_) => {
+            match col_2 {
+                ColumnData::NullableUInt32(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableUInt64(_) => {
+            match col_2 {
+                ColumnData::NullableUInt64(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableFloat32(_) => {
+            match col_2 {
+                ColumnData::NullableFloat32(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableFloat64(_) => {
+            match col_2 {
+                ColumnData::NullableFloat64(_) => true,
+                _ => false
+            }
+        },
+        ColumnData::NullableText(_) => {
+            match col_2 {
+                ColumnData::NullableText(_) => true,
+                _ => false
+            }
+        },
+    }
+}

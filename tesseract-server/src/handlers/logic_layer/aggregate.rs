@@ -17,12 +17,13 @@ use serde_derive::Deserialize;
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
-use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame, Column, ColumnData};
+use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame, Column, ColumnData, is_same_columndata_type};
 use tesseract_core::schema::{Cube};
 
 use crate::app::AppState;
 use crate::errors::ServerError;
-use crate::logic_layer::{LogicLayerConfig, CubeCache, Time, boxed_error};
+use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
+use crate::util::boxed_error;
 use super::super::util;
 
 
@@ -151,7 +152,7 @@ pub fn logic_layer_aggregation(
     };
 
     let cube = match schema.get_cube_by_name(&cube_name) {
-        Ok(c) => c.clone(),
+        Ok(c) => c,
         Err(err) => return boxed_error(err.to_string())
     };
 
@@ -235,40 +236,13 @@ pub fn logic_layer_aggregation(
 
             for col_i in 0..num_cols {
                 let mut same_type = true;
-                let mut curr_type: i32 = -1;
+
+                let first_col: &Column = &dfs[0].columns[col_i];
 
                 for df in &dfs {
-                    let c = &df.columns[col_i];
-                    let i = match c.column_data {
-                        ColumnData::Int8(_) => 0,
-                        ColumnData::Int16(_) => 1,
-                        ColumnData::Int32(_) => 2,
-                        ColumnData::Int64(_) => 3,
-                        ColumnData::UInt8(_) => 4,
-                        ColumnData::UInt16(_) => 5,
-                        ColumnData::UInt32(_) => 6,
-                        ColumnData::UInt64(_) => 7,
-                        ColumnData::Float32(_) => 8,
-                        ColumnData::Float64(_) => 9,
-                        ColumnData::Text(_) => 10,
-                        ColumnData::NullableInt8(_) => 11,
-                        ColumnData::NullableInt16(_) => 12,
-                        ColumnData::NullableInt32(_) => 13,
-                        ColumnData::NullableInt64(_) => 14,
-                        ColumnData::NullableUInt8(_) => 15,
-                        ColumnData::NullableUInt16(_) => 16,
-                        ColumnData::NullableUInt32(_) => 17,
-                        ColumnData::NullableUInt64(_) => 18,
-                        ColumnData::NullableFloat32(_) => 19,
-                        ColumnData::NullableFloat64(_) => 20,
-                        ColumnData::NullableText(_) => 21,
-                    };
-
-                    if curr_type == -1 {
-                        curr_type = i;
-                    } else if curr_type != i {
+                    if !is_same_columndata_type(&first_col.column_data, &df.columns[col_i].column_data) {
                         same_type = false;
-                        break
+                        break;
                     }
                 }
 
@@ -284,17 +258,37 @@ pub fn logic_layer_aggregation(
                     let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
 
                     // TODO: Process nullable columns
-                    match curr_type {
-                        0 => column_data = ColumnData::Int8(col_data.iter().map(|x| x.parse::<i8>().unwrap()).collect()),
-                        1 => column_data = ColumnData::Int16(col_data.iter().map(|x| x.parse::<i16>().unwrap()).collect()),
-                        2 => column_data = ColumnData::Int32(col_data.iter().map(|x| x.parse::<i32>().unwrap()).collect()),
-                        3 => column_data = ColumnData::Int64(col_data.iter().map(|x| x.parse::<i64>().unwrap()).collect()),
-                        4 => column_data = ColumnData::UInt8(col_data.iter().map(|x| x.parse::<u8>().unwrap()).collect()),
-                        5 => column_data = ColumnData::UInt16(col_data.iter().map(|x| x.parse::<u16>().unwrap()).collect()),
-                        6 => column_data = ColumnData::UInt32(col_data.iter().map(|x| x.parse::<u32>().unwrap()).collect()),
-                        7 => column_data = ColumnData::UInt64(col_data.iter().map(|x| x.parse::<u64>().unwrap()).collect()),
-                        8 => column_data = ColumnData::Float32(col_data.iter().map(|x| x.parse::<f32>().unwrap()).collect()),
-                        9 => column_data = ColumnData::Float64(col_data.iter().map(|x| x.parse::<f64>().unwrap()).collect()),
+                    match first_col.column_data {
+                        ColumnData::Int8(_) => {
+                            column_data = ColumnData::Int8(col_data.iter().map(|x| x.parse::<i8>().unwrap()).collect());
+                        },
+                        ColumnData::Int16(_) => {
+                            column_data = ColumnData::Int16(col_data.iter().map(|x| x.parse::<i16>().unwrap()).collect());
+                        },
+                        ColumnData::Int32(_) => {
+                            column_data = ColumnData::Int32(col_data.iter().map(|x| x.parse::<i32>().unwrap()).collect());
+                        },
+                        ColumnData::Int64(_) => {
+                            column_data = ColumnData::Int64(col_data.iter().map(|x| x.parse::<i64>().unwrap()).collect());
+                        },
+                        ColumnData::UInt8(_) => {
+                            column_data = ColumnData::UInt8(col_data.iter().map(|x| x.parse::<u8>().unwrap()).collect());
+                        },
+                        ColumnData::UInt16(_) => {
+                            column_data = ColumnData::UInt16(col_data.iter().map(|x| x.parse::<u16>().unwrap()).collect());
+                        },
+                        ColumnData::UInt32(_) => {
+                            column_data = ColumnData::UInt32(col_data.iter().map(|x| x.parse::<u32>().unwrap()).collect());
+                        },
+                        ColumnData::UInt64(_) => {
+                            column_data = ColumnData::UInt64(col_data.iter().map(|x| x.parse::<u64>().unwrap()).collect());
+                        },
+                        ColumnData::Float32(_) => {
+                            column_data = ColumnData::Float32(col_data.iter().map(|x| x.parse::<f32>().unwrap()).collect());
+                        },
+                        ColumnData::Float64(_) => {
+                            column_data = ColumnData::Float64(col_data.iter().map(|x| x.parse::<f64>().unwrap()).collect());
+                        },
                         _ => ()
                     }
 

@@ -17,7 +17,7 @@ use std::str::FromStr;
 use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
-pub use self::dataframe::{DataFrame, Column, ColumnData};
+pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
 use self::names::{
     Cut,
     Drilldown,
