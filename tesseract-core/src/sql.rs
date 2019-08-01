@@ -37,6 +37,8 @@ pub(crate) fn standard_sql(
             Aggregator::Sum => format!("sum({})", &m.column),
             Aggregator::Count => format!("count({})", &m.column),
             Aggregator::Average => format!("avg({})", &m.column),
+            Aggregator::Max => format!("max({})", &m.column),
+            Aggregator::Min => format!("min({})", &m.column),
             // median doesn't work like this
             Aggregator::BasicGroupedMedian { .. } => format!("median"),
             Aggregator::WeightedAverage {..} => format!("avg"),

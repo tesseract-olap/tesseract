@@ -227,9 +227,10 @@ pub fn calculate(
     // Now add part d
     let bd = if d_drills.is_empty() {
             format!("select {}, b, d from \
-                        (select groupArray(b) as b_s, sum(b) as d from ({})) \
+                        (select {}, groupArray(b) as b_s, sum(b) as d from ({})) \
                         Array Join {}, b_s as b",
             b_drills_str,
+            group_array_rca_drill_2,
             b,
             join_array_rca_drill_2,
         )
