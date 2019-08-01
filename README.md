@@ -28,7 +28,7 @@ Note: as of v0.13.0 the binary is called `tesseract-olap` on both linux and osx.
 Using [Homebrew](https://brew.sh/):
 
 ```
-brew tap hwchen/tesseract https://github.com/hwchen/tesseract.git
+brew tap tesseract-olap/tesseract https://github.com/tesseract-olap/tesseract.git
 brew install tesseract-olap
 ```
 
