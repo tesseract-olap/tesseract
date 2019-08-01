@@ -1,3 +1,6 @@
+use failure::{Error, format_err};
+
+
 #[derive(Debug)]
 pub struct DataFrame {
     pub columns: Vec<Column>,
@@ -66,115 +69,146 @@ impl Column {
         &mut self.column_data
     }
 
+    /// Sort column entries for all types, but floats.
+    pub fn sort_column_data(&mut self) -> Result<(), Error> {
+        match self.column_data {
+            ColumnData::Int8(ref mut v) => v.sort(),
+            ColumnData::Int16(ref mut v) => v.sort(),
+            ColumnData::Int32(ref mut v) => v.sort(),
+            ColumnData::Int64(ref mut v) => v.sort(),
+            ColumnData::UInt8(ref mut v) => v.sort(),
+            ColumnData::UInt16(ref mut v) => v.sort(),
+            ColumnData::UInt32(ref mut v) => v.sort(),
+            ColumnData::UInt64(ref mut v) => v.sort(),
+            ColumnData::Float32(_) => {
+                return Err(format_err!("Cannot sort Float32 column"));
+            },
+            ColumnData::Float64(_) => {
+                return Err(format_err!("Cannot sort Float64 column"));
+            },
+            ColumnData::Text(ref mut v) => v.sort(),
+            ColumnData::NullableInt8(ref mut v) => v.sort(),
+            ColumnData::NullableInt16(ref mut v) => v.sort(),
+            ColumnData::NullableInt32(ref mut v) => v.sort(),
+            ColumnData::NullableInt64(ref mut v) => v.sort(),
+            ColumnData::NullableUInt8(ref mut v) => v.sort(),
+            ColumnData::NullableUInt16(ref mut v) => v.sort(),
+            ColumnData::NullableUInt32(ref mut v) => v.sort(),
+            ColumnData::NullableUInt64(ref mut v) => v.sort(),
+            ColumnData::NullableFloat32(_) => {
+                return Err(format_err!("Cannot sort NullableFloat32 column"));
+            },
+            ColumnData::NullableFloat64(_) => {
+                return Err(format_err!("Cannot sort NullableFloat64 column"));
+            },
+            ColumnData::NullableText(ref mut v) => v.sort(),
+        }
+
+        Ok(())
+    }
+
     /// DataFrame columns can come in many different types. This function converts
     /// all data to a common type (String).
     pub fn stringify_column_data(&self) -> Vec<String> {
         return match &self.column_data {
-            ColumnData::Int8(v) => {
-                let mut t: Vec<i8> = v.iter().map(|&e| e.clone() as i8).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int16(v) => {
-                let mut t: Vec<i16> = v.iter().map(|&e| e.clone() as i16).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int32(v) => {
-                let mut t: Vec<i32> = v.iter().map(|&e| e.clone() as i32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int64(v) => {
-                let mut t: Vec<i64> = v.iter().map(|&e| e.clone() as i64).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt8(v) => {
-                let mut t: Vec<u8> = v.iter().map(|&e| e.clone() as u8).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt16(v) => {
-                let mut t: Vec<u16> = v.iter().map(|&e| e.clone() as u16).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt32(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt64(v) => {
-                let mut t: Vec<u64> = v.iter().map(|&e| e.clone() as u64).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Float32(v) => {
-                let t: Vec<f32> = v.iter().map(|&e| e.clone() as f32).collect();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Float64(v) => {
-                let t: Vec<f64> = v.iter().map(|&e| e.clone() as f64).collect();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Text(v) => {
-                let mut t = v.to_vec();
-                t.sort();
-                t
-            },
+            ColumnData::Int8(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::Int16(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::Int32(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::Int64(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::UInt8(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::UInt16(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::UInt32(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::UInt64(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::Float32(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::Float64(v) => v.iter().map(|&e| e.to_string()).collect(),
+            ColumnData::Text(v) => v.to_vec(),
             ColumnData::NullableInt8(v) => {
-                let mut t: Vec<i8> = v.iter().filter_map(|&e| e.map(|e| e.clone() as i8)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableInt16(v) => {
-                let mut t: Vec<i16> = v.iter().filter_map(|&e| e.map(|e| e.clone() as i16)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableInt32(v) => {
-                let mut t: Vec<i32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as i32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableInt64(v) => {
-                let mut t: Vec<i64> = v.iter().filter_map(|&e| e.map(|e| e.clone() as i64)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableUInt8(v) => {
-                let mut t: Vec<u8> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u8)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableUInt16(v) => {
-                let mut t: Vec<u16> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u16)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableUInt32(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableUInt64(v) => {
-                let mut t: Vec<u64> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u64)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableFloat32(v) => {
-                let t: Vec<f32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as f32)).collect();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableFloat64(v) => {
-                let t: Vec<f64> = v.iter().filter_map(|&e| e.map(|e| e.clone() as f64)).collect();
-                t.iter().map(|&e| e.to_string()).collect()
+                v.iter().map(|&e| {
+                    match e {
+                        Some(e) => e.to_string(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
             ColumnData::NullableText(v) => {
-                let mut t: Vec<_> = v.into_iter().filter_map(|e| e.clone()).collect();
-                t.sort();
-                t
+                v.iter().map(|e| {
+                    match e {
+                        Some(e) => e.clone(),
+                        None => "".to_string()
+                    }
+                }).collect()
             },
         }
     }

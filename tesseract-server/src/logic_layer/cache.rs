@@ -739,7 +739,7 @@ pub fn get_distinct_values(
             format!("select distinct {} from {}", column, table).to_string()
         );
 
-    let df = match sys.block_on(future) {
+    let mut df = match sys.block_on(future) {
         Ok(df) => df,
         Err(err) => {
             return Err(format_err!("Error populating cache with backend data: {}", err));
@@ -747,6 +747,7 @@ pub fn get_distinct_values(
     };
 
     if df.columns.len() >= 1 {
+        df.columns[0].sort_column_data()?;
         let values: Vec<String> = df.columns[0].stringify_column_data();
         return Ok(values);
     }
