@@ -28,7 +28,7 @@ use std::str::FromStr;
 
 /// Fully qualified name of Dimension, Hierarchy, and Level
 /// Basis for other names.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Eq, Hash)]
 pub struct LevelName {
     pub dimension: String,
     pub hierarchy: String,

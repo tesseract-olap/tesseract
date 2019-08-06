@@ -9,6 +9,7 @@ pub mod query;
 pub mod query_ir;
 
 use failure::{Error, format_err, bail};
+use log::*;
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
@@ -16,7 +17,7 @@ use std::str::FromStr;
 use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
-pub use self::dataframe::{DataFrame, Column, ColumnData};
+pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
 use self::names::{
     Cut,
     Drilldown,
@@ -148,12 +149,20 @@ impl Schema {
                     // Check each cube for unique level and property names
                     for level in &hierarchy.levels {
                         if !levels.insert(&level.name) {
+                            info!(
+                                "Found repeated level name: {}.{}.{}.{}",
+                                cube.name, dimension.name, hierarchy.name, level.name
+                            );
                             return false
                         }
 
                         if let Some(ref props) = level.properties {
                             for property in props {
                                 if !properties.insert(&property.name) {
+                                    info!(
+                                        "Found repeated property name: {}.{}.{}.{}.{}",
+                                        cube.name, dimension.name, hierarchy.name, level.name, property.name
+                                    );
                                     return false
                                 }
                             }

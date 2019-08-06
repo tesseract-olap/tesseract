@@ -28,7 +28,7 @@ pub use crate::schema::{
     xml::TableConfigXML,
     xml::PropertyConfigXML,
 };
-use crate::names::{LevelName, Measure as MeasureName};
+use crate::names::{LevelName, Measure as MeasureName, Property as TsProperty};
 use crate::query_ir::MemberType;
 pub use self::aggregator::Aggregator;
 
@@ -257,6 +257,20 @@ impl Cube {
         Err(format_err!("'{}' not found", property_name))
     }
 
+    /// Returns a Hierarchy object corresponding to a provided LevelName.
+    pub fn get_hierarchy(&self, level_name: &LevelName) -> Option<Hierarchy> {
+        for dimension in &self.dimensions {
+            if dimension.name == level_name.dimension {
+                for hierarchy in &dimension.hierarchies {
+                    if hierarchy.name == level_name.hierarchy {
+                        return Some(hierarchy.clone())
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Returns a Level object corresponding to a provided LevelName.
     pub fn get_level(&self, level_name: &LevelName) -> Option<Level> {
         for dimension in &self.dimensions {
@@ -273,6 +287,28 @@ impl Cube {
             }
         }
         None
+    }
+
+    pub fn get_child_level(&self, level_name: &LevelName) -> Result<Option<Level>, Error> {
+        let hierarchy = self.get_hierarchy(level_name)
+            .ok_or_else(|| format_err!("Could not find parent hierarchy for level: {}", level_name.level))?;
+
+        let mut child_level: Option<Level> = None;
+        let mut is_next: bool = false;
+
+        for level in &hierarchy.levels {
+            if is_next {
+                child_level = Some(level.clone());
+                break;
+            }
+
+            if level.name == level_name.level {
+                is_next = true;
+                continue;
+            }
+        }
+
+        Ok(child_level)
     }
 }
 
@@ -495,6 +531,33 @@ pub struct Level {
     pub properties: Option<Vec<Property>>,
     pub key_type: Option<MemberType>,
     pub annotations: Option<Vec<Annotation>>,
+}
+
+impl Level {
+    pub fn get_captions(&self, level_name: &LevelName, locales: &Vec<String>) -> Vec<TsProperty> {
+        let mut captions: Vec<TsProperty> = vec![];
+
+        if let Some(props) = self.properties.clone() {
+            for prop in props {
+                if let Some(cap) = prop.caption_set {
+                    for locale in locales.clone() {
+                        if locale == cap {
+                            captions.push(
+                                TsProperty::new(
+                                    level_name.dimension.clone(),
+                                    level_name.hierarchy.clone(),
+                                    level_name.level.clone(),
+                                    prop.name.clone()
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        captions
+    }
 }
 
 impl From<LevelConfigJson> for Level {

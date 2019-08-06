@@ -5,12 +5,101 @@ use log::info;
 
 use serde_derive::Deserialize;
 
-use tesseract_core::{Schema, Backend, ColumnData};
+use tesseract_core::{Schema, Backend};
 use tesseract_core::names::{LevelName, Property};
-use tesseract_core::schema::{Level, Cube};
+use tesseract_core::schema::{Level, Cube, InlineTable};
 
-use super::super::handlers::logic_layer::shared::{Time, TimePrecision, TimeValue};
-use crate::logic_layer::LogicLayerConfig;
+use crate::logic_layer::{LogicLayerConfig};
+
+
+#[derive(Debug, Clone)]
+pub enum TimeValue {
+    First,
+    Last,
+    Value(u32),
+}
+
+
+impl TimeValue {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        if raw == "latest" {
+            Ok(TimeValue::Last)
+        } else if raw == "oldest" {
+            Ok(TimeValue::First)
+        } else {
+            match raw.parse::<u32>() {
+                Ok(n) => Ok(TimeValue::Value(n)),
+                Err(_) => Err(format_err!("Wrong type for time argument."))
+            }
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub enum TimePrecision {
+    Year,
+    Quarter,
+    Month,
+    Week,
+    Day,
+}
+
+
+impl TimePrecision {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        match raw.as_ref() {
+            "year" => Ok(TimePrecision::Year),
+            "quarter" => Ok(TimePrecision::Quarter),
+            "month" => Ok(TimePrecision::Month),
+            "week" => Ok(TimePrecision::Week),
+            "day" => Ok(TimePrecision::Day),
+            _ => Err(format_err!("Wrong type for time precision argument."))
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct Time {
+    pub precision: TimePrecision,
+    pub value: TimeValue,
+}
+
+
+impl Time {
+    pub fn from_str(raw: String) -> Result<Self, Error> {
+        let e: Vec<&str> = raw.split(".").collect();
+
+        if e.len() != 2 {
+            return Err(format_err!("Wrong format for time argument."));
+        }
+
+        let precision = match TimePrecision::from_str(e[0].to_string()) {
+            Ok(precision) => precision,
+            Err(err) => return Err(err),
+        };
+        let value = match TimeValue::from_str(e[1].to_string()) {
+            Ok(value) => value,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Time {precision, value})
+    }
+
+    pub fn from_key_value(key: String, value: String) -> Result<Self, Error> {
+        let precision = match TimePrecision::from_str( key) {
+            Ok(precision) => precision,
+            Err(err) => return Err(err),
+        };
+        let value = match TimeValue::from_str(value) {
+            Ok(value) => value,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Time {precision, value})
+    }
+}
 
 
 /// Holds cache information.
@@ -18,6 +107,7 @@ use crate::logic_layer::LogicLayerConfig;
 pub struct Cache {
     pub cubes: Vec<CubeCache>,
 }
+
 
 impl Cache {
     /// Finds the `CubeCache` object for a cube with a given name.
@@ -30,6 +120,7 @@ impl Cache {
         None
     }
 }
+
 
 /// Holds cache information for a given cube.
 #[derive(Debug, Clone, Deserialize)]
@@ -53,34 +144,41 @@ pub struct CubeCache {
 
     pub level_map: HashMap<String, LevelName>,
     pub property_map: HashMap<String, Property>,
+
+    // Maps a level name to a `LevelCache` object
+    pub level_caches: HashMap<String, LevelCache>,
+
+    // Maps a dimension name to a `DimensionCache` object
+    pub dimension_caches: HashMap<String, DimensionCache>,
 }
+
 
 impl CubeCache {
     pub fn get_time_cut(&self, time: Time) -> Result<(String, String), Error> {
         let (val_res, ln_res) = match time.precision {
             TimePrecision::Year => {
                 let v = self.get_value(&time, self.year_values.clone());
-                let l = self.get_level_name(&time, self.year_level.clone());
+                let l = self.get_level_name(self.year_level.clone());
                 (v, l)
             },
             TimePrecision::Quarter => {
                 let v = self.get_value(&time, self.quarter_values.clone());
-                let l = self.get_level_name(&time, self.quarter_level.clone());
+                let l = self.get_level_name(self.quarter_level.clone());
                 (v, l)
             },
             TimePrecision::Month => {
                 let v = self.get_value(&time, self.month_values.clone());
-                let l = self.get_level_name(&time, self.month_level.clone());
+                let l = self.get_level_name(self.month_level.clone());
                 (v, l)
             },
             TimePrecision::Week => {
                 let v = self.get_value(&time, self.week_values.clone());
-                let l = self.get_level_name(&time, self.week_level.clone());
+                let l = self.get_level_name(self.week_level.clone());
                 (v, l)
             },
             TimePrecision::Day => {
                 let v = self.get_value(&time, self.day_values.clone());
-                let l = self.get_level_name(&time, self.day_level.clone());
+                let l = self.get_level_name(self.day_level.clone());
                 (v, l)
             }
         };
@@ -98,7 +196,7 @@ impl CubeCache {
         Ok((ln, val))
     }
 
-    pub fn get_level_name(&self, time: &Time, level: Option<Level>) -> Option<String> {
+    pub fn get_level_name(&self, level: Option<Level>) -> Option<String> {
         match level {
             Some(l) => Some(l.name),
             None => None
@@ -127,6 +225,20 @@ impl CubeCache {
             None => None
         }
     }
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LevelCache {
+    pub parent_map: Option<HashMap<String, String>>,
+    pub children_map: Option<HashMap<String, Vec<String>>>,
+    pub neighbors_map: HashMap<String, Vec<String>>,
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DimensionCache {
+    pub id_map: HashMap<String, Vec<LevelName>>,
 }
 
 
@@ -161,46 +273,134 @@ pub fn populate_cache(
         let mut day_level: Option<Level> = None;
         let mut day_values: Option<Vec<String>> = None;
 
-        for dimension in cube.dimensions.clone() {
-            for hierarchy in dimension.hierarchies.clone() {
-                let table = match hierarchy.table {
-                    Some(t) => t.name,
-                    None => cube.table.name.clone()
+        let mut level_caches: HashMap<String, LevelCache> = HashMap::new();
+        let mut dimension_caches: HashMap<String, DimensionCache> = HashMap::new();
+
+        for dimension in &cube.dimensions {
+            let mut id_map: HashMap<String, Vec<LevelName>> = HashMap::new();
+
+            for hierarchy in &dimension.hierarchies {
+                let table = match &hierarchy.table {
+                    Some(t) => &t.name,
+                    None => &cube.table.name
                 };
 
-                for level in hierarchy.levels.clone() {
+                for level in &hierarchy.levels {
                     if time_column_names.contains(&level.name) {
-                        let values_res = get_time_values(
-                            level.key_column.clone(),
-                            table.clone(),
-                            backend.clone(),
-                            sys
-                        );
+                        let val = get_distinct_values(
+                            &level.key_column, &table, backend.clone(), sys
+                        )?;
 
-                        match values_res {
-                            Ok(val) => {
-                                if level.name == "Year" {
-                                    year_level = Some(level);
-                                    year_values = Some(val);
-                                } else if level.name == "Quarter" {
-                                    quarter_level = Some(level);
-                                    quarter_values = Some(val);
-                                } else if level.name == "Month" {
-                                    month_level = Some(level);
-                                    month_values = Some(val);
-                                } else if level.name == "Week" {
-                                    week_level = Some(level);
-                                    week_values = Some(val);
-                                } else if level.name == "Day" {
-                                    day_level = Some(level);
-                                    day_values = Some(val);
-                                }
-                            },
-                            Err(err) => return Err(err)
-                        };
+                        if level.name == "Year" {
+                            year_level = Some(level.clone());
+                            year_values = Some(val);
+                        } else if level.name == "Quarter" {
+                            quarter_level = Some(level.clone());
+                            quarter_values = Some(val);
+                        } else if level.name == "Month" {
+                            month_level = Some(level.clone());
+                            month_values = Some(val);
+                        } else if level.name == "Week" {
+                            week_level = Some(level.clone());
+                            week_values = Some(val);
+                        } else if level.name == "Day" {
+                            day_level = Some(level.clone());
+                            day_values = Some(val);
+                        }
                     }
+
+                    // Get unique name for this level
+                    let unique_name = match get_unique_level_name(&cube, ll_config, &level)? {
+                        Some(name) => name,
+                        None => return Err(format_err!("Couldn't find unique name for {}", level.name.clone()))
+                    };
+
+                    let level_name = LevelName::new(
+                        dimension.name.clone(),
+                        hierarchy.name.clone(),
+                        level.name.clone()
+                    );
+
+                    let mut parent_map: Option<HashMap<String, String>> = None;
+                    let mut children_map: Option<HashMap<String, Vec<String>>> = None;
+
+                    let parent_levels = cube.get_level_parents(&level_name)?;
+                    let child_level = cube.get_child_level(&level_name)?;
+
+                    let mut distinct_ids: Vec<String> = vec![];
+
+                    if hierarchy.inline_table.is_some() {
+                        // Inline table
+
+                        let inline_table = match &hierarchy.inline_table {
+                            Some(t) => t,
+                            None => return Err(format_err!("Could not get inline table for {}", level.name.clone()))
+                        };
+
+                        if parent_levels.len() >= 1 {
+                            parent_map = Some(get_inline_parent_data(
+                                &parent_levels[parent_levels.len() - 1], &level,
+                                &inline_table
+                            ));
+                        }
+
+                        match child_level {
+                            Some(child_level) => {
+                                children_map = Some(get_inline_children_data(
+                                    &level, &child_level, &inline_table
+                                ));
+                            },
+                            None => ()
+                        }
+
+                        // Get all IDs for this level
+                        for row in &inline_table.rows {
+                            for row_value in &row.row_values {
+                                if row_value.column == level.key_column {
+                                    distinct_ids.push(row_value.value.clone());
+                                }
+                            }
+                        }
+                    } else {
+                        // Database table
+
+                        if parent_levels.len() >= 1 {
+                            parent_map = Some(get_parent_data(
+                                &parent_levels[parent_levels.len() - 1], &level,
+                                table, backend.clone(), sys
+                            )?);
+                        }
+
+                        match child_level {
+                            Some(child_level) => {
+                                children_map = Some(get_children_data(
+                                    &level, &child_level,
+                                    table, backend.clone(), sys
+                                )?);
+                            },
+                            None => ()
+                        }
+
+                        // Get all IDs for this level
+                        distinct_ids = get_distinct_values(
+                            &level.key_column, &table, backend.clone(), sys
+                        )?;
+                    }
+
+                    let neighbors_map = get_neighbors_map(&distinct_ids);
+
+                    // Add each distinct ID to the id_map HashMap
+                    for distinct_id in distinct_ids {
+                        id_map.entry(distinct_id.clone()).or_insert(vec![]);
+                        let map_entry = id_map.get_mut(&distinct_id).unwrap();
+                        map_entry.push(level_name.clone());
+                    }
+
+                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map, neighbors_map });
                 }
             }
+
+            dimension_caches.insert(dimension.name.clone(), DimensionCache { id_map });
         }
 
         let level_map = get_level_map(&cube, ll_config)?;
@@ -219,13 +419,56 @@ pub fn populate_cache(
             day_level,
             day_values,
             level_map,
-            property_map
+            property_map,
+            level_caches,
+            dimension_caches,
         })
     }
 
     info!("Cache ready!");
 
     Ok(Cache { cubes })
+}
+
+
+pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, level: &Level) -> Result<Option<String>, Error> {
+    for dimension in &cube.dimensions {
+        for hierarchy in &dimension.hierarchies {
+            for curr_level in &hierarchy.levels {
+                if curr_level == level {
+                    let level_name = LevelName::new(
+                        dimension.name.clone(),
+                        hierarchy.name.clone(),
+                        curr_level.name.clone()
+                    );
+
+                    let unique_level_name = match ll_config {
+                        Some(ll_config) => {
+                            let unique_level_name_opt = if dimension.is_shared {
+                                ll_config.find_unique_shared_dimension_level_name(
+                                    &dimension.name, &cube.name, &level_name
+                                )?
+                            } else {
+                                ll_config.find_unique_cube_level_name(
+                                    &cube.name, &level_name
+                                )?
+                            };
+
+                            match unique_level_name_opt {
+                                Some(unique_level_name) => unique_level_name,
+                                None => curr_level.name.clone()
+                            }
+                        },
+                        None => curr_level.name.clone()
+                    };
+
+                    return Ok(Some(unique_level_name))
+                }
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 
@@ -271,6 +514,7 @@ pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Resul
 
     Ok(level_name_map)
 }
+
 
 pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, Property>, Error> {
     let mut property_map = HashMap::new();
@@ -321,17 +565,97 @@ pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Re
 }
 
 
-/// Queries the database to get all the distinct values for a given time level.
-pub fn get_time_values(
-        column: String,
-        table: String,
+pub fn get_inline_parent_data(
+        parent_level: &Level,
+        current_level: &Level,
+        inline_table: &InlineTable,
+) -> HashMap<String, String> {
+    let mut parent_data: HashMap<String, String> = HashMap::new();
+
+    let mut parent_column: Vec<String> = vec![];
+    let mut current_column: Vec<String> = vec![];
+
+    for row in &inline_table.rows {
+        for row_value in &row.row_values {
+            if row_value.column == parent_level.key_column {
+                parent_column.push(row_value.value.clone());
+            } else if row_value.column == current_level.key_column {
+                current_column.push(row_value.value.clone());
+            }
+        }
+    }
+
+    for i in 0..current_column.len() {
+        parent_data.insert(current_column[i].clone(), parent_column[i].clone());
+    }
+
+    parent_data
+}
+
+
+pub fn get_inline_children_data(
+        current_level: &Level,
+        child_level: &Level,
+        inline_table: &InlineTable,
+) -> HashMap<String, Vec<String>> {
+    let mut children_data: HashMap<String, Vec<String>> = HashMap::new();
+
+    let mut current_column: Vec<String> = vec![];
+    let mut children_column: Vec<String> = vec![];
+
+    for row in &inline_table.rows {
+        for row_value in &row.row_values {
+            if row_value.column == current_level.key_column {
+                current_column.push(row_value.value.clone());
+            } else if row_value.column == child_level.key_column {
+                children_column.push(row_value.value.clone());
+            }
+        }
+    }
+
+    let mut current_value: String = "".to_string();
+    let mut current_children: Vec<String> = vec![];
+
+    for i in 0..current_column.len() {
+        if current_value == "".to_string() {
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        } else {
+            if current_column[i].clone() != current_value {
+                children_data.insert(current_value.clone(), current_children.clone());
+                current_children = vec![];
+            }
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        }
+    }
+
+    // Add last set of IDs
+    children_data.insert(current_value, current_children);
+
+    children_data
+}
+
+
+pub fn get_parent_data(
+        parent_level: &Level,
+        current_level: &Level,
+        table: &str,
         backend: Box<dyn Backend + Sync + Send>,
         sys: &mut SystemRunner
-) -> Result<Vec<String>, Error> {
+) -> Result<HashMap<String, String>, Error> {
+    let mut parent_data: HashMap<String, String> = HashMap::new();
+
     let future = backend
         .exec_sql(
-            format!("select distinct {} from {}", column, table).to_string()
+            format!(
+                "select distinct {}, {} from {} group by {}, {} order by {}, {}",
+                parent_level.key_column, current_level.key_column, table,
+                parent_level.key_column, current_level.key_column,
+                parent_level.key_column, current_level.key_column,
+            ).to_string()
         );
+
     let df = match sys.block_on(future) {
         Ok(df) => df,
         Err(err) => {
@@ -339,122 +663,142 @@ pub fn get_time_values(
         }
     };
 
-    if df.columns.len() >= 1 {
-        let values: Vec<String> = match &df.columns[0].column_data {
-            ColumnData::Int8(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int16(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int32(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Int64(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt8(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt16(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt32(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::UInt64(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Float32(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Float64(v) => {
-                let mut t: Vec<u32> = v.iter().map(|&e| e.clone() as u32).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::Text(v) => {
-                let mut t = v.to_vec();
-                t.sort();
-                t
-            },
-            ColumnData::NullableInt8(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableInt16(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableInt32(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableInt64(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt8(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt16(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt32(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableUInt64(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableFloat32(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableFloat64(v) => {
-                let mut t: Vec<u32> = v.iter().filter_map(|&e| e.map(|e| e.clone() as u32)).collect();
-                t.sort();
-                t.iter().map(|&e| e.to_string()).collect()
-            },
-            ColumnData::NullableText(v) => {
-                let mut t: Vec<_> = v.into_iter().filter_map(|e| e.clone()).collect();
-                t.sort();
-                t
-            },
-        };
+    let parent_column = df.columns[0].stringify_column_data();
+    let current_column = df.columns[1].stringify_column_data();
 
+    for i in 0..current_column.len() {
+        parent_data.insert(current_column[i].clone(), parent_column[i].clone());
+    }
+
+    Ok(parent_data)
+}
+
+
+pub fn get_children_data(
+        current_level: &Level,
+        child_level: &Level,
+        table: &str,
+        backend: Box<dyn Backend + Sync + Send>,
+        sys: &mut SystemRunner
+) -> Result<HashMap<String, Vec<String>>, Error> {
+    let mut children_data: HashMap<String, Vec<String>> = HashMap::new();
+
+    let future = backend
+        .exec_sql(
+            format!(
+                "select distinct {}, {} from {} group by {}, {} order by {}, {}",
+                current_level.key_column, child_level.key_column, table,
+                current_level.key_column, child_level.key_column,
+                current_level.key_column, child_level.key_column,
+            ).to_string()
+        );
+
+    let df = match sys.block_on(future) {
+        Ok(df) => df,
+        Err(err) => {
+            return Err(format_err!("Error populating cache with backend data: {}", err));
+        }
+    };
+
+    let current_column = df.columns[0].stringify_column_data();
+    let children_column = df.columns[1].stringify_column_data();
+
+    let mut current_value: String = "".to_string();
+    let mut current_children: Vec<String> = vec![];
+
+    for i in 0..current_column.len() {
+        if current_value == "".to_string() {
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        } else {
+            if current_column[i].clone() != current_value {
+                children_data.insert(current_value.clone(), current_children.clone());
+                current_children = vec![];
+            }
+            current_value = current_column[i].clone();
+            current_children.push(children_column[i].clone())
+        }
+    }
+
+    // Add last set of IDs
+    children_data.insert(current_value, current_children);
+
+    Ok(children_data)
+}
+
+
+/// Queries the database to get all the distinct values for a given level.
+pub fn get_distinct_values(
+        column: &str,
+        table: &str,
+        backend: Box<dyn Backend + Sync + Send>,
+        sys: &mut SystemRunner
+) -> Result<Vec<String>, Error> {
+    let future = backend
+        .exec_sql(
+            format!("select distinct {} from {}", column, table).to_string()
+        );
+
+    let mut df = match sys.block_on(future) {
+        Ok(df) => df,
+        Err(err) => {
+            return Err(format_err!("Error populating cache with backend data: {}", err));
+        }
+    };
+
+    if df.columns.len() >= 1 {
+        df.columns[0].sort_column_data()?;
+        let values: Vec<String> = df.columns[0].stringify_column_data();
         return Ok(values);
     }
 
     return Ok(vec![]);
+}
+
+
+pub fn get_neighbors_map(distinct_ids: &Vec<String>) -> HashMap<String, Vec<String>> {
+    let mut neighbors_map: HashMap<String, Vec<String>> = HashMap::new();
+
+    // Populate neighbors map
+    let mut prev = 0;
+    let mut curr = 0;
+    let mut next = 2;
+
+    let max_index = distinct_ids.len();
+
+    let mut done = false; // mut done: bool
+
+    while !done {
+        // Before
+        let mut before: Vec<String> = vec![];
+
+        if prev == 0 && curr <= 1 {
+            before = distinct_ids[0..curr].to_vec();
+        } else {
+            before = distinct_ids[prev..curr].to_vec();
+        }
+
+        // After
+        let mut after: Vec<String> = vec![];
+
+        if next >= max_index {
+            after = distinct_ids[curr+1..].to_vec();
+        } else {
+            after = distinct_ids[curr+1..next+1].to_vec();
+        }
+
+        neighbors_map.insert(distinct_ids[curr].clone(), [&before[..], &after[..]].concat());
+
+        if curr >= 2 {
+            prev += 1;
+        }
+        curr += 1;
+        next += 1;
+
+        if curr == max_index {
+            done = true;
+        }
+    }
+
+    neighbors_map
 }
