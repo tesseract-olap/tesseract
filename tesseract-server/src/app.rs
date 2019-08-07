@@ -40,6 +40,7 @@ pub enum SchemaSource {
 #[derive(Debug, Clone)]
 pub struct EnvVars {
     pub database_url: String,
+    pub geoservice_url: Option<String>,
     pub schema_source: SchemaSource,
     pub flush_secret: Option<String>,
 }
