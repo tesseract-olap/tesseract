@@ -924,13 +924,16 @@ pub fn resolve_cuts(
                         DimensionType::Geo => {
                             match geoservice_url {
                                 Some(geoservice_url) => {
-                                    let neighbors_ids = query_geoservice(geoservice_url, &elements[0]);
+                                    let mut neighbors_ids: Vec<String> = vec![];
 
-                                    println!(" ");
-                                    println!(" ");
-                                    println!("{:?}", neighbors_ids);
-                                    println!(" ");
-                                    println!(" ");
+                                    let geoservice_response = query_geoservice(geoservice_url, &elements[0])?;
+
+                                    for res in &geoservice_response {
+                                        neighbors_ids.push(res.geoid.clone());
+                                    }
+
+                                    // Add neighbors IDs to the `dimension_cuts_map`
+                                    dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, neighbors_ids);
                                 },
                                 None => return Err(format_err!("Unable to perform geoservice request: A Geoservice URL has not been provided."))
                             };
