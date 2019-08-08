@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str;
 
 use actix_web::{
     client,
@@ -923,7 +924,7 @@ pub fn resolve_cuts(
                         DimensionType::Geo => {
                             match geoservice_url {
                                 Some(geoservice_url) => {
-                                    let neighbors_ids = perform_geoservice_query(geoservice_url, &elements[0]);
+                                    let neighbors_ids = query_geoservice(geoservice_url, &elements[0]);
 
                                     println!(" ");
                                     println!(" ");
@@ -1030,43 +1031,55 @@ pub fn get_parent_captions(cube: &Cube, level_name: &LevelName, locales: &Vec<St
 }
 
 
-/// Queries geoservice to get a list of neighbor IDs.
-pub fn perform_geoservice_query(geoservice_url: &str, geo_id: &str) -> Result<(), Error> {
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct GeoServiceResponseJson {
+    pub geoid: String,
+    pub level: String,
+}
+
+
+/// Queries geoservice for geo cuts resolution.
+pub fn query_geoservice(geoservice_url: &str, geo_id: &str) -> Result<Vec<GeoServiceResponseJson>, Error> {
     let mut query_url: String;
 
+    // TODO: Remove this
     let geo_id = "27".to_string();
 
+    // TODO: Add support for children and parents
     if &geoservice_url[geoservice_url.len()-1..] == "/" {
         query_url = format!("{}neighbors/{}", geoservice_url, geo_id);
     } else {
         query_url = format!("{}/neighbors/{}", geoservice_url, geo_id);
     }
 
-    println!("{:?}", query_url);
-
-    let res: Result<(), ()> = client::get(query_url)
+    let result: Result<Vec<GeoServiceResponseJson>, Result<(), Error>> = client::get(query_url)
         .header("User-Agent", "Actix-web")
-        .finish().unwrap()
+        .finish()
+        .unwrap()
         .send()
         .map_err(|err| {
-            // return Err(format_err!("{}", err.to_string()));
-            println!("{:?}", err.to_string());
+            Err(format_err!("{}", err.to_string()))
         })
         .and_then(|response| {
-
-            response.body().and_then(|body| {
-                println!("==== BODY ====");
-                println!("{:?}", body);
-                Ok(())
-            }).map_err(|err| {
-                // return Err(format_err!("{}", err.to_string()));
-                println!("{:?}", err.to_string());
-            })
-
+            response.body()
+                .and_then(|body| {
+                    let body = str::from_utf8(&body).unwrap();
+                    let data: Vec<GeoServiceResponseJson> = serde_json::from_str(body).unwrap();
+                    Ok(data)
+                })
+                .map_err(|err| {
+                    Err(format_err!("{}", err.to_string()))
+                })
         })
         .wait();
 
-    println!("{:?}", res);
-
-    Ok(())
+    match result {
+        Ok(data) => Ok(data),
+        Err(err) => {
+            match err {
+                Ok(_) => Err(format_err!("No data returned from geoservice")),
+                Err(err) => Err(format_err!("{}", err.to_string()))
+            }
+        }
+    }
 }
