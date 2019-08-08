@@ -926,7 +926,7 @@ pub fn resolve_cuts(
                                 Some(geoservice_url) => {
                                     let mut neighbors_ids: Vec<String> = vec![];
 
-                                    let geoservice_response = query_geoservice(geoservice_url, &elements[0])?;
+                                    let geoservice_response = query_geoservice(geoservice_url, &GeoserviceQuery::Neighbors, &elements[0])?;
 
                                     for res in &geoservice_response {
                                         neighbors_ids.push(res.geoid.clone());
@@ -1041,18 +1041,40 @@ pub struct GeoServiceResponseJson {
 }
 
 
+pub enum GeoserviceQuery {
+    Neighbors,
+    Children,
+    Parents,
+    Intersects,
+    Distance,
+}
+
+
 /// Queries geoservice for geo cuts resolution.
-pub fn query_geoservice(geoservice_url: &str, geo_id: &str) -> Result<Vec<GeoServiceResponseJson>, Error> {
+pub fn query_geoservice(
+        geoservice_url: &str,
+        geoservice_query: &GeoserviceQuery,
+        geo_id: &str
+) -> Result<Vec<GeoServiceResponseJson>, Error> {
     let mut query_url: String;
 
-    // TODO: Remove this
+    // TODO Remove
     let geo_id = "27".to_string();
 
-    // TODO: Add support for children and parents
     if &geoservice_url[geoservice_url.len()-1..] == "/" {
-        query_url = format!("{}neighbors/{}", geoservice_url, geo_id);
+        match geoservice_query {
+            GeoserviceQuery::Neighbors => query_url = format!("{}neighbors/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Children => query_url = format!("{}relations/children/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Parents => query_url = format!("{}relations/parents/{}", geoservice_url, geo_id),
+            _ => return Err(format_err!("This type of geoservice query is not yet supported"))
+        }
     } else {
-        query_url = format!("{}/neighbors/{}", geoservice_url, geo_id);
+        match geoservice_query {
+            GeoserviceQuery::Neighbors => query_url = format!("{}/neighbors/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Children => query_url = format!("{}/relations/children/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Parents => query_url = format!("{}/relations/parents/{}", geoservice_url, geo_id),
+            _ => return Err(format_err!("This type of geoservice query is not yet supported"))
+        }
     }
 
     let result: Result<Vec<GeoServiceResponseJson>, Result<(), Error>> = client::get(query_url)
