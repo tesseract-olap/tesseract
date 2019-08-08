@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
 use actix_web::{
+    client,
     AsyncResponder,
     FutureResponse,
+    HttpMessage,
     HttpRequest,
     HttpResponse,
     Path,
@@ -1029,8 +1031,10 @@ pub fn get_parent_captions(cube: &Cube, level_name: &LevelName, locales: &Vec<St
 
 
 /// Queries geoservice to get a list of neighbor IDs.
-pub fn perform_geoservice_query(geoservice_url: &str, geo_id: &str) -> Vec<String> {
+pub fn perform_geoservice_query(geoservice_url: &str, geo_id: &str) -> Result<(), Error> {
     let mut query_url: String;
+
+    let geo_id = "27".to_string();
 
     if &geoservice_url[geoservice_url.len()-1..] == "/" {
         query_url = format!("{}neighbors/{}", geoservice_url, geo_id);
@@ -1040,5 +1044,29 @@ pub fn perform_geoservice_query(geoservice_url: &str, geo_id: &str) -> Vec<Strin
 
     println!("{:?}", query_url);
 
-    vec![]
+    let res: Result<(), ()> = client::get(query_url)
+        .header("User-Agent", "Actix-web")
+        .finish().unwrap()
+        .send()
+        .map_err(|err| {
+            // return Err(format_err!("{}", err.to_string()));
+            println!("{:?}", err.to_string());
+        })
+        .and_then(|response| {
+
+            response.body().and_then(|body| {
+                println!("==== BODY ====");
+                println!("{:?}", body);
+                Ok(())
+            }).map_err(|err| {
+                // return Err(format_err!("{}", err.to_string()));
+                println!("{:?}", err.to_string());
+            })
+
+        })
+        .wait();
+
+    println!("{:?}", res);
+
+    Ok(())
 }
