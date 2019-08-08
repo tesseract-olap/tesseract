@@ -28,6 +28,7 @@ use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use crate::util::boxed_error;
 use super::super::util;
+use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -1031,80 +1032,4 @@ pub fn get_parent_captions(cube: &Cube, level_name: &LevelName, locales: &Vec<St
     }
 
     captions
-}
-
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct GeoServiceResponseJson {
-    pub geoid: String,
-    pub level: String,
-}
-
-
-pub enum GeoserviceQuery {
-    Neighbors,
-    Children,
-    Parents,
-    Intersects,
-    Distance,
-}
-
-
-/// Queries geoservice for geo cuts resolution.
-pub fn query_geoservice(
-        geoservice_url: &str,
-        geoservice_query: &GeoserviceQuery,
-        geo_id: &str
-) -> Result<Vec<GeoServiceResponseJson>, Error> {
-    let mut query_url: String;
-
-    // TODO Remove
-    let geo_id = "27".to_string();
-
-    if &geoservice_url[geoservice_url.len()-1..] == "/" {
-        match geoservice_query {
-            GeoserviceQuery::Neighbors => query_url = format!("{}neighbors/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Children => query_url = format!("{}relations/children/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Parents => query_url = format!("{}relations/parents/{}", geoservice_url, geo_id),
-            _ => return Err(format_err!("This type of geoservice query is not yet supported"))
-        }
-    } else {
-        match geoservice_query {
-            GeoserviceQuery::Neighbors => query_url = format!("{}/neighbors/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Children => query_url = format!("{}/relations/children/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Parents => query_url = format!("{}/relations/parents/{}", geoservice_url, geo_id),
-            _ => return Err(format_err!("This type of geoservice query is not yet supported"))
-        }
-    }
-
-    let result: Result<Vec<GeoServiceResponseJson>, Result<(), Error>> = client::get(query_url)
-        .header("User-Agent", "Actix-web")
-        .finish()
-        .unwrap()
-        .send()
-        .map_err(|err| {
-            Err(format_err!("{}", err.to_string()))
-        })
-        .and_then(|response| {
-            response.body()
-                .and_then(|body| {
-                    let body = str::from_utf8(&body).unwrap();
-                    let data: Vec<GeoServiceResponseJson> = serde_json::from_str(body).unwrap();
-                    Ok(data)
-                })
-                .map_err(|err| {
-                    Err(format_err!("{}", err.to_string()))
-                })
-        })
-        .wait();
-
-    match result {
-        Ok(data) => Ok(data),
-        Err(err) => {
-            match err {
-                Ok(_) => Err(format_err!("No data returned from geoservice")),
-                Err(err) => Err(format_err!("{}", err.to_string()))
-            }
-        }
-    }
 }
