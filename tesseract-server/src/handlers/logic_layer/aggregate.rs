@@ -916,10 +916,8 @@ pub fn resolve_cuts(
                 } else if operation == "neighbors".to_string() {
 
                     // Find dimension for the level name
-                    let dimension = match cube.get_dimension(&level_name) {
-                        Some(dimension) => dimension,
-                        None => return Err(format_err!("Could not find dimension for {}.", level_name.level))
-                    };
+                    let dimension = cube.get_dimension(&level_name)
+                        .ok_or_else(|| format_err!("Could not find dimension for {}.", level_name.level))?;
 
                     match dimension.dim_type {
                         DimensionType::Geo => {

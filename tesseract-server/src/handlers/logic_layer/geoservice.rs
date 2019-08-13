@@ -31,23 +31,23 @@ pub fn query_geoservice(
     geoservice_query: &GeoserviceQuery,
     geo_id: &str
 ) -> Result<Vec<GeoServiceResponseJson>, Error> {
-    let mut query_url: String;
+    let geo_id = "27";
 
-    if &geoservice_url[geoservice_url.len()-1..] == "/" {
+    let query_url = if &geoservice_url[geoservice_url.len()-1..] == "/" {
         match geoservice_query {
-            GeoserviceQuery::Neighbors => query_url = format!("{}neighbors/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Children => query_url = format!("{}relations/children/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Parents => query_url = format!("{}relations/parents/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Neighbors => format!("{}neighbors/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Children => format!("{}relations/children/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Parents => format!("{}relations/parents/{}", geoservice_url, geo_id),
             _ => return Err(format_err!("This type of geoservice query is not yet supported"))
         }
     } else {
         match geoservice_query {
-            GeoserviceQuery::Neighbors => query_url = format!("{}/neighbors/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Children => query_url = format!("{}/relations/children/{}", geoservice_url, geo_id),
-            GeoserviceQuery::Parents => query_url = format!("{}/relations/parents/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Neighbors => format!("{}/neighbors/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Children => format!("{}/relations/children/{}", geoservice_url, geo_id),
+            GeoserviceQuery::Parents => format!("{}/relations/parents/{}", geoservice_url, geo_id),
             _ => return Err(format_err!("This type of geoservice query is not yet supported"))
         }
-    }
+    };
 
     let result: Result<Vec<GeoServiceResponseJson>, Result<(), Error>> = client::get(query_url)
         .header("User-Agent", "Actix-web")
