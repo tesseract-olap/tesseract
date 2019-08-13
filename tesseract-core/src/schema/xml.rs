@@ -14,7 +14,7 @@ use serde_derive::Serialize;
 
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
-use super::DimensionType;
+use super::{DimensionType, MeasureType};
 
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -138,6 +138,7 @@ pub struct MeasureConfigXML {
     pub name: String,
     pub column: String,
     pub aggregator: Aggregator,
+    pub measure_type: MeasureType,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
 }
