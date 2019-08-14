@@ -138,7 +138,8 @@ pub struct MeasureConfigXML {
     pub name: String,
     pub column: String,
     pub aggregator: Aggregator,
-    pub measure_type: MeasureType,
+    #[serde(rename="type")]
+    pub measure_type: Option<MeasureType>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
 }

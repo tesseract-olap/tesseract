@@ -103,7 +103,8 @@ pub struct MeasureConfigJson {
     pub name: String,
     pub column: String,
     pub aggregator: Aggregator,
-    pub measure_type: MeasureType,
+    #[serde(rename="type")]
+    pub measure_type: Option<MeasureType>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 

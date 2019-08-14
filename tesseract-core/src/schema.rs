@@ -619,7 +619,7 @@ impl From<MeasureConfigJson> for Measure {
             name: measure_config.name,
             column: measure_config.column,
             aggregator: measure_config.aggregator,
-            measure_type: measure_config.measure_type,
+            measure_type: measure_config.measure_type.unwrap_or_else(|| MeasureType::default()),
             annotations,
         }
     }
@@ -627,11 +627,23 @@ impl From<MeasureConfigJson> for Measure {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MeasureType {
-    Standard,
+    #[serde(rename="standard")]
+    Standard {
+        units: Option<String>,
+    },
+    #[serde(rename="error")]
     Error {
         for_measure: String,
         err_type: String,
     },
+}
+
+impl Default for MeasureType {
+    fn default() -> Self {
+        MeasureType::Standard {
+            units: None,
+        }
+    }
 }
 
 

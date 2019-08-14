@@ -144,7 +144,11 @@ impl From<&Measure> for MeasureMetadata {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum MeasureTypeMetadata {
-    Standard,
+    #[serde(rename="standard")]
+    Standard {
+        units: Option<String>,
+    },
+    #[serde(rename="error")]
     Error {
         for_measure: String,
         err_type: String,
@@ -154,11 +158,13 @@ pub enum MeasureTypeMetadata {
 impl From<&MeasureType> for MeasureTypeMetadata {
     fn from(mea_type: &MeasureType) -> Self {
         match mea_type {
-            MeasureType::Standard => MeasureTypeMetadata::Standard,
+            MeasureType::Standard { units } => MeasureTypeMetadata::Standard {
+                units: units.to_owned(),
+            },
             MeasureType::Error { for_measure, err_type } => {
                 MeasureTypeMetadata::Error {
-                    for_measure: for_measure.to_string(),
-                    err_type: err_type.to_string(),
+                    for_measure: for_measure.to_owned(),
+                    err_type: err_type.to_owned(),
                 }
             }
         }
