@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::str;
 
 use actix_web::{
+    client,
     AsyncResponder,
     FutureResponse,
+    HttpMessage,
     HttpRequest,
     HttpResponse,
     Path,
@@ -13,18 +16,20 @@ use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
 use serde_derive::Deserialize;
+use url::Url;
 
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
 use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame, Column, ColumnData, is_same_columndata_type};
-use tesseract_core::schema::{Cube};
+use tesseract_core::schema::{Cube, DimensionType};
 
 use crate::app::AppState;
 use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use crate::util::boxed_error;
 use super::super::util;
+use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -166,7 +171,7 @@ pub fn logic_layer_aggregation(
     // Turn AggregateQueryOpt into TsQuery
     let ts_queries = generate_ts_queries(
         agg_query.clone(), &cube, &cube_cache,
-        &logic_layer_config
+        &logic_layer_config, &req.state().env_vars.geoservice_url
     );
     let (ts_queries, header_map) = match ts_queries {
         Ok((ts_queries, header_map)) => (ts_queries, header_map),
@@ -335,6 +340,7 @@ pub fn generate_ts_queries(
         cube: &Cube,
         cube_cache: &CubeCache,
         ll_config: &Option<LogicLayerConfig>,
+        geoservice_url: &Option<Url>
 ) -> Result<(Vec<TsQuery>, HashMap<String, String>), Error> {
 
     let level_map = &cube_cache.level_map;
@@ -560,7 +566,7 @@ pub fn generate_ts_queries(
     // Everything before this is common to all queries being generated.
 
     let (dimension_cuts_map, header_map) = resolve_cuts(
-        &cuts_map, &cube, &cube_cache, &level_map, &property_map
+        &cuts_map, &cube, &cube_cache, &level_map, &property_map, &geoservice_url
     )?;
 
     // Groups together cuts for the same dimension
@@ -769,7 +775,8 @@ pub fn resolve_cuts(
         cube: &Cube,
         cube_cache: &CubeCache,
         level_map: &HashMap<String, LevelName>,
-        property_map: &HashMap<String, Property>
+        property_map: &HashMap<String, Property>,
+        geoservice_url: &Option<Url>
 ) -> Result<(HashMap<String, HashMap<LevelName, Vec<String>>>, HashMap<String, String>), Error> {
     // HashMap of cuts for each dimension.
     // In the outer HashMap, the keys are dimension names as string and the
@@ -844,6 +851,7 @@ pub fn resolve_cuts(
                         level: child_level.name.clone()
                     };
 
+                    // Will help convert the column name for this level to its dimension name
                     header_map.entry(child_level_name.level.clone()).or_insert(child_level_name.dimension.clone());
 
                     // Get children IDs from the cache
@@ -908,23 +916,44 @@ pub fn resolve_cuts(
 
                 } else if operation == "neighbors".to_string() {
 
-                    if level_name.level == "Geography".to_string() {
-                        // TODO: Add a better way to identify geography levels in the schema
-                        // TODO: Wait for geoservice API to be ready
-                        return Err(format_err!("Geoservice neighbors not currently supported."));
-                    } else {
-                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
-                            Some(level_cache) => level_cache,
-                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
-                        };
+                    // Find dimension for the level name
+                    let dimension = cube.get_dimension(&level_name)
+                        .ok_or_else(|| format_err!("Could not find dimension for {}.", level_name.level))?;
 
-                        let neighbors_ids = match level_cache.neighbors_map.get(&elements[0]) {
-                            Some(neighbors_ids) => neighbors_ids.clone(),
-                            None => continue
-                        };
+                    match dimension.dim_type {
+                        DimensionType::Geo => {
+                            match geoservice_url {
+                                Some(geoservice_url) => {
+                                    let mut neighbors_ids: Vec<String> = vec![];
 
-                        // Add neighbors IDs to the `dimension_cuts_map`
-                        dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, neighbors_ids);
+                                    let geoservice_response = query_geoservice(
+                                        geoservice_url, &GeoserviceQuery::Neighbors, &elements[0]
+                                    )?;
+
+                                    for res in &geoservice_response {
+                                        neighbors_ids.push(res.geoid.clone());
+                                    }
+
+                                    // Add neighbors IDs to the `dimension_cuts_map`
+                                    dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, neighbors_ids);
+                                },
+                                None => return Err(format_err!("Unable to perform geoservice request: A Geoservice URL has not been provided."))
+                            };
+                        },
+                        _ => {
+                            let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                                Some(level_cache) => level_cache,
+                                None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                            };
+
+                            let neighbors_ids = match level_cache.neighbors_map.get(&elements[0]) {
+                                Some(neighbors_ids) => neighbors_ids.clone(),
+                                None => continue
+                            };
+
+                            // Add neighbors IDs to the `dimension_cuts_map`
+                            dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, neighbors_ids);
+                        }
                     }
 
                 } else {

@@ -310,6 +310,16 @@ impl Cube {
 
         Ok(child_level)
     }
+
+    /// Returns a Dimension object corresponding to a provided LevelName.
+    pub fn get_dimension(&self, level_name: &LevelName) -> Option<Dimension> {
+        for dimension in &self.dimensions {
+            if dimension.name == level_name.dimension {
+                return Some(dimension.clone())
+            }
+        }
+        None
+    }
 }
 
 

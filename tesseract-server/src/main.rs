@@ -30,8 +30,10 @@ mod util;
 use actix_web::server;
 use dotenv::dotenv;
 use failure::{Error, format_err};
+use log::*;
 use std::env;
 use structopt::StructOpt;
+use url::Url;
 
 use std::sync::{Arc, RwLock};
 
@@ -101,6 +103,17 @@ fn main() -> Result<(), Error> {
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
 
+    // Geoservice
+    let geoservice_url = match env::var("TESSERACT_GEOSERVICE_URL") {
+        Ok(geoservice_url) => {
+            Some(Url::parse(&geoservice_url).unwrap())
+        },
+        Err(_) => {
+            info!("Geoservice URL not provided");
+            None
+        }
+    };
+
     // NOTE: Local schema is the only supported SchemaSource for now
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
@@ -112,6 +125,7 @@ fn main() -> Result<(), Error> {
     // Env
     let env_vars = EnvVars {
         database_url: db_url.clone(),
+        geoservice_url,
         schema_source,
         flush_secret,
     };
@@ -167,6 +181,7 @@ fn main() -> Result<(), Error> {
     println!("Tesseract listening on: {}", server_addr);
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
+
     if debug {
         println!("Tesseract debug mode: ON");
     }
@@ -179,6 +194,7 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
+
 /// CLI arguments helper.
 #[derive(Debug, StructOpt)]
 #[structopt(name="tesseract")]
@@ -188,6 +204,9 @@ struct Opt {
 
     #[structopt(long="db-url")]
     database_url: Option<String>,
+
+    #[structopt(long="geoservice-url")]
+    geoservice_url: Option<String>,
 
     #[structopt(long="debug")]
     debug: bool,

@@ -26,6 +26,7 @@ use crate::handlers::{
 use crate::logic_layer::{Cache, LogicLayerConfig};
 
 use std::sync::{Arc, RwLock};
+use url::Url;
 
 
 /// Holds data about the source of a schema file.
@@ -40,6 +41,7 @@ pub enum SchemaSource {
 #[derive(Debug, Clone)]
 pub struct EnvVars {
     pub database_url: String,
+    pub geoservice_url: Option<Url>,
     pub schema_source: SchemaSource,
     pub flush_secret: Option<String>,
 }
