@@ -340,7 +340,7 @@ pub fn generate_ts_queries(
         cube: &Cube,
         cube_cache: &CubeCache,
         ll_config: &Option<LogicLayerConfig>,
-        geoservice_url: &Option<String>
+        geoservice_url: &Option<Url>
 ) -> Result<(Vec<TsQuery>, HashMap<String, String>), Error> {
 
     let level_map = &cube_cache.level_map;
@@ -776,7 +776,7 @@ pub fn resolve_cuts(
         cube_cache: &CubeCache,
         level_map: &HashMap<String, LevelName>,
         property_map: &HashMap<String, Property>,
-        geoservice_url: &Option<String>
+        geoservice_url: &Option<Url>
 ) -> Result<(HashMap<String, HashMap<LevelName, Vec<String>>>, HashMap<String, String>), Error> {
     // HashMap of cuts for each dimension.
     // In the outer HashMap, the keys are dimension names as string and the
@@ -926,10 +926,8 @@ pub fn resolve_cuts(
                                 Some(geoservice_url) => {
                                     let mut neighbors_ids: Vec<String> = vec![];
 
-                                    let base_geoservice_url = Url::parse(geoservice_url).unwrap();
-
                                     let geoservice_response = query_geoservice(
-                                        base_geoservice_url, &GeoserviceQuery::Neighbors, &elements[0]
+                                        geoservice_url, &GeoserviceQuery::Neighbors, &elements[0]
                                     )?;
 
                                     for res in &geoservice_response {

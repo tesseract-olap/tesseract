@@ -33,6 +33,7 @@ use failure::{Error, format_err};
 use log::*;
 use std::env;
 use structopt::StructOpt;
+use url::Url;
 
 use std::sync::{Arc, RwLock};
 
@@ -104,7 +105,9 @@ fn main() -> Result<(), Error> {
 
     // Geoservice
     let geoservice_url = match env::var("TESSERACT_GEOSERVICE_URL") {
-        Ok(geoservice_url) => Some(geoservice_url),
+        Ok(geoservice_url) => {
+            Some(Url::parse(&geoservice_url).unwrap())
+        },
         Err(_) => {
             info!("Geoservice URL not provided");
             None

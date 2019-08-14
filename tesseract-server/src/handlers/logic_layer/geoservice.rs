@@ -28,7 +28,7 @@ pub enum GeoserviceQuery {
 
 /// Queries geoservice for geo cuts resolution.
 pub fn query_geoservice(
-    base_url: Url,
+    base_url: &Url,
     geoservice_query: &GeoserviceQuery,
     geo_id: &str
 ) -> Result<Vec<GeoServiceResponseJson>, Error> {
