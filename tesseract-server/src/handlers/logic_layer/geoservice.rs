@@ -39,9 +39,9 @@ pub fn query_geoservice(
         _ => return Err(format_err!("This type of geoservice query is not yet supported"))
     };
 
-    let query_url = base_url.join(&join_str).unwrap().as_str().to_string();
+    let query_url = base_url.join(&join_str).unwrap();
 
-    let result: Result<Vec<GeoServiceResponseJson>, Result<(), Error>> = client::get(query_url)
+    let result: Result<Vec<GeoServiceResponseJson>, Result<(), Error>> = client::get(query_url.as_str())
         .header("User-Agent", "Actix-web")
         .finish()
         .unwrap()
