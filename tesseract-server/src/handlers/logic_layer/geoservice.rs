@@ -28,16 +28,14 @@ pub enum GeoserviceQuery {
 
 /// Queries geoservice for geo cuts resolution.
 pub fn query_geoservice(
-    geoservice_url: &str,
+    base_url: Url,
     geoservice_query: &GeoserviceQuery,
     geo_id: &str
 ) -> Result<Vec<GeoServiceResponseJson>, Error> {
-    let base_url = Url::parse(geoservice_url.clone()).unwrap();
-
     let join_str = match geoservice_query {
-        GeoserviceQuery::Neighbors => format!("{}neighbors/{}", geoservice_url, geo_id),
-        GeoserviceQuery::Children => format!("{}relations/children/{}", geoservice_url, geo_id),
-        GeoserviceQuery::Parents => format!("{}relations/parents/{}", geoservice_url, geo_id),
+        GeoserviceQuery::Neighbors => format!("neighbors/{}", geo_id),
+        GeoserviceQuery::Children => format!("relations/children/{}", geo_id),
+        GeoserviceQuery::Parents => format!("relations/parents/{}", geo_id),
         _ => return Err(format_err!("This type of geoservice query is not yet supported"))
     };
 

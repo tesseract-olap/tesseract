@@ -16,6 +16,7 @@ use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
 use serde_derive::Deserialize;
+use url::Url;
 
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
@@ -925,7 +926,11 @@ pub fn resolve_cuts(
                                 Some(geoservice_url) => {
                                     let mut neighbors_ids: Vec<String> = vec![];
 
-                                    let geoservice_response = query_geoservice(geoservice_url, &GeoserviceQuery::Neighbors, &elements[0])?;
+                                    let base_geoservice_url = Url::parse(geoservice_url).unwrap();
+
+                                    let geoservice_response = query_geoservice(
+                                        base_geoservice_url, &GeoserviceQuery::Neighbors, &elements[0]
+                                    )?;
 
                                     for res in &geoservice_response {
                                         neighbors_ids.push(res.geoid.clone());
