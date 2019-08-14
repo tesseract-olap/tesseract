@@ -2,7 +2,7 @@ use serde_derive::Deserialize;
 
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
-use super::DimensionType;
+use super::{DimensionType, MeasureType};
 
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -103,6 +103,8 @@ pub struct MeasureConfigJson {
     pub name: String,
     pub column: String,
     pub aggregator: Aggregator,
+    #[serde(rename="type")]
+    pub measure_type: Option<MeasureType>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 

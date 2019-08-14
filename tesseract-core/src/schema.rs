@@ -602,6 +602,7 @@ pub struct Measure{
     pub name: String,
     pub column: String,
     pub aggregator: Aggregator,
+    pub measure_type: MeasureType,
     pub annotations: Option<Vec<Annotation>>,
 }
 
@@ -618,7 +619,29 @@ impl From<MeasureConfigJson> for Measure {
             name: measure_config.name,
             column: measure_config.column,
             aggregator: measure_config.aggregator,
+            measure_type: measure_config.measure_type.unwrap_or_else(|| MeasureType::default()),
             annotations,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MeasureType {
+    #[serde(rename="standard")]
+    Standard {
+        units: Option<String>,
+    },
+    #[serde(rename="error")]
+    Error {
+        for_measure: String,
+        err_type: String,
+    },
+}
+
+impl Default for MeasureType {
+    fn default() -> Self {
+        MeasureType::Standard {
+            units: None,
         }
     }
 }

@@ -10,6 +10,7 @@ use super::{
     Hierarchy,
     Level,
     Measure,
+    MeasureType,
     Property,
     Annotation,
     aggregator::Aggregator,
@@ -124,6 +125,7 @@ impl From<&Level> for LevelMetadata {
 pub struct MeasureMetadata {
     pub name: String,
     pub aggregator: AggregatorMetadata,
+    pub measure_type: MeasureTypeMetadata,
     pub annotations: AnnotationMetadata,
 }
 
@@ -134,7 +136,37 @@ impl From<&Measure> for MeasureMetadata {
         MeasureMetadata {
             name: measure.name.clone(),
             aggregator: (&measure.aggregator).into(),
+            measure_type: (&measure.measure_type).into(),
             annotations,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum MeasureTypeMetadata {
+    #[serde(rename="standard")]
+    Standard {
+        units: Option<String>,
+    },
+    #[serde(rename="error")]
+    Error {
+        for_measure: String,
+        err_type: String,
+    },
+}
+
+impl From<&MeasureType> for MeasureTypeMetadata {
+    fn from(mea_type: &MeasureType) -> Self {
+        match mea_type {
+            MeasureType::Standard { units } => MeasureTypeMetadata::Standard {
+                units: units.to_owned(),
+            },
+            MeasureType::Error { for_measure, err_type } => {
+                MeasureTypeMetadata::Error {
+                    for_measure: for_measure.to_owned(),
+                    err_type: err_type.to_owned(),
+                }
+            }
         }
     }
 }
