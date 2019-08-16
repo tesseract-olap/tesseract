@@ -5,7 +5,6 @@ use actix_web::{
     client,
     AsyncResponder,
     FutureResponse,
-    HttpMessage,
     HttpRequest,
     HttpResponse,
     Path,
@@ -148,7 +147,7 @@ pub fn logic_layer_aggregation(
     // provided cube name
     let cube_name = match logic_layer_config.clone() {
         Some(llc) => {
-            match llc.sub_cube_name(agg_query.cube.clone()) {
+            match llc.substitute_cube_name(agg_query.cube.clone()) {
                 Ok(cn) => cn,
                 Err(_) => agg_query.cube.clone()
             }

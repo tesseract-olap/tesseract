@@ -14,6 +14,8 @@ pub use self::logic_layer::logic_layer_handler;
 pub use self::logic_layer::logic_layer_default_handler;
 pub use self::logic_layer::logic_layer_non_unique_levels_handler;
 pub use self::logic_layer::logic_layer_non_unique_levels_default_handler;
+pub use self::logic_layer::logic_layer_members_handler;
+pub use self::logic_layer::logic_layer_members_default_handler;
 pub use self::flush::flush_handler;
 pub use self::index::index_handler;
 pub use self::metadata::members_handler;

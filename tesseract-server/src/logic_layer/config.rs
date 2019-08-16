@@ -156,7 +156,7 @@ pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
 impl LogicLayerConfig {
     /// Given a cube name, loops over the LogicLayerConfig and returns the
     /// actual cube name if an alias was provided.
-    pub fn sub_cube_name(self, name: String) -> Result<String, Error> {
+    pub fn substitute_cube_name(self, name: String) -> Result<String, Error> {
         match self.aliases {
             Some(aliases) => {
                 match aliases.cubes {
