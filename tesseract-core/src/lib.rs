@@ -213,6 +213,7 @@ impl Schema {
     ) -> Result<(String, Vec<String>), Error> // Sql and then Header
     {
         // TODO: Add support for multiple locales
+        let locales: Vec<String> = locale.split(",").map(|s| s.to_string()).collect();
 
         let cube = self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
@@ -238,6 +239,31 @@ impl Schema {
         };
 
         let key_column = level.key_column.clone();
+
+        let mut locale_properties: Vec<schema::Property> = vec![];
+
+        for locale in &locales {
+            match &level.properties {
+                Some(properties) => {
+                    for property in properties {
+                        match &property.caption_set {
+                            Some(caption_set) => {
+                                if caption_set == locale {
+                                    locale_properties.push(property.clone());
+                                    break;
+                                }
+                            },
+                            None => ()
+                        }
+                    }
+                },
+                None => ()
+            }
+        }
+
+        println!(" ");
+        println!("{:?}", locale_properties);
+        println!(" ");
 
         let property = match &level.properties {
             Some(properties) => {
