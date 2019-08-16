@@ -73,26 +73,22 @@ pub fn get_members(
         Err(err) => return boxed_error(err.to_string())
     };
 
-    let mut cube_name: String = members_query.cube.clone();
+    let mut cube_name = members_query.cube.clone();
     let mut level_name: Option<LevelName> = None;
 
     match &logic_layer_config {
         Some(logic_layer_config) => {
-            let mut level: String = members_query.level.clone();
-
-            // Cube name may have been changed due to config substitutions
-            cube_name = match &logic_layer_config.clone().substitute_cube_name(members_query.cube.clone()) {
-                Ok(cube_name) => cube_name.clone(),
-                Err(_) => return boxed_error("Unable to resolve this cube name.".to_string())
-            };
-
             match &logic_layer_config.aliases {
                 Some(aliases) => {
                     match &aliases.cubes {
                         Some(cubes) => {
                             for cube in cubes {
-
-                                // TODO: Consider moving cube resolution here
+                                // Cube name may change due to config substitutions
+                                for alternative in &cube.alternatives {
+                                    if alternative == &cube_name {
+                                        cube_name = cube.name.clone();
+                                    }
+                                }
 
                                 if &cube.name == &cube_name {
                                     match &cube.levels {
