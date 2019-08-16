@@ -205,7 +205,82 @@ impl Schema {
         Ok((sql, header))
     }
 
-    /// Convert user parameters into required default member cuts based on cube defintion.
+    pub fn members_locale_sql(
+        &self,
+        cube_name: &str,
+        level_name: &LevelName,
+        locale: &str
+    ) -> Result<(String, Vec<String>), Error> // Sql and then Header
+    {
+        // TODO: Add support for multiple locales
+
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let dim = cube.dimensions.iter()
+            .find(|dim| dim.name == level_name.dimension)
+            .ok_or(format_err!("could not find dimension for level name"))?;
+        let hier = dim.hierarchies.iter()
+            .find(|hier| hier.name == level_name.hierarchy)
+            .ok_or(format_err!("could not find hierarchy for level name"))?;
+        let level = hier.levels.iter()
+            .find(|lvl| lvl.name == level_name.level)
+            .ok_or(format_err!("could not find level for level name"))?;
+
+        let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
+
+        // TODO: have a check that there can't be inline table and regular table at the same time.
+        let table_sql = if let Some(ref inline) = hier.inline_table {
+            return Err(format_err!("Inline table caption sets are not yet supported."));
+        } else {
+            table.full_name()
+        };
+
+        let key_column = level.key_column.clone();
+
+        let property = match &level.properties {
+            Some(properties) => {
+                let property = properties.iter()
+                    .find(|prop| {
+                        match &prop.caption_set {
+                            Some(caption_set) => caption_set == locale,
+                            None => false
+                        }
+                    })
+                    .ok_or(format_err!("could not find translation for locale '{}'", locale))?;
+                property
+            },
+            None => return Err(format_err!("could not find translation for locale '{}'", locale))
+        };
+
+        let name_column = Some(property.column.clone());
+
+        let members_query_ir = MembersQueryIR {
+            table_sql,
+            key_column,
+            name_column,
+        };
+
+        let header = vec!["ID".into(), "Label".into()];
+
+        let name_col = if let Some(ref col) = members_query_ir.name_column {
+            col.to_owned()
+        } else {
+            "".into()
+        };
+
+        let sql = format!("select distinct {}{}{} from {}",
+            members_query_ir.key_column,
+            if members_query_ir.name_column.is_some() { ", " } else { "" },
+            name_col,
+            members_query_ir.table_sql,
+        );
+
+        Ok((sql, header))
+    }
+
+    /// Convert user parameters into required default member cuts based on cube definition.
     ///
     /// Given a cube and user supplied Query parameters and a boolean for negate mode, this function will:
     ///
@@ -1097,8 +1172,9 @@ impl Schema {
             .ok_or(format_err!("could not find level for level name"))?;
 
         let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
-        // inline table has highest precedence. TODO have a check that there can't be inline table
-        // and regular table at the same time.
+
+        // TODO: have a check that there can't be inline table and regular table at the same time.
+        // Inline table has highest precedence.
         let table_sql = if let Some(ref inline) = hier.inline_table {
             format!("({})", inline.sql_string())
         } else {
@@ -1157,6 +1233,7 @@ impl Schema {
     }
 }
 
+#[derive(Debug)]
 struct MembersQueryIR {
     table_sql: String,
     key_column: String,

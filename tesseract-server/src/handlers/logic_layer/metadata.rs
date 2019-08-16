@@ -156,22 +156,13 @@ pub fn get_members(
         None => return boxed_error("Unable to find a level with the name provided".to_string())
     };
 
-    println!(" ");
-    println!("{:?}", cube_name);
-    println!("{:?}", level_name);
-    println!(" ");
+    debug!("{:?}", cube_name);
+    debug!("{:?}", level_name);
 
-    // TODO: Actually get the data
-    //       - from regular tables
-    //       - from inline tables
-
-    // TODO: Add locale splitting
-
-    let members_sql_and_headers = schema.members_sql(&cube_name, &level_name);
-
-    println!(" ");
-    println!("{:?}", members_sql_and_headers);
-    println!(" ");
+    let members_sql_and_headers = match members_query.locale {
+        Some(locale) => schema.members_locale_sql(&cube_name, &level_name, &locale),
+        None => schema.members_sql(&cube_name, &level_name)
+    };
 
     let (members_sql, header) = match members_sql_and_headers {
         Ok(s) => s,
@@ -183,6 +174,9 @@ pub fn get_members(
             );
         },
     };
+
+    debug!("{:?}", members_sql);
+    debug!("{:?}", header);
 
     req.state()
         .backend

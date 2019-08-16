@@ -652,7 +652,7 @@ impl Table {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Property{
+pub struct Property {
     pub name: String,
     pub column: String,
     pub caption_set: Option<String>,
