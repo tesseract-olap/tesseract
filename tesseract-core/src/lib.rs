@@ -236,20 +236,16 @@ impl Schema {
         let mut header = vec!["ID".into()];
         let mut name_columns: Vec<String> = vec![];
 
-        // TODO: have a check that there can't be inline table and regular table at the same time.
         let table_sql = if let Some(ref inline) = hier.inline_table {
             // This level has an inline table
             for locale in &locales {
                 for column_def in &inline.column_definitions {
-                    match &column_def.caption_set {
-                        Some(caption_set) => {
-                            if caption_set == locale {
-                                header.push(format!("{} Label", caption_set.to_uppercase()));
-                                name_columns.push(column_def.name.clone());
-                                break;
-                            }
-                        },
-                        None => ()
+                    if let Some(caption_set) = &column_def.caption_set {
+                        if caption_set == locale {
+                            header.push(format!("{} Label", caption_set.to_uppercase()));
+                            name_columns.push(column_def.name.clone());
+                            break;
+                        }
                     }
                 }
             }
@@ -257,24 +253,16 @@ impl Schema {
             format!("({})", inline.sql_string())
         } else {
             for locale in &locales {
-                match &level.properties {
-                    Some(properties) => {
-                        for property in properties {
-                            match &property.caption_set {
-                                Some(caption_set) => {
-                                    if caption_set == locale {
-                                        header.push(format!("{} Label", caption_set.to_uppercase()));
-                                        name_columns.push(property.column.clone());
-
-                                        break;
-
-                                    }
-                                },
-                                None => ()
+                if let Some(properties) = &level.properties {
+                    for property in properties {
+                        if let Some(caption_set) = &property.caption_set {
+                            if caption_set == locale {
+                                header.push(format!("{} Label", caption_set.to_uppercase()));
+                                name_columns.push(property.column.clone());
+                                break;
                             }
                         }
-                    },
-                    None => ()
+                    }
                 }
             }
 

@@ -90,10 +90,6 @@ pub fn do_members(
         },
     };
 
-    println!(" ");
-    println!("{:?}", query);
-    println!(" ");
-
     let level: LevelName = match query.level.parse() {
         Ok(q) => q,
         Err(err) => {

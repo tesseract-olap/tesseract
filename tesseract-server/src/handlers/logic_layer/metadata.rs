@@ -76,47 +76,35 @@ pub fn get_members(
     let mut cube_name = members_query.cube.clone();
     let mut level_name: Option<LevelName> = None;
 
-    match &logic_layer_config {
-        Some(logic_layer_config) => {
-            match &logic_layer_config.aliases {
-                Some(aliases) => {
-                    match &aliases.cubes {
-                        Some(cubes) => {
-                            for cube in cubes {
-                                // Cube name may change due to config substitutions
-                                for alternative in &cube.alternatives {
-                                    if alternative == &cube_name {
-                                        cube_name = cube.name.clone();
-                                    }
-                                }
+    if let Some(logic_layer_config) = &logic_layer_config {
+        if let Some(aliases) = &logic_layer_config.aliases {
+            if let Some(cubes) = &aliases.cubes {
+                for cube in cubes {
+                    // Cube name may change due to config substitutions
+                    for alternative in &cube.alternatives {
+                        if alternative == &cube_name {
+                            cube_name = cube.name.clone();
+                        }
+                    }
 
-                                if &cube.name == &cube_name {
-                                    match &cube.levels {
-                                        Some(levels) => {
-                                            for level_prop_config in levels {
-                                                if level_prop_config.unique_name == members_query.level {
-                                                    let parsed_level_name_res: Result<LevelName, Error> = level_prop_config.current_name.clone().parse();
-                                                    match parsed_level_name_res {
-                                                        Ok(parsed_level_name) => level_name = Some(parsed_level_name),
-                                                        Err(_) => ()
-                                                    }
-
-                                                    break;
-                                                }
-                                            }
-                                        },
-                                        None => ()
+                    if &cube.name == &cube_name {
+                        if let Some(levels) = &cube.levels {
+                            for level_prop_config in levels {
+                                if level_prop_config.unique_name == members_query.level {
+                                    let parsed_level_name_res: Result<LevelName, Error> = level_prop_config.current_name.clone().parse();
+                                    match parsed_level_name_res {
+                                        Ok(parsed_level_name) => level_name = Some(parsed_level_name),
+                                        Err(_) => ()
                                     }
+
+                                    break;
                                 }
                             }
-                        },
-                        None => ()
+                        }
                     }
-                },
-                None => ()
-            };
-        },
-        None => ()
+                }
+            }
+        }
     }
 
     // If level name is not yet set, try to set it from a cube object by a direct match
