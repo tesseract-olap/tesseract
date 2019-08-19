@@ -16,6 +16,8 @@ use crate::handlers::{
     logic_layer_handler,
     logic_layer_non_unique_levels_handler,
     logic_layer_non_unique_levels_default_handler,
+    logic_layer_members_handler,
+    logic_layer_members_default_handler,
     flush_handler,
     index_handler,
     metadata_handler,
@@ -127,13 +129,24 @@ pub fn create_app(
             .resource("/data.{format}", |r| {
                 r.method(Method::GET).with(logic_layer_handler)
             })
-
+            .resource("/members", |r| {
+                r.method(Method::GET).with(logic_layer_members_default_handler)
+            })
+            .resource("/members.{format}", |r| {
+                r.method(Method::GET).with(logic_layer_members_handler)
+            })
     } else {
         app
             .resource("/data", |r| {
                 r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
             })
             .resource("/data.{format}", |r| {
+                r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
+            })
+            .resource("/members", |r| {
+                r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
+            })
+            .resource("/members.{format}", |r| {
                 r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
             })
     }

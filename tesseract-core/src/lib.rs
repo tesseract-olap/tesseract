@@ -14,7 +14,7 @@ use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
 use std::str::FromStr;
-use crate::schema::{SchemaConfigJson, SchemaConfigXML};
+use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTableColumnDefinition};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
@@ -205,7 +205,82 @@ impl Schema {
         Ok((sql, header))
     }
 
-    /// Convert user parameters into required default member cuts based on cube defintion.
+    /// Generates SQL to resolve a members locale query.
+    /// Supports resolving multiple locales at the same time.
+    pub fn members_locale_sql(
+        &self,
+        cube_name: &str,
+        level_name: &LevelName,
+        locale: &str
+    ) -> Result<(String, Vec<String>), Error> // Sql and then Header
+    {
+        let locales: Vec<String> = locale.split(",").map(|s| s.to_string()).collect();
+
+        let cube = self.cubes.iter()
+            .find(|cube| &cube.name == &cube_name)
+            .ok_or(format_err!("Could not find cube"))?;
+
+        let dim = cube.dimensions.iter()
+            .find(|dim| dim.name == level_name.dimension)
+            .ok_or(format_err!("could not find dimension for level name"))?;
+        let hier = dim.hierarchies.iter()
+            .find(|hier| hier.name == level_name.hierarchy)
+            .ok_or(format_err!("could not find hierarchy for level name"))?;
+        let level = hier.levels.iter()
+            .find(|lvl| lvl.name == level_name.level)
+            .ok_or(format_err!("could not find level for level name"))?;
+
+        let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
+
+        let key_column = level.key_column.clone();
+        let mut header = vec!["ID".into()];
+        let mut name_columns: Vec<String> = vec![];
+
+        let table_sql = if let Some(ref inline) = hier.inline_table {
+            // This level has an inline table
+            for locale in &locales {
+                for column_def in &inline.column_definitions {
+                    if let Some(caption_set) = &column_def.caption_set {
+                        if caption_set == locale {
+                            header.push(format!("{} Label", caption_set.to_uppercase()));
+                            name_columns.push(column_def.name.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+
+            format!("({})", inline.sql_string())
+        } else {
+            for locale in &locales {
+                if let Some(properties) = &level.properties {
+                    for property in properties {
+                        if let Some(caption_set) = &property.caption_set {
+                            if caption_set == locale {
+                                header.push(format!("{} Label", caption_set.to_uppercase()));
+                                name_columns.push(property.column.clone());
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            table.full_name()
+        };
+
+        let sql = format!("select distinct {}{}{} from {} order by {}",
+            key_column,
+            if name_columns.len() > 0 { ", " } else { "" },
+            name_columns.join(", "),
+            table_sql,
+            key_column
+        );
+
+        Ok((sql, header))
+    }
+
+    /// Convert user parameters into required default member cuts based on cube definition.
     ///
     /// Given a cube and user supplied Query parameters and a boolean for negate mode, this function will:
     ///
@@ -1097,8 +1172,9 @@ impl Schema {
             .ok_or(format_err!("could not find level for level name"))?;
 
         let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
-        // inline table has highest precedence. TODO have a check that there can't be inline table
-        // and regular table at the same time.
+
+        // TODO: have a check that there can't be inline table and regular table at the same time.
+        // Inline table has highest precedence.
         let table_sql = if let Some(ref inline) = hier.inline_table {
             format!("({})", inline.sql_string())
         } else {
@@ -1157,6 +1233,7 @@ impl Schema {
     }
 }
 
+#[derive(Debug)]
 struct MembersQueryIR {
     table_sql: String,
     key_column: String,
