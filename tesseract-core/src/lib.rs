@@ -14,7 +14,7 @@ use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
 use std::str::FromStr;
-use crate::schema::{SchemaConfigJson, SchemaConfigXML};
+use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTableColumnDefinition};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
@@ -232,49 +232,54 @@ impl Schema {
 
         let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
 
-        // TODO: have a check that there can't be inline table and regular table at the same time.
-        let table_sql = if let Some(ref inline) = hier.inline_table {
-            return Err(format_err!("Inline table caption sets are not yet supported."));
-        } else {
-            table.full_name()
-        };
-
         let key_column = level.key_column.clone();
-
-        let mut locale_properties: Vec<schema::Property> = vec![];
-
-        for locale in &locales {
-            match &level.properties {
-                Some(properties) => {
-                    for property in properties {
-                        match &property.caption_set {
-                            Some(caption_set) => {
-                                if caption_set == locale {
-                                    locale_properties.push(property.clone());
-                                    break;
-                                }
-                            },
-                            None => ()
-                        }
-                    }
-                },
-                None => ()
-            }
-        }
-
         let mut header = vec!["ID".into()];
         let mut name_columns: Vec<String> = vec![];
 
-        for locale_property in &locale_properties {
-            // Populate header list
-            match &locale_property.caption_set {
-                Some(caption_set) => header.push(format!("{} Label", caption_set.to_uppercase())),
-                None => ()
+        // TODO: have a check that there can't be inline table and regular table at the same time.
+        let table_sql = if let Some(ref inline) = hier.inline_table {
+            // This level has an inline table
+            for locale in &locales {
+                for column_def in &inline.column_definitions {
+                    match &column_def.caption_set {
+                        Some(caption_set) => {
+                            if caption_set == locale {
+                                header.push(format!("{} Label", caption_set.to_uppercase()));
+                                name_columns.push(column_def.name.clone());
+                                break;
+                            }
+                        },
+                        None => ()
+                    }
+                }
             }
 
-            // Create SQL
-            name_columns.push(locale_property.column.clone());
-        }
+            format!("({})", inline.sql_string())
+        } else {
+            for locale in &locales {
+                match &level.properties {
+                    Some(properties) => {
+                        for property in properties {
+                            match &property.caption_set {
+                                Some(caption_set) => {
+                                    if caption_set == locale {
+                                        header.push(format!("{} Label", caption_set.to_uppercase()));
+                                        name_columns.push(property.column.clone());
+
+                                        break;
+
+                                    }
+                                },
+                                None => ()
+                            }
+                        }
+                    },
+                    None => ()
+                }
+            }
+
+            table.full_name()
+        };
 
         let sql = format!("select distinct {}{}{} from {} order by {}",
             key_column,

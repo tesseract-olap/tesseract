@@ -488,6 +488,7 @@ pub struct InlineTableColumnDefinition {
     pub name: String,
     pub key_type: MemberType,
     pub key_column_type: Option<String>,
+    pub caption_set: Option<String>,
 }
 
 impl From<InlineTableColumnDefinitionJson> for InlineTableColumnDefinition {
@@ -496,6 +497,7 @@ impl From<InlineTableColumnDefinitionJson> for InlineTableColumnDefinition {
             name: column_definition_config.name,
             key_type: column_definition_config.key_type,
             key_column_type: column_definition_config.key_column_type,
+            caption_set: column_definition_config.caption_set,
         }
     }
 }

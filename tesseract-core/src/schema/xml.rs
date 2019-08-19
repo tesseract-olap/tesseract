@@ -106,6 +106,7 @@ pub struct InlineTableColumnDefinitionXML {
     pub name: String,
     pub key_type: MemberType,
     pub key_column_type: Option<String>,
+    pub caption_set: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

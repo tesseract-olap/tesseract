@@ -75,6 +75,7 @@ pub struct InlineTableColumnDefinitionJson {
     pub name: String,
     pub key_type: MemberType,
     pub key_column_type: Option<String>,
+    pub caption_set: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
