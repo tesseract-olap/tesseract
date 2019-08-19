@@ -205,6 +205,8 @@ impl Schema {
         Ok((sql, header))
     }
 
+    /// Generates SQL to resolve a members locale query.
+    /// Supports resolving multiple locales at the same time.
     pub fn members_locale_sql(
         &self,
         cube_name: &str,
@@ -212,7 +214,6 @@ impl Schema {
         locale: &str
     ) -> Result<(String, Vec<String>), Error> // Sql and then Header
     {
-        // TODO: Add support for multiple locales
         let locales: Vec<String> = locale.split(",").map(|s| s.to_string()).collect();
 
         let cube = self.cubes.iter()
@@ -261,46 +262,26 @@ impl Schema {
             }
         }
 
-        println!(" ");
-        println!("{:?}", locale_properties);
-        println!(" ");
+        let mut header = vec!["ID".into()];
+        let mut name_columns: Vec<String> = vec![];
 
-        let property = match &level.properties {
-            Some(properties) => {
-                let property = properties.iter()
-                    .find(|prop| {
-                        match &prop.caption_set {
-                            Some(caption_set) => caption_set == locale,
-                            None => false
-                        }
-                    })
-                    .ok_or(format_err!("could not find translation for locale '{}'", locale))?;
-                property
-            },
-            None => return Err(format_err!("could not find translation for locale '{}'", locale))
-        };
+        for locale_property in &locale_properties {
+            // Populate header list
+            match &locale_property.caption_set {
+                Some(caption_set) => header.push(format!("{} Label", caption_set.to_uppercase())),
+                None => ()
+            }
 
-        let name_column = Some(property.column.clone());
+            // Create SQL
+            name_columns.push(locale_property.column.clone());
+        }
 
-        let members_query_ir = MembersQueryIR {
-            table_sql,
+        let sql = format!("select distinct {}{}{} from {} order by {}",
             key_column,
-            name_column,
-        };
-
-        let header = vec!["ID".into(), "Label".into()];
-
-        let name_col = if let Some(ref col) = members_query_ir.name_column {
-            col.to_owned()
-        } else {
-            "".into()
-        };
-
-        let sql = format!("select distinct {}{}{} from {}",
-            members_query_ir.key_column,
-            if members_query_ir.name_column.is_some() { ", " } else { "" },
-            name_col,
-            members_query_ir.table_sql,
+            if name_columns.len() > 0 { ", " } else { "" },
+            name_columns.join(", "),
+            table_sql,
+            key_column
         );
 
         Ok((sql, header))
