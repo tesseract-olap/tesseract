@@ -12,6 +12,12 @@ echo "# Creating user 'tesseract-olap' if needed"
 
 id -u tesseract-olap >/dev/null 2>&1 || useradd tesseract-olap
 
+read -p "Are you upgrading, and would like to keep your old .service file? y/n: " -r
+if [[ ! $REPLY =~ ^[Yy]$ ]]
+then
+    exit 0
+fi
+
 read -p "Would you like to use the default db address 127.0.0.1:9000? y/n: " -r
 if [[ ! $REPLY =~ ^[Yy]$ ]]
 then
