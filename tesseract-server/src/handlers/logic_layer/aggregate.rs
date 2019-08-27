@@ -623,35 +623,14 @@ pub fn generate_ts_queries(
     // Get all possible combinations of cuts across dimensions
     let cut_combinations: Vec<Vec<Cut>> = cartesian_product(dimension_cuts);
 
-    // Create a TsQuery for each cut combination
-    for cut_combination in &cut_combinations {
-        let mut drills = drilldowns.clone();
-        let mut caps = captions.clone();
-
-        for cut in cut_combination.clone() {
-            // Look for drilldowns that might need to be added
-            if added_drilldowns.contains(&cut.level_name) {
-                drills.push(Drilldown(cut.level_name.clone()));
-
-                let level = match cube.get_level(&cut.level_name) {
-                    Some(level) => level,
-                    None => break
-                };
-
-                // Add captions for this level
-                let new_captions = level.get_captions(&cut.level_name, &locales);
-                caps.extend_from_slice(&new_captions);
-            }
-        }
-
-        // Populate queries vector
+    if cut_combinations.len() == 0 {
         queries.push(TsQuery {
-            drilldowns: drills,
-            cuts: cut_combination.clone(),
+            drilldowns: drilldowns.clone(),
+            cuts: vec![],
             measures: measures.clone(),
             parents: parents.clone(),
             properties: properties.clone(),
-            captions: caps,
+            captions: captions.clone(),
             top: top.clone(),
             top_where: top_where.clone(),
             sort: sort.clone(),
@@ -664,6 +643,49 @@ pub fn generate_ts_queries(
             rate: rate.clone(),
             sparse: sparse.clone(),
         });
+    } else {
+        // Create a TsQuery for each cut combination
+        for cut_combination in &cut_combinations {
+            let mut drills = drilldowns.clone();
+            let mut caps = captions.clone();
+
+            for cut in cut_combination.clone() {
+                // Look for drilldowns that might need to be added
+                if added_drilldowns.contains(&cut.level_name) {
+                    drills.push(Drilldown(cut.level_name.clone()));
+
+                    let level = match cube.get_level(&cut.level_name) {
+                        Some(level) => level,
+                        None => break
+                    };
+
+                    // Add captions for this level
+                    let new_captions = level.get_captions(&cut.level_name, &locales);
+                    caps.extend_from_slice(&new_captions);
+                }
+            }
+
+            // Populate queries vector
+            queries.push(TsQuery {
+                drilldowns: drills,
+                cuts: cut_combination.clone(),
+                measures: measures.clone(),
+                parents: parents.clone(),
+                properties: properties.clone(),
+                captions: caps,
+                top: top.clone(),
+                top_where: top_where.clone(),
+                sort: sort.clone(),
+                limit: limit.clone(),
+                rca: rca.clone(),
+                growth: growth.clone(),
+                debug: debug.clone(),
+                exclude_default_members: exclude_default_members.clone(),
+                filters: filters.clone(),
+                rate: rate.clone(),
+                sparse: sparse.clone(),
+            });
+        }
     }
 
     Ok((queries, header_map))
