@@ -177,6 +177,10 @@ pub fn logic_layer_aggregation(
         Err(err) => return boxed_error(err.to_string())
     };
 
+    if ts_queries.len() == 0 {
+        return boxed_error("Unable to generate queries".to_string())
+    }
+
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
 
@@ -236,12 +240,19 @@ pub fn logic_layer_aggregation(
     futs
         .and_then(move |dfs| {
             let mut final_columns: Vec<Column> = vec![];
-            let num_cols = dfs[0].columns.len();
+
+            let num_cols = match dfs.get(0) {
+                Some(df) => df.columns.len(),
+                None => return Err(format_err!("No dataframes were returned."))
+            };
 
             for col_i in 0..num_cols {
                 let mut same_type = true;
 
-                let first_col: &Column = &dfs[0].columns[col_i];
+                let first_col: &Column = match &dfs[0].columns.get(col_i) {
+                    Some(col) => col,
+                    None => return Err(format_err!("Unable to index column."))
+                };
 
                 for df in &dfs {
                     if !is_same_columndata_type(&first_col.column_data, &df.columns[col_i].column_data) {
@@ -444,6 +455,10 @@ pub fn generate_ts_queries(
         .map(|t| {
             let top_split: Vec<String> = t.split(",").map(|s| s.to_string()).collect();
 
+            if top_split.len() != 4 {
+                return Err(format_err!("Bad formatting for top param."));
+            }
+
             let level_name = match level_map.get(&top_split[1]) {
                 Some(l) => l,
                 None => bail!("Unable to find top level")
@@ -503,7 +518,7 @@ pub fn generate_ts_queries(
         Some(r) => {
             let rca_split: Vec<String> = r.split(",").map(|s| s.to_string()).collect();
 
-            if rca_split.len() <= 2 || rca_split.len() >= 4 {
+            if rca_split.len() != 3 {
                 return Err(format_err!("Bad formatting for RCA param."));
             }
 
@@ -540,8 +555,9 @@ pub fn generate_ts_queries(
     let rate = match agg_query_opt.rate {
         Some(rate) => {
             let level_value_split: Vec<String> = rate.split(".").map(|s| s.to_string()).collect();
+
             if level_value_split.len() != 2 {
-                bail!("Malformatted rate calculation specification.");
+                bail!("Bad formatting for rate calculation.");
             }
 
             let level_name = match level_map.get(&level_value_split[0]) {
@@ -804,16 +820,25 @@ pub fn resolve_cuts(
         for cut_value in &cut_values {
             let elements: Vec<String> = cut_value.clone().split(":").map(|s| s.to_string()).collect();
 
+            let cut = match elements.get(0) {
+                Some(cut) => cut,
+                None => return Err(format_err!("Malformatted cut."))
+            };
+
             // Check to see if this matches any dimension names
             // Get LevelName based on cut_key and element
             let mut level_name = match cube_cache.dimension_caches.get(cut_key) {
                 Some(dimension_cache) => {
-                    match dimension_cache.id_map.get(&elements[0]) {
+                    match dimension_cache.id_map.get(cut) {
                         Some(level_names) => {
                             if level_names.len() > 1 {
-                                return Err(format_err!("{} matches multiple levels in this dimension.", elements[0]))
+                                return Err(format_err!("{} matches multiple levels in this dimension.", cut))
                             }
-                            level_names[0].clone()
+
+                            match level_names.get(0) {
+                                Some(ln) => ln.clone(),
+                                None => return Err(format_err!("{} matches no levels in this dimension.", cut))
+                            }
                         },
                         None => continue
                     }
@@ -833,9 +858,12 @@ pub fn resolve_cuts(
 
             if elements.len() == 1 {
                 // Simply add this cut to the map
-                dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, vec![elements[0].clone()]);
+                dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, vec![cut.clone()]);
             } else if elements.len() == 2 {
-                let operation = elements[1].clone();
+                let operation = match elements.get(1) {
+                    Some(operation) => operation.clone(),
+                    None => return Err(format_err!("Unable to extract cut operation."))
+                };
 
                 if operation == "children".to_string() {
 
@@ -861,7 +889,7 @@ pub fn resolve_cuts(
 
                     let children_ids = match &level_cache.children_map {
                         Some(children_map) => {
-                            match children_map.get(&elements[0]) {
+                            match children_map.get(cut) {
                                 Some(children_ids) => children_ids.clone(),
                                 None => continue
                             }
@@ -898,7 +926,7 @@ pub fn resolve_cuts(
 
                         let parent_id = match &level_cache.parent_map {
                             Some(parent_map) => {
-                                match parent_map.get(&elements[0]) {
+                                match parent_map.get(cut) {
                                     Some(parent_id) => parent_id.clone(),
                                     None => continue
                                 }
@@ -926,7 +954,7 @@ pub fn resolve_cuts(
                                     let mut neighbors_ids: Vec<String> = vec![];
 
                                     let geoservice_response = query_geoservice(
-                                        geoservice_url, &GeoserviceQuery::Neighbors, &elements[0]
+                                        geoservice_url, &GeoserviceQuery::Neighbors, &cut
                                     )?;
 
                                     for res in &geoservice_response {
@@ -945,7 +973,7 @@ pub fn resolve_cuts(
                                 None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
                             };
 
-                            let neighbors_ids = match level_cache.neighbors_map.get(&elements[0]) {
+                            let neighbors_ids = match level_cache.neighbors_map.get(cut) {
                                 Some(neighbors_ids) => neighbors_ids.clone(),
                                 None => continue
                             };
