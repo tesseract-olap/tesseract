@@ -4,7 +4,7 @@ use actix_web::{
     App,
     http::NormalizePath,
 };
-use tesseract_core::{Backend, Schema};
+use tesseract_core::{Backend, Schema, CubeHasUniqueLevelsAndProperties};
 
 use crate::db_config::Database;
 use crate::handlers::{
@@ -59,6 +59,10 @@ pub struct AppState {
     pub schema: Arc<RwLock<Schema>>,
     pub cache: Arc<RwLock<Cache>>,
     pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
+    // TODO is there a way to acces this that's not through state? Tried using closures to
+    // capture, but the handlers need to implement Fn, not FnOnce (which happens once capturing
+    // variables from environment
+    pub has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
 }
 
 /// Creates an ActixWeb application with an `AppState`.
@@ -71,10 +75,20 @@ pub fn create_app(
         cache: Arc<RwLock<Cache>>,
         logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
         streaming_response: bool,
-        has_unique_levels_properties: bool,
+        has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
     ) -> App<AppState>
 {
-    let app = App::with_state(AppState { debug, backend, db_type, env_vars, schema, cache, logic_layer_config })
+    let app = App::with_state(
+            AppState {
+                debug,
+                backend,
+                db_type,
+                env_vars,
+                schema,
+                cache,
+                logic_layer_config,
+                has_unique_levels_properties: has_unique_levels_properties.clone(),
+        })
         .middleware(middleware::Logger::default())
 
         // Metadata
@@ -120,35 +134,39 @@ pub fn create_app(
             })
     };
 
-    if has_unique_levels_properties {
-        // Logic Layer
-        app
-            .resource("/data", |r| {
-                r.method(Method::GET).with(logic_layer_default_handler)
-            })
-            .resource("/data.{format}", |r| {
-                r.method(Method::GET).with(logic_layer_handler)
-            })
-            .resource("/members", |r| {
-                r.method(Method::GET).with(logic_layer_members_default_handler)
-            })
-            .resource("/members.{format}", |r| {
-                r.method(Method::GET).with(logic_layer_members_handler)
-            })
-    } else {
-        app
-            .resource("/data", |r| {
-                r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
-            })
-            .resource("/data.{format}", |r| {
-                r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
-            })
-            .resource("/members", |r| {
-                r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
-            })
-            .resource("/members.{format}", |r| {
-                r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
-            })
+    match has_unique_levels_properties {
+        CubeHasUniqueLevelsAndProperties::True => {
+            // Logic Layer
+            app
+                .resource("/data", |r| {
+                    r.method(Method::GET).with(logic_layer_default_handler)
+                })
+                .resource("/data.{format}", |r| {
+                    r.method(Method::GET).with(logic_layer_handler)
+                })
+                .resource("/members", |r| {
+                    r.method(Method::GET).with(logic_layer_members_default_handler)
+                })
+                .resource("/members.{format}", |r| {
+                    r.method(Method::GET).with(logic_layer_members_handler)
+                })
+        },
+        CubeHasUniqueLevelsAndProperties::False { .. } => {
+            // No Logic Layer, give error instead
+            app
+                .resource("/data", |r| {
+                    r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
+                })
+                .resource("/data.{format}", |r| {
+                    r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
+                })
+                .resource("/members", |r| {
+                    r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
+                })
+                .resource("/members.{format}", |r| {
+                    r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
+                })
+        },
     }
 
 }

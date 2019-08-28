@@ -138,7 +138,7 @@ impl Schema {
         self.into()
     }
 
-    pub fn has_unique_levels_properties(&self) -> bool {
+    pub fn has_unique_levels_properties(&self) -> CubeHasUniqueLevelsAndProperties {
         for cube in &self.cubes {
             let mut levels = HashSet::new();
             let mut properties = HashSet::new();
@@ -153,7 +153,10 @@ impl Schema {
                                 "Found repeated level name: {}.{}.{}.{}",
                                 cube.name, dimension.name, hierarchy.name, level.name
                             );
-                            return false
+                            return CubeHasUniqueLevelsAndProperties::False {
+                                cube: cube.name.clone(),
+                                name: level.name.clone(),
+                            };
                         }
 
                         if let Some(ref props) = level.properties {
@@ -163,7 +166,10 @@ impl Schema {
                                         "Found repeated property name: {}.{}.{}.{}.{}",
                                         cube.name, dimension.name, hierarchy.name, level.name, property.name
                                     );
-                                    return false
+                                    return CubeHasUniqueLevelsAndProperties::False {
+                                        cube: cube.name.clone(),
+                                        name: property.name.clone(),
+                                    };
                                 }
                             }
                         }
@@ -172,7 +178,7 @@ impl Schema {
             }
         }
 
-        true
+        CubeHasUniqueLevelsAndProperties::True
     }
 
     pub fn members_sql(
@@ -1238,6 +1244,16 @@ struct MembersQueryIR {
     table_sql: String,
     key_column: String,
     name_column: Option<String>,
+}
+
+
+#[derive(Debug, Clone)]
+pub enum CubeHasUniqueLevelsAndProperties {
+    True,
+    False {
+        cube: String,
+        name: String,
+    }
 }
 
 #[cfg(test)]

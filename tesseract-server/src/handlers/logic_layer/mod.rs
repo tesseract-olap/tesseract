@@ -10,21 +10,41 @@ pub use self::geoservice::query_geoservice;
 pub use self::metadata::logic_layer_members_handler;
 pub use self::metadata::logic_layer_members_default_handler;
 
-use actix_web::{HttpRequest, HttpResponse, Path};
+use actix_web::{HttpRequest, HttpResponse, Path, ResponseError};
 use crate::app::AppState;
+use crate::errors::ServerError;
+use tesseract_core::CubeHasUniqueLevelsAndProperties;
 
 
 pub fn logic_layer_non_unique_levels_default_handler(
-    (_req, _cube): (HttpRequest<AppState>, Path<()>),
+    (req, _cube): (HttpRequest<AppState>, Path<()>),
     ) -> HttpResponse
 {
-    HttpResponse::InternalServerError().body("Error Code 555")
+    if req.state().debug {
+        // must be true, but have to destructure again after doing it before in app.rs;
+        if let CubeHasUniqueLevelsAndProperties::False { cube, name } = &req.state().has_unique_levels_properties {
+            ServerError::LogicLayerDuplicateNames { cube: cube.clone(), name: name.clone() }.error_response()
+        } else {
+            unreachable!();
+        }
+    } else {
+        ServerError::ErrorCode { code: "555".to_owned() }.error_response()
+    }
 }
 
 
 pub fn logic_layer_non_unique_levels_handler(
-    (_req, _cube): (HttpRequest<AppState>, Path<(String)>),
+    (req, _cube): (HttpRequest<AppState>, Path<(String)>),
     ) -> HttpResponse
 {
-    HttpResponse::InternalServerError().body("Error Code 555")
+    if req.state().debug {
+        // must be true, but have to destructure again after doing it before in app.rs;
+        if let CubeHasUniqueLevelsAndProperties::False { cube, name } = &req.state().has_unique_levels_properties {
+            ServerError::LogicLayerDuplicateNames { cube: cube.clone(), name: name.clone() }.error_response()
+        } else {
+            unreachable!();
+        }
+    } else {
+        ServerError::ErrorCode { code: "555".to_owned() }.error_response()
+    }
 }

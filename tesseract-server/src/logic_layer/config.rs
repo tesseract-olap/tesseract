@@ -3,7 +3,7 @@ use std::collections::HashSet;
 
 use serde_derive::Deserialize;
 use serde_json;
-use tesseract_core::Schema;
+use tesseract_core::{Schema, CubeHasUniqueLevelsAndProperties};
 use tesseract_core::names::{LevelName, Property};
 
 
@@ -332,7 +332,7 @@ impl LogicLayerConfig {
 
     /// Ensures level and property names are unique inside each cube based on
     /// name substitutions from a logic layer configuration.
-    pub fn has_unique_levels_properties(&self, schema: &Schema) -> Result<bool, Error> {
+    pub fn has_unique_levels_properties(&self, schema: &Schema) -> Result<CubeHasUniqueLevelsAndProperties, Error> {
         for cube in &schema.cubes {
             let mut levels = HashSet::new();
             let mut properties = HashSet::new();
@@ -363,8 +363,12 @@ impl LogicLayerConfig {
                             None => level.name.clone()
                         };
 
-                        if !levels.insert(unique_level_name) {
-                            return Ok(false)
+                        // TODO remove this clone?
+                        if !levels.insert(unique_level_name.clone()) {
+                            return Ok(CubeHasUniqueLevelsAndProperties::False {
+                                cube: cube.name.clone(),
+                                name: unique_level_name.to_string(),
+                            })
                         }
 
                         if let Some(ref props) = level.properties {
@@ -392,7 +396,10 @@ impl LogicLayerConfig {
                                 };
 
                                 if !properties.insert(unique_property_name) {
-                                    return Ok(false)
+                                    return Ok(CubeHasUniqueLevelsAndProperties::False {
+                                        cube: cube.name.clone(),
+                                        name: property_name.to_string(),
+                                    })
                                 }
                             }
                         }
@@ -401,6 +408,6 @@ impl LogicLayerConfig {
             }
         }
 
-        Ok(true)
+        Ok(CubeHasUniqueLevelsAndProperties::True)
     }
 }
