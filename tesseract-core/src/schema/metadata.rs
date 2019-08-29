@@ -3,17 +3,8 @@ use std::collections::HashMap;
 use std::convert::From;
 
 use super::{
-    Schema,
-    Cube,
-    Dimension,
-    DimensionType,
-    Hierarchy,
-    Level,
-    Measure,
-    MeasureType,
-    Property,
-    Annotation,
-    aggregator::Aggregator,
+    aggregator::Aggregator, Annotation, Cube, Dimension, DimensionType, Hierarchy, Level, Measure,
+    MeasureType, Property, Schema,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -61,7 +52,7 @@ pub struct DimensionMetadata {
     pub name: String,
     pub hierarchies: Vec<HierarchyMetadata>,
     pub default_hierarchy: Option<String>,
-    #[serde(rename="type")]
+    #[serde(rename = "type")]
     pub dim_type: DimensionType,
     pub annotations: AnnotationMetadata,
 }
@@ -70,9 +61,29 @@ impl From<&Dimension> for DimensionMetadata {
     fn from(dimension: &Dimension) -> Self {
         let annotations = (&dimension.annotations).into();
 
+        // Create unique level names here, it's the lowest level at which we know
+        // all of:
+        // - dimension
+        // - hierarchy
+        // - level
+        let hierarchies = dimension
+            .hierarchies
+            .iter()
+            .map(|h| {
+                let mut h: HierarchyMetadata = h.into();
+
+                for level in h.levels.iter_mut() {
+                    level.unique_name =
+                        format!("[{}].[{}].[{}]", dimension.name, h.name, level.name,);
+                }
+
+                h
+            })
+            .collect();
+
         DimensionMetadata {
             name: dimension.name.clone(),
-            hierarchies: dimension.hierarchies.iter().map(|h| h.into()).collect(),
+            hierarchies,
             default_hierarchy: dimension.default_hierarchy.clone(),
             dim_type: dimension.dim_type.clone(),
             annotations,
@@ -102,19 +113,24 @@ impl From<&Hierarchy> for HierarchyMetadata {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct LevelMetadata {
     pub name: String,
+    pub unique_name: String,
     pub properties: Option<Vec<PropertyMetadata>>,
     pub annotations: AnnotationMetadata,
 }
 
+// unique_name is just default, to be filled in afterwards with the metadata
+// about the dimension and hierachy.
 impl From<&Level> for LevelMetadata {
     fn from(level: &Level) -> Self {
-        let properties = level.properties.clone().map(|props| {
-                props.iter().map(|p| p.into()).collect()
-            });
+        let properties = level
+            .properties
+            .clone()
+            .map(|props| props.iter().map(|p| p.into()).collect());
         let annotations = (&level.annotations).into();
 
         LevelMetadata {
             name: level.name.clone(),
+            unique_name: String::new(),
             properties,
             annotations,
         }
@@ -144,11 +160,9 @@ impl From<&Measure> for MeasureMetadata {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum MeasureTypeMetadata {
-    #[serde(rename="standard")]
-    Standard {
-        units: Option<String>,
-    },
-    #[serde(rename="error")]
+    #[serde(rename = "standard")]
+    Standard { units: Option<String> },
+    #[serde(rename = "error")]
     Error {
         for_measure: String,
         err_type: String,
@@ -161,12 +175,13 @@ impl From<&MeasureType> for MeasureTypeMetadata {
             MeasureType::Standard { units } => MeasureTypeMetadata::Standard {
                 units: units.to_owned(),
             },
-            MeasureType::Error { for_measure, err_type } => {
-                MeasureTypeMetadata::Error {
-                    for_measure: for_measure.to_owned(),
-                    err_type: err_type.to_owned(),
-                }
-            }
+            MeasureType::Error {
+                for_measure,
+                err_type,
+            } => MeasureTypeMetadata::Error {
+                for_measure: for_measure.to_owned(),
+                err_type: err_type.to_owned(),
+            },
         }
     }
 }
@@ -197,7 +212,7 @@ impl From<&Option<Vec<Annotation>>> for AnnotationMetadata {
     fn from(annotations: &Option<Vec<Annotation>>) -> Self {
         let res = if let Some(anns) = annotations {
             anns.iter()
-                .map(|ann| (ann.name.to_owned(), ann.text.to_owned()) )
+                .map(|ann| (ann.name.to_owned(), ann.text.to_owned()))
                 .collect()
         } else {
             HashMap::new()
@@ -221,15 +236,13 @@ impl From<&Aggregator> for AggregatorMetadata {
             Aggregator::Max => "max".into(),
             Aggregator::Min => "min".into(),
             Aggregator::BasicGroupedMedian { .. } => "basic_grouped_median".into(),
-            Aggregator::WeightedAverage { ..} => "weighted_average".into(),
-            Aggregator::WeightedSum { ..} => "weighted_sum".into(),
+            Aggregator::WeightedAverage { .. } => "weighted_average".into(),
+            Aggregator::WeightedSum { .. } => "weighted_sum".into(),
             Aggregator::Moe { .. } => "MOE".into(),
             Aggregator::WeightedAverageMoe { .. } => "weighted_average_moe".into(),
             Aggregator::Custom(_) => "custom".into(),
         };
 
-        AggregatorMetadata {
-            name,
-        }
+        AggregatorMetadata { name }
     }
 }
