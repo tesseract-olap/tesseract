@@ -171,7 +171,7 @@ fn main() -> Result<(), Error> {
                 cache_arc.clone(),
                 logic_layer_config.clone(),
                 streaming_response,
-                has_unique_levels_properties,
+                has_unique_levels_properties.clone(),
             )
         )
         .bind(&server_addr)
