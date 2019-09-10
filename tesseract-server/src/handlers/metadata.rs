@@ -10,12 +10,14 @@ use actix_web::{
 use futures::future::{self, Future};
 use lazy_static::lazy_static;
 use log::*;
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 use serde_qs as qs;
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
+use tesseract_core::schema::metadata::{SchemaMetadata, CubeMetadata};
 
 use crate::app::AppState;
+use crate::logic_layer::LogicLayerConfigMeta;
 
 pub fn metadata_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
@@ -25,12 +27,36 @@ pub fn metadata_handler(
 
     // currently, we do not check that cube names are distinct
     // TODO fix this
-    match req.state().schema.read().unwrap().cube_metadata(&cube) {
-        Some(cube) => Ok(HttpResponse::Ok().json(cube)),
+
+    let cube_meta = req.state()
+        .schema
+        .read()
+        .unwrap()
+        .cube_metadata(&cube);
+
+    let ll_meta = req.state()
+        .logic_layer_config
+        .as_ref()
+        .map(|ll| {
+            let ll = &*(ll.read().unwrap());
+            let res = ll.into();
+            res
+        });
+
+    let meta = cube_meta.map(|c_meta| {
+        CubeAllMetadata {
+            core: c_meta,
+            logic_layer: ll_meta,
+        }
+    });
+
+    match meta {
+        Some(res) => Ok(HttpResponse::Ok().json(res)),
         None => Ok(HttpResponse::NotFound().finish()),
     }
 }
 
+// TODO do LL info for all metadata
 pub fn metadata_all_handler(
     req: HttpRequest<AppState>
     ) -> ActixResult<HttpResponse>
@@ -132,4 +158,16 @@ pub fn do_members(
 #[derive(Debug, Deserialize)]
 struct MembersQueryOpt {
     level: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SchemaAllMetadata {
+    core: SchemaMetadata,
+    logic_layer: Option<LogicLayerConfigMeta>,
+}
+
+#[derive(Debug, Serialize)]
+struct CubeAllMetadata {
+    core: CubeMetadata,
+    logic_layer: Option<LogicLayerConfigMeta>,
 }
