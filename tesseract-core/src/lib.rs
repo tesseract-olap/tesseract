@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 mod backend;
 mod dataframe;
 mod sql;
@@ -8,6 +11,7 @@ pub mod schema;
 pub mod query;
 pub mod query_ir;
 
+use std::env;
 use failure::{Error, format_err, bail};
 use log::*;
 use serde_xml_rs as serde_xml;
@@ -258,6 +262,7 @@ impl Schema {
 
             format!("({})", inline.sql_string())
         } else {
+
             for locale in &locales {
                 if let Some(properties) = &level.properties {
                     for property in properties {
@@ -268,6 +273,15 @@ impl Schema {
                                 break;
                             }
                         }
+                    }
+                }
+                lazy_static! {
+                    static ref DEFAULT_LOCALE: String = env::var("TESSERACT_DEFAULT_LOCALE").unwrap_or_else(|_| "en".to_string());
+                };
+                if locale == &*DEFAULT_LOCALE {
+                    if let Some(level_name_col_val) = &level.name_column {
+                        header.push(format!("{} Label", locale.to_uppercase()));
+                        name_columns.push(level_name_col_val.to_owned());
                     }
                 }
             }
