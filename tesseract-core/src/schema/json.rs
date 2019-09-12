@@ -11,6 +11,7 @@ pub struct SchemaConfigJson {
     pub shared_dimensions: Option<Vec<SharedDimensionConfigJson>>,
     pub cubes: Vec<CubeConfigJson>,
     pub annotations: Option<Vec<AnnotationConfigJson>>,
+    pub default_locale: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

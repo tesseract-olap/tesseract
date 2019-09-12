@@ -26,6 +26,7 @@ pub struct SchemaConfigXML {
     pub cubes: Vec<CubeConfigXML>,
     #[serde(rename(deserialize="Annotation"))]
     pub annotations: Option<Vec<AnnotationConfigXML>>,
+    pub default_locale: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
