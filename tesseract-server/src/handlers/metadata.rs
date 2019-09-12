@@ -63,7 +63,27 @@ pub fn metadata_all_handler(
 {
     info!("Metadata for all");
 
-    Ok(HttpResponse::Ok().json(req.state().schema.read().unwrap().metadata()))
+    let schema_meta = req.state()
+        .schema
+        .read()
+        .unwrap()
+        .metadata();
+
+    let ll_meta = req.state()
+        .logic_layer_config
+        .as_ref()
+        .map(|ll| {
+            let ll = &*(ll.read().unwrap());
+            let res = ll.into();
+            res
+        });
+
+    let meta = SchemaAllMetadata {
+        core: schema_meta,
+        logic_layer: ll_meta,
+    };
+
+    Ok(HttpResponse::Ok().json(meta))
 }
 
 pub fn members_default_handler(
