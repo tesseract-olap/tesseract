@@ -14,7 +14,6 @@ log = "0.4.3"
 serde = "1.0.71"
 serde-xml-rs = "0.3.1"
 serde_derive = "1.0.71"
-lazy_static = "1.2.0"
 
 [dependencies.indexmap]
 features = ["serde-1"]
