@@ -275,10 +275,8 @@ impl Schema {
                         }
                     }
                 }
-                lazy_static! {
-                    static ref DEFAULT_LOCALE: String = env::var("TESSERACT_DEFAULT_LOCALE").unwrap_or_else(|_| "en".to_string());
-                };
-                if locale == &*DEFAULT_LOCALE {
+
+                if locale == &self.default_locale {
                     if let Some(level_name_col_val) = &level.name_column {
                         header.push(format!("{} Label", locale.to_uppercase()));
                         name_columns.push(level_name_col_val.to_owned());
