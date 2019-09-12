@@ -38,6 +38,7 @@ pub struct Schema {
     pub name: String,
     pub cubes: Vec<Cube>,
     pub annotations: Option<Vec<Annotation>>,
+    pub default_locale: String,
 }
 
 impl From<SchemaConfigJson> for Schema {
@@ -138,10 +139,13 @@ impl From<SchemaConfigJson> for Schema {
                     .collect()
             });
 
+        let default_locale_str: &str = "en";
+
         Schema {
             name: schema_config.name,
             cubes,
             annotations: schema_annotations,
+            default_locale: schema_config.default_locale.unwrap_or_else(|| default_locale_str.to_owned()),
         }
     }
 }
