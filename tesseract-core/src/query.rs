@@ -54,6 +54,20 @@ impl Query {
             exclude_default_members: false,
         }
     }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.rca.is_none() || self.drilldowns.is_empty() { return Ok(()); }
+
+        let rca = self.rca.as_ref().unwrap();
+        let dupe = self.drilldowns.iter().find(|&drilldown| {
+            rca.drill_1 == *drilldown || rca.drill_2 == *drilldown
+        });
+        
+        match dupe {
+            None => Ok(()),
+            Some(drilldown) => bail!("Duplicated drilldown in RCA and drilldowns: {:?}", drilldown)
+        }
+    }
 }
 
 // TODO: Move ClickHouse specific queries away from ts-core
@@ -488,5 +502,24 @@ impl FromStr for RateQuery {
             level_name,
             values
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_validate() {
+        let mut q = Query::new();
+        assert!(q.validate().is_ok());
+
+        let drilldown = Drilldown::new("1", "2", "3");
+        let rca = RcaQuery::new("1", "2", "3", "4", "5", "6", "7");
+
+        q.drilldowns = vec![drilldown];
+        q.rca = Some(rca);
+
+        assert!(q.validate().is_err());
     }
 }
