@@ -50,7 +50,7 @@ Note that a systemd `.service` is also installed. You will probably need to modi
 
 ### Environment Variables
 - `TESSERACT_DATABASE_URL`: required, is the address of the database; make sure to include the user, password, and database name.
-- `TESSERACT_DEBUG`: boolean, `true` is a debug mode for data/calculations. As of now, the only feature is the `rca` calculation will show `a b c d` sub-aggregations for the calculation`(a/b)/(c/d)`.
+- `TESSERACT_DEBUG`: boolean, `true` is a flag to enable more verbose logging output to help the debugging process while testing.
 - `TESSERACT_FLUSH_SECRET`: optional, but required for flush; is the secret key for the flush endpoint.
 - `TESSERACT_LOGIC_LAYER_CONFIG_FILEPATH`: optional, should point to the location on path for the logic layer configuration.
 - `TESSERACT_SCHEMA_FILEPATH`: required, should point to the location on disk for the tesseract schema file.
