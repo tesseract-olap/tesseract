@@ -5,7 +5,7 @@ license = "MIT"
 readme = "README.md"
 edition = "2018"
 name = "tesseract-olap"
-version = "0.14.1"
+version = "0.14.2"
 
 [package.metadata.deb]
 maintainer = "Walther Chen <walther.chen@gmail.com>"
