@@ -8,6 +8,7 @@ pub mod schema;
 pub mod query;
 pub mod query_ir;
 
+use std::env;
 use failure::{Error, format_err, bail};
 use log::*;
 use serde_xml_rs as serde_xml;
@@ -258,6 +259,7 @@ impl Schema {
 
             format!("({})", inline.sql_string())
         } else {
+
             for locale in &locales {
                 if let Some(properties) = &level.properties {
                     for property in properties {
@@ -268,6 +270,13 @@ impl Schema {
                                 break;
                             }
                         }
+                    }
+                }
+
+                if locale == &self.default_locale {
+                    if let Some(level_name_col_val) = &level.name_column {
+                        header.push(format!("{} Label", locale.to_uppercase()));
+                        name_columns.push(level_name_col_val.to_owned());
                     }
                 }
             }

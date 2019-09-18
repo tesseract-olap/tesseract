@@ -7,6 +7,9 @@ pub mod metadata;
 mod json;
 mod xml;
 
+const DEFAULT_LOCALE_STR: &str = "en";
+
+
 pub use crate::schema::{
     json::SchemaConfigJson,
     json::DimensionConfigJson,
@@ -38,6 +41,7 @@ pub struct Schema {
     pub name: String,
     pub cubes: Vec<Cube>,
     pub annotations: Option<Vec<Annotation>>,
+    pub default_locale: String,
 }
 
 impl From<SchemaConfigJson> for Schema {
@@ -142,6 +146,7 @@ impl From<SchemaConfigJson> for Schema {
             name: schema_config.name,
             cubes,
             annotations: schema_annotations,
+            default_locale: schema_config.default_locale.unwrap_or_else(|| DEFAULT_LOCALE_STR.to_owned()),
         }
     }
 }
