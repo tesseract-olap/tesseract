@@ -39,8 +39,8 @@ You should check the exact release on the releases page. v0.12.0 is just the fir
 For now, just `wget` and `dpkg -i`. In the future, a ppa may be set up.
 
 ```
-wget https://github.com/hwchen/tesseract/releases/download/v0.13.0/tesseract-olap_0.13.0_amd64.deb
-dpkg -i tesseract-olap_0.13.0_amd64.deb
+wget https://github.com/tesseract-olap/tesseract/releases/download/v0.14.2/tesseract-olap_0.14.2_amd64.deb
+dpkg -i tesseract-olap_0.14.2_amd64.deb
 ```
 
 You can then run the binary `tesseract-olap`.
