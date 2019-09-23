@@ -738,6 +738,7 @@ mod test {
     #[test]
     fn test_dimension_usage() {
         let schema_config = SchemaConfigJson {
+            default_locale: Some(DEFAULT_LOCALE_STR.into()),
             name: "test".into(),
             shared_dimensions: Some(vec![
                 SharedDimensionConfigJson {
