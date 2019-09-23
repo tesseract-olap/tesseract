@@ -17,7 +17,7 @@ use tesseract_core::names::LevelName;
 use tesseract_core::schema::metadata::{SchemaMetadata, CubeMetadata};
 
 use crate::app::AppState;
-use crate::logic_layer::LogicLayerConfigMeta;
+use crate::config::LogicLayerConfig;
 
 pub fn metadata_handler(
     (req, cube): (HttpRequest<AppState>, Path<String>)
@@ -180,14 +180,39 @@ struct MembersQueryOpt {
     level: String,
 }
 
-#[derive(Debug, Serialize)]
-struct SchemaAllMetadata {
-    core: SchemaMetadata,
-    logic_layer: Option<LogicLayerConfigMeta>,
+fn update_schema_meta_with_unique_names(
+    schema_meta: &mut SchemaMetadata,
+    ll_config: &LogicLayerConfig)
+{
+    for cube in schema_meta.cubes.iter_mut() {
+        for dimension in cube.dimensions.iter_mut() {
+            for hierarchy in dimension.hierarchies.iter_mut() {
+                for level in hierarchy.levels.iter_mut() {
+                    let level_name = LevelName::new(
+                        dimension.name,
+                        hierarchy.name,
+                        level.name
+                    );
+
+                    // need to check both both shared and regular dimensions
+                    // TODO ask marcio, how does ll config deal with
+                    // shared dimensions, which have been renamed
+                    // I'm guessing that the LL config just has to specify the
+                    // name correctly
+                    let level_unique_name = ll_config.find_unique_cube_level_name(&cube_name, &level_name)
+                        .or_else(|| {
+                            ll_config.find_unique_shared_dimension_level_name(&cube_name, &level_name)
+                        });
+
+                    if let Some(unique) = level_unique_name {
+                        uniq
+                    }
+
+
+                    // need to check properties too.
+                }
+            }
+        }
+    }
 }
 
-#[derive(Debug, Serialize)]
-struct CubeAllMetadata {
-    core: CubeMetadata,
-    logic_layer: Option<LogicLayerConfigMeta>,
-}

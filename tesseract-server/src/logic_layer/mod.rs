@@ -4,4 +4,3 @@ mod config_meta;
 
 pub use self::cache::{Cache, CubeCache, Time, TimePrecision, TimeValue, populate_cache};
 pub use self::config::{LogicLayerConfig, read_config};
-pub use self::config_meta::LogicLayerConfigMeta;

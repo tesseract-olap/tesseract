@@ -104,6 +104,8 @@ pub struct LevelMetadata {
     pub name: String,
     pub properties: Option<Vec<PropertyMetadata>>,
     pub annotations: AnnotationMetadata,
+    // This field is optionally pulled in from the logic layer config
+    pub unique_name: Option<String>,
 }
 
 impl From<&Level> for LevelMetadata {
