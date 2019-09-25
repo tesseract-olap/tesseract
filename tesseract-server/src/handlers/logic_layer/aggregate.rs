@@ -19,7 +19,7 @@ use url::Url;
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
-use tesseract_core::{Query as TsQuery, MeaOrCalc, Dimension, DataFrame, Column, ColumnData, is_same_columndata_type};
+use tesseract_core::{Query as TsQuery, MeaOrCalc, DataFrame, Column, ColumnData, is_same_columndata_type};
 use tesseract_core::schema::{Cube, DimensionType};
 
 use crate::app::AppState;
@@ -452,7 +452,7 @@ pub fn generate_ts_queries(
 
     let top: Option<TopQuery> = agg_query_opt.top.clone()
         .map(|t| {
-            let top_split: Vec<String> = t.split(",").map(|s| s.to_string()).collect();
+            let top_split: Vec<String> = t.split(',').map(|s| s.to_string()).collect();
 
             if top_split.len() != 4 {
                 return Err(format_err!("Bad formatting for top param."));
@@ -485,7 +485,7 @@ pub fn generate_ts_queries(
 
     let growth = match agg_query_opt.growth {
         Some(g) => {
-            let gro_split: Vec<String> = g.split(",").map(|s| s.to_string()).collect();
+            let gro_split: Vec<String> = g.split(',').map(|s| s.to_string()).collect();
 
             if gro_split.len() == 1 {
                 return Err(format_err!("Please provide a growth measure name."));
@@ -553,7 +553,7 @@ pub fn generate_ts_queries(
     // TODO: Resolve named sets
     let rate = match agg_query_opt.rate {
         Some(rate) => {
-            let level_value_split: Vec<String> = rate.split(".").map(|s| s.to_string()).collect();
+            let level_value_split: Vec<String> = rate.split('.').map(|s| s.to_string()).collect();
 
             if level_value_split.len() != 2 {
                 bail!("Bad formatting for rate calculation.");
