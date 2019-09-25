@@ -29,6 +29,20 @@ pub fn aggregate_default_handler(
     do_aggregate(req, cube_format)
 }
 
+macro_rules! ok_or_404 {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(err) => {
+                return Box::new(
+                future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string())))
+                );
+            }
+        }
+    };
+}
+
 /// Handles aggregation when a format is specified.
 pub fn aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
@@ -46,16 +60,7 @@ pub fn do_aggregate(
     let (cube, format) = cube_format;
 
     let format = format.parse::<FormatType>();
-    let format = match format {
-        Ok(f) => f,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                )
-            );
-        },
-    };
+    let format = ok_or_404!(format);
 
     info!("cube: {}, format: {:?}", cube, format);
 
@@ -64,46 +69,19 @@ pub fn do_aggregate(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
-    let agg_query = match agg_query_res {
-        Ok(q) => q,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                )
-            );
-        },
-    };
+    let agg_query = ok_or_404!(agg_query_res);
     info!("query opts:{:?}", agg_query);
 
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
-    let ts_query = match ts_query {
-        Ok(q) => q,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                )
-            );
-        },
-    };
+    let ts_query = ok_or_404!(ts_query);
 
     let query_ir_headers = req
         .state()
         .schema.read().unwrap()
         .sql_query(&cube, &ts_query);
 
-    let (query_ir, headers) = match query_ir_headers {
-        Ok(x) => x,
-        Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                )
-            );
-        },
-    };
+    let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
     let sql = req.state()
         .backend
