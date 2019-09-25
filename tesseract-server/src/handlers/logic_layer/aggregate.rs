@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::str;
 
 use actix_web::{
-    client,
     AsyncResponder,
     FutureResponse,
     HttpRequest,
