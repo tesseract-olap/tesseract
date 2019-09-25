@@ -35,8 +35,9 @@ macro_rules! ok_or_404 {
             Ok(val) => val,
             Err(err) => {
                 return Box::new(
-                future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string())))
+                    future::result(
+                        Ok(HttpResponse::NotFound().json(err.to_string()))
+                    )
                 );
             }
         }
