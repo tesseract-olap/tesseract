@@ -223,6 +223,7 @@ impl From<&Aggregator> for AggregatorMetadata {
             Aggregator::BasicGroupedMedian { .. } => "basic_grouped_median".into(),
             Aggregator::WeightedAverage { ..} => "weighted_average".into(),
             Aggregator::WeightedSum { ..} => "weighted_sum".into(),
+            Aggregator::ReplicateWeightMoe { .. } => "Replicate Weight MOE".into(),
             Aggregator::Moe { .. } => "MOE".into(),
             Aggregator::WeightedAverageMoe { .. } => "weighted_average_moe".into(),
             Aggregator::Custom(_) => "custom".into(),

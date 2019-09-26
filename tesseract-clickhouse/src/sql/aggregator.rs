@@ -49,7 +49,7 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
                 mea_idx,
             )
         },
-        Aggregator::Moe { secondary_columns, .. }=> {
+        Aggregator::ReplicateWeightMoe { secondary_columns, .. }=> {
             let secondaries = secondary_columns.iter().enumerate()
                 .map(|(n, s_col)| {
                     format!("sum({}) as m{}_moe_secondary_{}", s_col, mea_idx, n)
@@ -59,6 +59,11 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
                 col,
                 mea_idx,
                 join(secondaries, ", "),
+            )
+        },
+        Aggregator::Moe { .. }=> {
+            format!("sum(power( m{0} / 1.645, 2)) as m{0}_moe_sub_agg",
+                mea_idx,
             )
         },
         Aggregator::WeightedAverageMoe { primary_weight, secondary_weight_columns, .. }=> {
@@ -111,7 +116,7 @@ pub fn agg_sql_string_select_mea(aggregator: &Aggregator, mea_idx: usize) -> Str
                 mea_idx,
             )
         },
-        Aggregator::Moe { secondary_columns, .. }=> {
+        Aggregator::ReplicateWeightMoe { secondary_columns, .. }=> {
             let secondaries = secondary_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("m{}_moe_secondary_{}", mea_idx, n)
@@ -120,6 +125,11 @@ pub fn agg_sql_string_select_mea(aggregator: &Aggregator, mea_idx: usize) -> Str
             format!("m{}_moe_primary, {}",
                 mea_idx,
                 join(secondaries, ", "),
+            )
+        },
+        Aggregator::Moe { .. }=> {
+            format!("m{}_moe_sub_agg",
+                mea_idx,
             )
         },
         Aggregator::WeightedAverageMoe { secondary_weight_columns, .. }=> {
@@ -162,7 +172,7 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
                 mea_idx,
             )
         },
-        Aggregator::Moe { design_factor, secondary_columns }=> {
+        Aggregator::ReplicateWeightMoe { critical_value, design_factor, secondary_columns }=> {
             let inner_seq = secondary_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("pow(sum(m{0}_moe_primary) - sum(m{0}_moe_secondary_{1}), 2)",
@@ -172,12 +182,19 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
                 });
             let inner_seq = join(inner_seq, " + ");
 
-            format!("1.645 * sqrt({} * ({}))",
+            format!("{} * sqrt({} * ({}))",
+                critical_value,
                 design_factor / secondary_columns.len() as f64,
                 inner_seq,
             )
         },
-        Aggregator::WeightedAverageMoe { design_factor, secondary_weight_columns, .. }=> {
+        Aggregator::Moe { critical_value, .. } => {
+            format!("{} * sqrt(m{}_moe_sub_agg)",
+                critical_value,
+                mea_idx,
+            )
+        },
+        Aggregator::WeightedAverageMoe { critical_value, design_factor, secondary_weight_columns, .. } => {
             let inner_seq = secondary_weight_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("pow(\
@@ -190,7 +207,8 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
                 });
             let inner_seq = join(inner_seq, " + ");
 
-            format!("1.645 * sqrt({} * ({}))",
+            format!("{} * sqrt({} * ({}))",
+                critical_value,
                 design_factor / secondary_weight_columns.len() as f64,
                 inner_seq,
             )

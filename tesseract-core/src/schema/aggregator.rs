@@ -49,22 +49,39 @@ pub enum Aggregator {
     ///
     /// The general equation for Margin of Error is
     /// ```text
-    /// 1.645 * pow(0.05 * (pow(sum(column) - sum(secondary_columns[0]), 2) + pow(sum(column) - sum(secondary_columns_[1]), 2) + ...), 0.5)
+    /// cv * pow(df * (pow(sum(column) - sum(secondary_columns[0]), 2) + pow(sum(column) - sum(secondary_columns_[1]), 2) + ...), 0.5)
     /// ```
-    #[serde(rename="moe")]
-    Moe {
+    /// where cv = critical value, for 90% confidence interval it's 1.645
+    /// where df = design factor / #samples
+    #[serde(rename="replicate_weight_moe")]
+    ReplicateWeightMoe {
+        critical_value: f64,
         design_factor: f64,
         secondary_columns: Vec<String>,
+    },
+    /// Where the moe is already calculated for each row, and
+    /// this just aggregates them correctly.
+    ///
+    /// ```text
+    /// sqrt(sum(power(moe / cv, 2))) * cv
+    /// ```
+    /// where cv = critical value, for 90% confidence interval it's 1.645
+    #[serde(rename="moe")]
+    Moe {
+        critical_value: f64,
     },
     /// Where the measure column is the primary value,
     /// and a list of secondary weight columns is provided to the MO aggregator:
     ///
     /// The general equation for Margin of Error is
     /// ```text
-    /// 1.645 * pow(0.05 * (pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[0])/sum(secondary_weight_columns[0]) ), 2) + pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[1]/sum(secondary_weight_columns[1]) ), 2) + ...), 0.5)
+    /// cv * pow(df * (pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[0])/sum(secondary_weight_columns[0]) ), 2) + pow(( sum(column * primary_weight)/sum(primary_weight) ) - ( sum(column * secondary_weight_columns[1]/sum(secondary_weight_columns[1]) ), 2) + ...), 0.5)
     /// ```
+    /// where cv = critical value, for 90% confidence interval it's 1.645
+    /// where df = design factor / #samples
     #[serde(rename="weighted_average_moe")]
     WeightedAverageMoe {
+        critical_value: f64,
         design_factor: f64,
         primary_weight: String,
         secondary_weight_columns: Vec<String>,

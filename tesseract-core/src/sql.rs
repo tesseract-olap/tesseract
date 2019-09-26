@@ -43,6 +43,7 @@ pub(crate) fn standard_sql(
             Aggregator::BasicGroupedMedian { .. } => format!("median"),
             Aggregator::WeightedAverage {..} => format!("avg"),
             Aggregator::WeightedSum {..} => format!(""),
+            Aggregator::ReplicateWeightMoe {..} => format!(""),
             Aggregator::Moe {..} => format!(""),
             Aggregator::WeightedAverageMoe {..} => format!(""),
             Aggregator::Custom(s) => format!("{}", s),
