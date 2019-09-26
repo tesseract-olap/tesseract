@@ -62,7 +62,8 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
             )
         },
         Aggregator::Moe { .. }=> {
-            format!("sum(power( m{0} / 1.645, 2)) as m{0}_moe_sub_agg",
+            format!("sum(power( {} / 1.645, 2)) as m{}_moe_sub_agg",
+                col,
                 mea_idx,
             )
         },
@@ -189,7 +190,7 @@ pub fn agg_sql_string_pass_2(aggregator: &Aggregator, mea_idx: usize) -> String 
             )
         },
         Aggregator::Moe { critical_value, .. } => {
-            format!("{} * sqrt(m{}_moe_sub_agg)",
+            format!("{} * sqrt(sum(m{}_moe_sub_agg))",
                 critical_value,
                 mea_idx,
             )
