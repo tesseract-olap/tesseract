@@ -58,9 +58,9 @@ pub fn get_db(db_url_full: &str) -> Result<(Box<dyn Backend + Send + Sync>, Stri
 
     // Remove password when there's a user:password@host in the url
     // for display purposes only
-    let db_url = match &db_url.split("@").collect::<Vec<_>>()[..] {
+    let db_url = match &db_url.split('@').collect::<Vec<_>>()[..] {
         [user_pass, url] => {
-            match &user_pass.split(":").collect::<Vec<_>>()[..] {
+            match &user_pass.split(':').collect::<Vec<_>>()[..] {
                 [user, _pass] => {
                     format!("{}:*@{}", user, url)
                 },
