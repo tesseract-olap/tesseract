@@ -61,9 +61,10 @@ pub fn agg_sql_string_pass_1(col: &str, aggregator: &Aggregator, mea_idx: usize)
                 join(secondaries, ", "),
             )
         },
-        Aggregator::Moe { .. }=> {
-            format!("sum(power( {} / 1.645, 2)) as m{}_moe_sub_agg",
+        Aggregator::Moe { critical_value, .. }=> {
+            format!("sum(power( {} / {}, 2)) as m{}_moe_sub_agg",
                 col,
+                critical_value,
                 mea_idx,
             )
         },
@@ -117,7 +118,7 @@ pub fn agg_sql_string_select_mea(aggregator: &Aggregator, mea_idx: usize) -> Str
                 mea_idx,
             )
         },
-        Aggregator::ReplicateWeightMoe { secondary_columns, .. }=> {
+        Aggregator::ReplicateWeightMoe { secondary_columns, .. } => {
             let secondaries = secondary_columns.iter().enumerate()
                 .map(|(n, _)| {
                     format!("m{}_moe_secondary_{}", mea_idx, n)
