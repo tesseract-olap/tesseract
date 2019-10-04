@@ -649,10 +649,8 @@ pub fn get_parent_data(
     let future = backend
         .exec_sql(
             format!(
-                "select distinct {}, {} from {} group by {}, {} order by {}, {}",
+                "select distinct {0}, {1} from {2} group by {0}, {1} order by {0}, {1}",
                 parent_level.key_column, current_level.key_column, table,
-                parent_level.key_column, current_level.key_column,
-                parent_level.key_column, current_level.key_column,
             ).to_string()
         );
 
@@ -686,10 +684,8 @@ pub fn get_children_data(
     let future = backend
         .exec_sql(
             format!(
-                "select distinct {}, {} from {} group by {}, {} order by {}, {}",
+                "select distinct {0}, {1} from {2} group by {0}, {1} order by {0}, {1}",
                 current_level.key_column, child_level.key_column, table,
-                current_level.key_column, child_level.key_column,
-                current_level.key_column, child_level.key_column,
             ).to_string()
         );
 
