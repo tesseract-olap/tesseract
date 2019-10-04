@@ -1,5 +1,7 @@
 # Tesseract
 
+[![Build Status](https://travis-ci.org/tesseract-olap/tesseract.svg?branch=master)](https://travis-ci.org/tesseract-olap/tesseract)
+
 More documentation is coming soon!
 
 ## For Users
