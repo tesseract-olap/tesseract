@@ -297,7 +297,8 @@ mod test {
 
     #[test]
     fn moe() {
-        let agg = Aggregator::Moe {
+        let agg = Aggregator::ReplicateWeightMoe {
+            critical_value: 1.645,
             design_factor: 3.0,
             secondary_columns: vec!["s0".into(), "s1".into(), "s2".into()],
         };
@@ -327,6 +328,7 @@ mod test {
     #[test]
     fn weighted_average_moe() {
         let agg = Aggregator::WeightedAverageMoe {
+            critical_value: 1.645,
             design_factor: 3.0,
             primary_weight: "w".into(),
             secondary_weight_columns: vec!["w0".into(), "w1".into(), "w2".into()],
