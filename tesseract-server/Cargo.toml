@@ -22,7 +22,7 @@ maintainer-scripts = "pkg/deb/maintainer-scripts"
 [dependencies]
 actix = "0.7.7"
 actix-web = { version = "0.7.18", features = ["ssl"] }
-clickhouse-rs = "0.1.1"
+clickhouse-rs = "0.1.16"
 dotenv = "0.13.0"
 failure = "0.1.2"
 futures = "0.1.25"
