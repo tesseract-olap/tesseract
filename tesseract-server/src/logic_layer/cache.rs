@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use actix::SystemRunner;
 use failure::{Error, format_err};
 use log::info;
@@ -233,6 +233,9 @@ pub struct LevelCache {
     pub parent_map: Option<HashMap<String, String>>,
     pub children_map: Option<HashMap<String, Vec<String>>>,
     pub neighbors_map: HashMap<String, Vec<String>>,
+    // TODO to be able to use for /members endpoint, this will
+    // need both ID and member label.
+    pub members: HashSet<String>,
 }
 
 
@@ -396,7 +399,11 @@ pub fn populate_cache(
                         map_entry.push(level_name.clone());
                     }
 
-                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map, neighbors_map });
+                    // neighbors are not optional, iterate over the keys of neighbors to get all
+                    // members.
+                    let members = neighbors_map.keys().cloned().collect();
+
+                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map, neighbors_map, members });
                 }
             }
 
