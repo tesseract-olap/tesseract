@@ -232,8 +232,9 @@ impl CubeCache {
     // satisfying all the rules about level, property uniqueness, etc.)
     //
     // The next step is to figure out how to architecture this cache so that it can be used even in
-    // non-logic layer setups, but also be used for members endpoint (which requires ID)
+    // non-logic layer setups, but also be used for members endpoint (which requires label also)
     pub fn members_for_level(&self, level_name: &LevelName) -> Option<&HashSet<String>> {
+        println!("{:?}", self.level_caches);
         self.level_caches.get(&level_name.level)
             .map(|level_cache| &level_cache.members)
     }
@@ -246,7 +247,7 @@ pub struct LevelCache {
     pub children_map: Option<HashMap<String, Vec<String>>>,
     pub neighbors_map: HashMap<String, Vec<String>>,
     // TODO to be able to use for /members endpoint, this will
-    // need both ID and member label.
+    // need both ID and member label. Right now it's just ID
     pub members: HashSet<String>,
 }
 
