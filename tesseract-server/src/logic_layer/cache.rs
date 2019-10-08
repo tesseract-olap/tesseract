@@ -225,6 +225,18 @@ impl CubeCache {
             None => None
         }
     }
+
+    // TODO note that this is being used in core tesseract, but that the cache is created using
+    // logic layer rules. This means that at the moment of this implementation, this will work in
+    // core tesseract but only if the core tesseract schema can also be a logic layer schema (and
+    // satisfying all the rules about level, property uniqueness, etc.)
+    //
+    // The next step is to figure out how to architecture this cache so that it can be used even in
+    // non-logic layer setups, but also be used for members endpoint (which requires ID)
+    pub fn members_for_level(&self, level_name: &LevelName) -> Option<&HashSet<String>> {
+        self.level_caches.get(&level_name.level)
+            .map(|level_cache| &level_cache.members)
+    }
 }
 
 

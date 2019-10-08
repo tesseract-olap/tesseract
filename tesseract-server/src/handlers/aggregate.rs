@@ -44,6 +44,21 @@ macro_rules! ok_or_404 {
     };
 }
 
+macro_rules! some_or_404 {
+    ($expr:expr, $note:expr) => {
+        match $expr {
+            Some(val) => val,
+            None => {
+                return Box::new(
+                    future::result(
+                        Ok(HttpResponse::NotFound().json($note.to_string()))
+                    )
+                );
+            }
+        }
+    };
+}
+
 /// Handles aggregation when a format is specified.
 pub fn aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
@@ -76,6 +91,16 @@ pub fn do_aggregate(
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = ok_or_404!(ts_query);
+
+    // sql injection mitigation on query:
+    // - Check that cut members exist in members cache
+    // this is in braces to explicitly the scope in which
+    // req is borrowed, since req is moved later in the `map_err`
+    {
+        let cache = req.state().cache.read().unwrap();
+        let cube_cache = some_or_404!(cache.find_cube_info(&cube), format!("Cube {} not found", cube));
+        ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
+    }
 
     let query_ir_headers = req
         .state()
@@ -238,4 +263,22 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
             exclude_default_members,
         })
     }
+}
+
+use failure::{bail, format_err};
+use tesseract_core::names::Cut;
+use crate::logic_layer::CubeCache;
+
+fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Error> {
+    for cut in cuts {
+        // get level cache
+        let member_cache = cube_cache.members_for_level(&cut.level_name)
+            .ok_or_else(|| format_err!("Level not found in cache"))?;
+        for member in &cut.members {
+            if !member_cache.contains(member) {
+                bail!("Cut member not found");
+            }
+        }
+    }
+    Ok(())
 }
