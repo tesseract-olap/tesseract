@@ -13,3 +13,6 @@ log = "0.4.3"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"
+
+[dev-dependencies]
+tokio = "0.1.22"
