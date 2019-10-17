@@ -1,5 +1,5 @@
 use clickhouse_rs::Pool;
-use clickhouse_rs::types::Options;
+use clickhouse_rs::types::{Options, Simple, Complex, Block};
 use failure::{Error, format_err};
 use futures::{future, Future, Stream};
 use log::*;
@@ -9,7 +9,7 @@ use tesseract_core::{Backend, DataFrame, QueryIr};
 mod df;
 mod sql;
 
-use self::df::block_to_df;
+use self::df::{block_to_df};
 use self::sql::clickhouse_sql;
 
 // Ping timeout in millis
@@ -45,7 +45,7 @@ impl Backend for Clickhouse {
             .get_handle()
             .and_then(move |c| c.query(&sql[..]).fetch_all())
             .from_err()
-            .and_then(move |(_, block)| {
+            .and_then(move |(_, block): (_, Block<Complex>)| {
                 let timing = time_start.elapsed();
                 info!("Time for sql execution: {}.{:03}", timing.as_secs(), timing.subsec_millis());
                 //debug!("Block: {:?}", block);
@@ -63,7 +63,7 @@ impl Backend for Clickhouse {
                 future::ok(
                     c.query(&sql[..])
                         .stream_blocks()
-                        .map(move |block| {
+                        .map(move |block: Block<Simple>| {
                             block_to_df(block)
                         })
                 )
