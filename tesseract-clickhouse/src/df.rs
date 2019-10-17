@@ -2,7 +2,7 @@
 
 use failure::{Error, bail};
 
-use clickhouse_rs::types::{Block, SqlType};
+use clickhouse_rs::types::{Block, ColumnType, SqlType};
 use tesseract_core::{DataFrame, Column, ColumnData};
 
 // from source code of clickhouse_rs
@@ -20,7 +20,8 @@ use tesseract_core::{DataFrame, Column, ColumnData};
 //            SqlType::Date => "Date".into(),
 //            SqlType::DateTime => "DateTime".into(),
 
-pub fn block_to_df(block: Block) -> Result<DataFrame, Error> {
+pub fn block_to_df<T: ColumnType>(block: Block<T>) -> Result<DataFrame, Error>
+{
     let mut df = vec![];
 
     for col in block.columns() {
@@ -241,4 +242,3 @@ pub fn block_to_df(block: Block) -> Result<DataFrame, Error> {
 
     Ok(DataFrame::from_vec(df))
 }
-
