@@ -215,3 +215,104 @@ pub fn block_to_df<K: ColumnBuilder>(block: Block<K>) -> Result<DataFrame, Error
 
     Ok(DataFrame::from_vec(df))
 }
+
+#[test]
+fn test_block_to_df() {
+    let block = Block::new()
+        .column("u8", vec![1_u8, 2, 3])
+        .column("u16", vec![1_u16, 2, 3])
+        .column("u32", vec![1_u32, 2, 3])
+        .column("u64", vec![1_u64, 2, 3])
+        .column("i8", vec![1_i8, 2, 3])
+        .column("i16", vec![1_i16, 2, 3])
+        .column("i32", vec![1_i32, 2, 3])
+        .column("i64", vec![1_i64, 2, 3])
+        .column("str", vec!["A", "B", "C"])
+        .column("opt_u8", vec![Some(1_u8), None, Some(3)])
+        .column("opt_u16", vec![Some(1_u16), None, Some(3)])
+        .column("opt_u32", vec![Some(1_u32), None, Some(3)])
+        .column("opt_u64", vec![Some(1_u64), None, Some(3)])
+        .column("opt_i8", vec![Some(1_i8), None, Some(3)])
+        .column("opt_i16", vec![Some(1_i16), None, Some(3)])
+        .column("opt_i32", vec![Some(1_i32), None, Some(3)])
+        .column("opt_i64", vec![Some(1_i64), None, Some(3)])
+        .column("opt_str", vec![Some("A"), None, Some("C")])
+        .column("f32", vec![1.0_f32, 2.0, 3.0])
+        .column("f64", vec![1.0_f64, 2.0, 3.0])
+        .column("opt_f32", vec![Some(1.0_f32), None, Some(3.0)])
+        .column("opt_f64", vec![Some(1.0_f64), None, Some(3.0)]);
+
+    let df = block_to_df(block).unwrap();
+
+    assert_eq!(df.columns[0].column_data, ColumnData::UInt8(vec![1, 2, 3]));
+    assert_eq!(df.columns[1].column_data, ColumnData::UInt16(vec![1, 2, 3]));
+    assert_eq!(df.columns[2].column_data, ColumnData::UInt32(vec![1, 2, 3]));
+    assert_eq!(df.columns[3].column_data, ColumnData::UInt64(vec![1, 2, 3]));
+
+    assert_eq!(df.columns[4].column_data, ColumnData::Int8(vec![1, 2, 3]));
+    assert_eq!(df.columns[5].column_data, ColumnData::Int16(vec![1, 2, 3]));
+    assert_eq!(df.columns[6].column_data, ColumnData::Int32(vec![1, 2, 3]));
+    assert_eq!(df.columns[7].column_data, ColumnData::Int64(vec![1, 2, 3]));
+
+    assert_eq!(
+        df.columns[8].column_data,
+        ColumnData::Text(vec!["A".to_string(), "B".to_string(), "C".to_string()])
+    );
+
+    assert_eq!(
+        df.columns[9].column_data,
+        ColumnData::NullableUInt8(vec![Some(1), None, Some(3)])
+    );
+    assert_eq!(
+        df.columns[10].column_data,
+        ColumnData::NullableUInt16(vec![Some(1), None, Some(3)])
+    );
+    assert_eq!(
+        df.columns[11].column_data,
+        ColumnData::NullableUInt32(vec![Some(1), None, Some(3)])
+    );
+    assert_eq!(
+        df.columns[12].column_data,
+        ColumnData::NullableUInt64(vec![Some(1), None, Some(3)])
+    );
+
+    assert_eq!(
+        df.columns[13].column_data,
+        ColumnData::NullableInt8(vec![Some(1), None, Some(3)])
+    );
+    assert_eq!(
+        df.columns[14].column_data,
+        ColumnData::NullableInt16(vec![Some(1), None, Some(3)])
+    );
+    assert_eq!(
+        df.columns[15].column_data,
+        ColumnData::NullableInt32(vec![Some(1), None, Some(3)])
+    );
+    assert_eq!(
+        df.columns[16].column_data,
+        ColumnData::NullableInt64(vec![Some(1), None, Some(3)])
+    );
+
+    assert_eq!(
+        df.columns[17].column_data,
+        ColumnData::NullableText(vec![Some("A".to_string()), None, Some("C".to_string())])
+    );
+
+    assert_eq!(
+        df.columns[18].column_data,
+        ColumnData::Float32(vec![1.0, 2.0, 3.0])
+    );
+    assert_eq!(
+        df.columns[19].column_data,
+        ColumnData::Float64(vec![1.0, 2.0, 3.0])
+    );
+
+    assert_eq!(
+        df.columns[20].column_data,
+        ColumnData::NullableFloat32(vec![Some(1.0), None, Some(3.0)])
+    );
+    assert_eq!(
+        df.columns[21].column_data,
+        ColumnData::NullableFloat64(vec![Some(1.0), None, Some(3.0)])
+    );
+}
