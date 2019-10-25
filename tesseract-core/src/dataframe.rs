@@ -214,7 +214,7 @@ impl Column {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ColumnData {
     Int8(Vec<i8>),
     Int16(Vec<i16>),
