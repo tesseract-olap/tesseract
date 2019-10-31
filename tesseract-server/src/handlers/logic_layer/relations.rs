@@ -115,7 +115,7 @@ pub fn logic_layer_relations(
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string())),
     };
 
-    let final_headers: Vec<String> = ["level".to_string(), "id".to_string(), "operation".to_string(), "value".to_string()].to_vec();
+    let final_headers: Vec<String> = ["level".to_string(), "id".to_string(), "relation".to_string(), "value".to_string()].to_vec();
     let mut final_columns: Vec<Column> = vec![];
 
     let mut col_0: Vec<String> = Vec::new();
@@ -139,7 +139,7 @@ pub fn logic_layer_relations(
         column_data: ColumnData::Text(col_1)
     });
     final_columns.push(Column {
-        name: "operation".to_string(),
+        name: "relation".to_string(),
         column_data: ColumnData::Text(col_2)
     });
     final_columns.push(Column {
@@ -175,7 +175,7 @@ pub fn get_relations(
         return Err(format_err!("Please provide at least one cut"));
     }
 
-    let mut dimensions_map: Vec<Vec<String>> = vec![];
+    let mut relations: Vec<Vec<String>> = vec![];
 
     let mut level_matches: Vec<LevelName> = vec![];
 
@@ -250,17 +250,21 @@ pub fn get_relations(
                     };
 
                     for children_id in children_ids.iter() {
-                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "children".to_string(), children_id.to_string()].to_vec())
+                        relations.push([cut_key.to_string(), cut.to_string(), "child".to_string(), children_id.to_string()].to_vec())
                     }
 
                 }
                 else if op.to_string() == "parents".to_string() {
+                    let mut parent_entries: Vec<Vec<String>> = vec![];
+
                     let parent_levels = cube.get_level_parents(&level_name)?;
 
                     if parent_levels.is_empty() {
                         // This level has no parents
                         continue;
                     }
+
+                    let mut search_id = cut.clone();
 
                     for parent_level in (parent_levels.iter()).rev() {
                         let parent_level_name = LevelName {
@@ -277,7 +281,7 @@ pub fn get_relations(
 
                         let parent_id = match &level_cache.parent_map {
                             Some(parent_map) => {
-                                match parent_map.get(&cut) {
+                                match parent_map.get(&search_id) {
                                     Some(parent_id) => parent_id.clone(),
                                     None => continue
                                 }
@@ -285,11 +289,20 @@ pub fn get_relations(
                             None => continue
                         };
 
-                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "parent".to_string(), parent_id.to_string()].to_vec());
+                        parent_entries.push([cut_key.to_string(), cut.to_string(), "parent".to_string(), parent_id.to_string()].to_vec());
 
                         // Update current level_name for the next iteration
                         level_name = parent_level_name.clone();
+
+                        // The search_id in the next iteration will be the current parent
+                        search_id = parent_id;
                     }
+
+                    // Reverse the parent_entries vector so that parent levels
+                    // are returned as they appear in the hierarchy
+                    parent_entries.reverse();
+
+                    relations.extend(parent_entries);
                 }
                 else if op.to_string() == "neighbors".to_string() {
                     // Find dimension for the level name
@@ -311,7 +324,7 @@ pub fn get_relations(
                                     }
 
                                     for neighbor_id in neighbors_ids.iter() {
-                                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
+                                        relations.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
                                     }
 
                                 },
@@ -330,7 +343,7 @@ pub fn get_relations(
                             };
 
                             for neighbor_id in neighbors_ids.iter() {
-                                dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
+                                relations.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
                             }
                         }
                     }
@@ -340,5 +353,6 @@ pub fn get_relations(
             }
         }
     }
-    Ok(dimensions_map)
+
+    Ok(relations)
 }

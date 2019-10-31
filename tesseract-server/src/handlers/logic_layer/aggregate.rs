@@ -930,6 +930,8 @@ pub fn resolve_cuts(
                         continue;
                     }
 
+                    let mut search_id = cut.clone();
+
                     for parent_level in (parent_levels.iter()).rev() {
                         let parent_level_name = LevelName {
                             dimension: level_name.dimension.clone(),
@@ -947,7 +949,7 @@ pub fn resolve_cuts(
 
                         let parent_id = match &level_cache.parent_map {
                             Some(parent_map) => {
-                                match parent_map.get(cut) {
+                                match parent_map.get(&search_id) {
                                     Some(parent_id) => parent_id.clone(),
                                     None => continue
                                 }
@@ -956,10 +958,13 @@ pub fn resolve_cuts(
                         };
 
                         // Add parent ID to the `dimension_cuts_map`
-                        dimension_cuts_map = add_cut_entries(dimension_cuts_map, &parent_level_name, vec![parent_id]);
+                        dimension_cuts_map = add_cut_entries(dimension_cuts_map, &parent_level_name, vec![parent_id.clone()]);
 
                         // Update current level_name for the next iteration
                         level_name = parent_level_name.clone();
+
+                        // The search_id in the next iteration will be the current parent
+                        search_id = parent_id;
                     }
 
                 } else if operation == "neighbors".to_string() {
