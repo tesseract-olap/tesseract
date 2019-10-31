@@ -48,7 +48,7 @@ pub fn logic_layer_relations_handler(
 pub struct LogicLayerRelationQueryOpt {
     pub cube: String,
     #[serde(flatten)]
-    pub cuts: Option<HashMap<String, String>>,
+    pub cuts: HashMap<String, String>,
     debug: Option<bool>,
 }
 
@@ -104,10 +104,7 @@ pub fn logic_layer_relations(
         None => return Ok(HttpResponse::NotFound().json("Unable to access cube cache".to_string()))
     };
 
-    let cuts_map = match agg_query.cuts {
-        Some(cut_map) => cut_map,
-        None => return Ok(HttpResponse::NotFound().json("Cuts not provided".to_string())),
-    };
+    let cuts_map = agg_query.cuts;
 
     let level_map = &cube_cache.level_map;
     let property_map = &cube_cache.property_map;
@@ -175,7 +172,7 @@ pub fn get_relations(
 ) -> Result<Vec<Vec<String>>, Error> {
 
     if cuts_map.len() == 0 {
-        return Err(format_err!("Please provides the cuts"));
+        return Err(format_err!("Please provide at least one cut"));
     }
 
     let mut dimensions_map: Vec<Vec<String>> = vec![];
