@@ -106,7 +106,7 @@ pub fn logic_layer_relations(
 
     let cuts_map = match agg_query.cuts {
         Some(cut_map) => cut_map,
-        None => return Ok(HttpResponse::NotFound().json("Malformed cuts".to_string())),
+        None => return Ok(HttpResponse::NotFound().json("Cuts not provided".to_string())),
     };
 
     let level_map = &cube_cache.level_map;
@@ -115,7 +115,7 @@ pub fn logic_layer_relations(
 
     let dimensions_map: Vec<Vec<String>> = match get_relations(&cuts_map, &cube, &cube_cache, &level_map, &property_map, &geoservice_url) {
         Ok(dm) => dm,
-        Err(err) => Vec::new(),
+        Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string())),
     };
 
     let final_headers: Vec<String> = ["level".to_string(), "id".to_string(), "operation".to_string(), "value".to_string()].to_vec();
@@ -173,6 +173,10 @@ pub fn get_relations(
     property_map: &HashMap<String, Property>,
     geoservice_url: &Option<Url>
 ) -> Result<Vec<Vec<String>>, Error> {
+
+    if cuts_map.len() == 0 {
+        return Err(format_err!("Please provides the cuts"));
+    }
 
     let mut dimensions_map: Vec<Vec<String>> = vec![];
 
