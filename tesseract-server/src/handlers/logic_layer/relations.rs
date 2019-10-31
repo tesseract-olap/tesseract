@@ -175,7 +175,7 @@ pub fn get_relations(
         return Err(format_err!("Please provide at least one cut"));
     }
 
-    let mut dimensions_map: Vec<Vec<String>> = vec![];
+    let mut relations: Vec<Vec<String>> = vec![];
 
     let mut level_matches: Vec<LevelName> = vec![];
 
@@ -250,7 +250,7 @@ pub fn get_relations(
                     };
 
                     for children_id in children_ids.iter() {
-                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "child".to_string(), children_id.to_string()].to_vec())
+                        relations.push([cut_key.to_string(), cut.to_string(), "child".to_string(), children_id.to_string()].to_vec())
                     }
 
                 }
@@ -302,7 +302,7 @@ pub fn get_relations(
                     // are returned as they appear in the hierarchy
                     parent_entries.reverse();
 
-                    dimensions_map.extend(parent_entries);
+                    relations.extend(parent_entries);
                 }
                 else if op.to_string() == "neighbors".to_string() {
                     // Find dimension for the level name
@@ -324,7 +324,7 @@ pub fn get_relations(
                                     }
 
                                     for neighbor_id in neighbors_ids.iter() {
-                                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
+                                        relations.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
                                     }
 
                                 },
@@ -343,7 +343,7 @@ pub fn get_relations(
                             };
 
                             for neighbor_id in neighbors_ids.iter() {
-                                dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
+                                relations.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
                             }
                         }
                     }
@@ -353,5 +353,6 @@ pub fn get_relations(
             }
         }
     }
-    Ok(dimensions_map)
+
+    Ok(relations)
 }
