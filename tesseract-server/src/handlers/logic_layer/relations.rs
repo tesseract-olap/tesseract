@@ -294,7 +294,7 @@ pub fn get_relations(
                         // Update current level_name for the next iteration
                         level_name = parent_level_name.clone();
 
-                        // The searchId in the next iteration will be the current parent
+                        // The search_id in the next iteration will be the current parent
                         search_id = parent_id;
                     }
 
