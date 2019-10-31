@@ -10,8 +10,8 @@ pub use self::geoservice::GeoServiceResponseJson;
 pub use self::geoservice::query_geoservice;
 pub use self::metadata::logic_layer_members_handler;
 pub use self::metadata::logic_layer_members_default_handler;
-pub use self::geoadjacents::logic_layer_geoadjacents_handler;
-pub use self::geoadjacents::logic_layer_default_geoadjacents_handler;
+pub use self::geoadjacents::logic_layer_relations_handler;
+pub use self::geoadjacents::logic_layer_relations_default_handler;
 
 use actix_web::{HttpRequest, HttpResponse, Path, ResponseError};
 use crate::app::AppState;
@@ -53,7 +53,7 @@ pub fn logic_layer_non_unique_levels_handler(
 }
 
 
-pub fn logic_layer_geoadjacents_non_unique_levels_default_handler(
+pub fn logic_layer_relations_non_unique_levels_default_handler(
     (req, _cube): (HttpRequest<AppState>, Path<()>),
     ) -> HttpResponse
 {
@@ -70,7 +70,7 @@ pub fn logic_layer_geoadjacents_non_unique_levels_default_handler(
 }
 
 
-pub fn logic_layer_geoadjacents_non_unique_levels_handler(
+pub fn logic_layer_relations_non_unique_levels_handler(
     (req, _cube): (HttpRequest<AppState>, Path<(String)>),
     ) -> HttpResponse
 {

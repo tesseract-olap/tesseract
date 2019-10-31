@@ -27,37 +27,33 @@ use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is jsonrecords.
-pub fn logic_layer_default_geoadjacents_handler(
+pub fn logic_layer_relations_default_handler(
     (req, _cube): (HttpRequest<AppState>, Path<()>)
 ) -> ActixResult<HttpResponse>
 {
-    logic_layer_geoadjacent(req, "jsonrecords".to_owned())
+    logic_layer_relations(req, "jsonrecords".to_owned())
 }
 
 
 /// Handles aggregation when a format is specified.
-pub fn logic_layer_geoadjacents_handler(
+pub fn logic_layer_relations_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String)>)
 ) -> ActixResult<HttpResponse>
 {
-    logic_layer_geoadjacent(req, cube_format.to_owned())
+    logic_layer_relations(req, cube_format.to_owned())
 }
 
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct LogicLayerQueryOpt {
+pub struct LogicLayerRelationQueryOpt {
     pub cube: String,
     #[serde(flatten)]
     pub cuts: Option<HashMap<String, String>>,
-    parents: Option<bool>,
     debug: Option<bool>,
-    exclude_default_members: Option<bool>,
-    locale: Option<String>,
-    sparse: Option<bool>,
 }
 
 
-pub fn logic_layer_geoadjacent(
+pub fn logic_layer_relations(
     req: HttpRequest<AppState>,
     format: String,
 ) -> ActixResult<HttpResponse>
@@ -74,11 +70,11 @@ pub fn logic_layer_geoadjacent(
     let schema = req.state().schema.read().unwrap();
     let debug = req.state().debug;
 
-    lazy_static!{
+    lazy_static! {
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
-    let agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
+    let agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerRelationQueryOpt>(query) {
         Ok(q) => q,
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
     };
@@ -108,23 +104,19 @@ pub fn logic_layer_geoadjacent(
         None => return Ok(HttpResponse::NotFound().json("Unable to access cube cache".to_string()))
     };
 
-    let cuts_map = match agg_query.cuts{
+    let cuts_map = match agg_query.cuts {
         Some(cut_map) => cut_map,
-        None => HashMap::new(),
+        None => return Ok(HttpResponse::NotFound().json("Malformed cuts".to_string())),
     };
 
     let level_map = &cube_cache.level_map;
     let property_map = &cube_cache.property_map;
     let geoservice_url = &req.state().env_vars.geoservice_url;
 
-    let dimensions_map = match getdimensions(&cuts_map, &cube, &cube_cache, &level_map, &property_map, &geoservice_url) {
+    let dimensions_map: Vec<Vec<String>> = match get_relations(&cuts_map, &cube, &cube_cache, &level_map, &property_map, &geoservice_url) {
         Ok(dm) => dm,
-        Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
+        Err(err) => Vec::new(),
     };
-
-    if dimensions_map.len() == 0{
-        return Ok(HttpResponse::NotFound().json("Unable to genrate result".to_string()));
-    }
 
     let final_headers: Vec<String> = ["level".to_string(), "id".to_string(), "operation".to_string(), "value".to_string()].to_vec();
     let mut final_columns: Vec<Column> = vec![];
@@ -134,27 +126,27 @@ pub fn logic_layer_geoadjacent(
     let mut col_2: Vec<String> = Vec::new();
     let mut col_3: Vec<String> = Vec::new();
 
-    for row in dimensions_map{
+    for row in dimensions_map {
         col_0.push(row.get(0).unwrap().to_string());
         col_1.push(row.get(1).unwrap().to_string());
         col_2.push(row.get(2).unwrap().to_string());
         col_3.push(row.get(3).unwrap().to_string());
     }
 
-    final_columns.push(Column{
-        name: "placeholder".to_string(),
+    final_columns.push(Column {
+        name: "level".to_string(),
         column_data: ColumnData::Text(col_0)
     });
-    final_columns.push(Column{
-        name: "placeholder".to_string(),
+    final_columns.push(Column {
+        name: "id".to_string(),
         column_data: ColumnData::Text(col_1)
     });
-    final_columns.push(Column{
-        name: "placeholder".to_string(),
+    final_columns.push(Column {
+        name: "operation".to_string(),
         column_data: ColumnData::Text(col_2)
     });
-    final_columns.push(Column{
-        name: "placeholder".to_string(),
+    final_columns.push(Column {
+        name: "value".to_string(),
         column_data: ColumnData::Text(col_3)
     });
 
@@ -173,7 +165,7 @@ pub fn logic_layer_geoadjacent(
 }
 
 
-pub fn getdimensions(
+pub fn get_relations(
     cuts_map: &HashMap<String, String>,
     cube: &Cube,
     cube_cache: &CubeCache,
@@ -186,7 +178,7 @@ pub fn getdimensions(
 
     let mut level_matches: Vec<LevelName> = vec![];
 
-    for (cut_key, cut_values) in cuts_map.iter(){
+    for (cut_key, cut_values) in cuts_map.iter() {
         if cut_values.is_empty(){
             continue;
         }
@@ -195,13 +187,13 @@ pub fn getdimensions(
             Some(ckv) => ckv.split(",").map(|s| s.to_string()).collect(),
             None => continue,
         };
-        let operations:Vec<String> = match element.get(1){
+        let operations:Vec<String> = match element.get(1) {
             Some(op) => op.split(",").map(|s| s.to_string()).collect(),
             None => continue,
         };
-        for cut in cut_key_values{
-            for op in &operations{
-                let mut level_name = match cube_cache.dimension_caches.get(cut_key){
+        for cut in cut_key_values {
+            for op in &operations {
+                let mut level_name = match cube_cache.dimension_caches.get(cut_key) {
                     Some(dimension_cache) => {
                         match dimension_cache.id_map.get(&cut) {
                             Some(level_name) => {
@@ -256,8 +248,8 @@ pub fn getdimensions(
                         None => continue
                     };
 
-                    for children_id in children_ids.iter(){
-                        dimensions_map.push([level_name.level.to_string(), cut.to_string(), "children".to_string(), children_id.to_string()].to_vec())
+                    for children_id in children_ids.iter() {
+                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "children".to_string(), children_id.to_string()].to_vec())
                     }
 
                 }
@@ -292,7 +284,7 @@ pub fn getdimensions(
                             None => continue
                         };
 
-                        dimensions_map.push([level_name.level.to_string(), cut.to_string(), "parent".to_string(), parent_id.to_string()].to_vec());
+                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "parent".to_string(), parent_id.to_string()].to_vec());
 
                         // Update current level_name for the next iteration
                         level_name = parent_level_name.clone();
@@ -318,7 +310,7 @@ pub fn getdimensions(
                                     }
 
                                     for neighbor_id in neighbors_ids.iter() {
-                                        dimensions_map.push([level_name.level.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
+                                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
                                     }
 
                                 },
@@ -337,7 +329,7 @@ pub fn getdimensions(
                             };
 
                             for neighbor_id in neighbors_ids.iter() {
-                                dimensions_map.push([level_name.level.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
+                                dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
                             }
                         }
                     }

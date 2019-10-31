@@ -24,10 +24,10 @@ use crate::handlers::{
     metadata_all_handler,
     members_handler,
     members_default_handler,
-    logic_layer_geoadjacents_handler,
-    logic_layer_default_geoadjacents_handler,
-    logic_layer_geoadjacents_non_unique_levels_default_handler,
-    logic_layer_geoadjacents_non_unique_levels_handler
+    logic_layer_relations_handler,
+    logic_layer_relations_default_handler,
+    logic_layer_relations_non_unique_levels_default_handler,
+    logic_layer_relations_non_unique_levels_handler
 };
 use crate::logic_layer::{Cache, LogicLayerConfig};
 
@@ -154,11 +154,11 @@ pub fn create_app(
                 .resource("/members.{format}", |r| {
                     r.method(Method::GET).with(logic_layer_members_handler)
                 })
-                .resource("/geoadjacents", |r| {
-                    r.method(Method::GET).with(logic_layer_default_geoadjacents_handler)
+                .resource("/relations", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_default_handler)
                 })
-                .resource("/geoadjacents.{foramt}", |r| {
-                    r.method(Method::GET).with(logic_layer_geoadjacents_handler)
+                .resource("/relations.{foramt}", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_handler)
                 })
         },
         CubeHasUniqueLevelsAndProperties::False { .. } => {
@@ -176,11 +176,11 @@ pub fn create_app(
                 .resource("/members.{format}", |r| {
                     r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
                 })
-                .resource("/geoadjacents", |r| {
-                    r.method(Method::GET).with(logic_layer_geoadjacents_non_unique_levels_default_handler)
+                .resource("/relations", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_non_unique_levels_default_handler)
                 })
-                .resource("/geoadjacents.{foramt}", |r| {
-                    r.method(Method::GET).with(logic_layer_geoadjacents_non_unique_levels_handler)
+                .resource("/relations.{foramt}", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_non_unique_levels_handler)
                 })
         },
     }
