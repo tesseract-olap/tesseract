@@ -262,6 +262,8 @@ pub fn get_relations(
                         continue;
                     }
 
+                    let mut searchId = cut.clone();
+
                     for parent_level in (parent_levels.iter()).rev() {
                         let parent_level_name = LevelName {
                             dimension: level_name.dimension.clone(),
@@ -277,7 +279,7 @@ pub fn get_relations(
 
                         let parent_id = match &level_cache.parent_map {
                             Some(parent_map) => {
-                                match parent_map.get(&cut) {
+                                match parent_map.get(&searchId) {
                                     Some(parent_id) => parent_id.clone(),
                                     None => continue
                                 }
@@ -289,6 +291,9 @@ pub fn get_relations(
 
                         // Update current level_name for the next iteration
                         level_name = parent_level_name.clone();
+
+                        // The searchId in the next iteration will be the current parent
+                        searchId = parent_id;
                     }
                 }
                 else if op.to_string() == "neighbors".to_string() {
