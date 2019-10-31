@@ -255,6 +255,8 @@ pub fn get_relations(
 
                 }
                 else if op.to_string() == "parents".to_string() {
+                    let mut parent_entries: Vec<Vec<String>> = vec![];
+
                     let parent_levels = cube.get_level_parents(&level_name)?;
 
                     if parent_levels.is_empty() {
@@ -262,7 +264,7 @@ pub fn get_relations(
                         continue;
                     }
 
-                    let mut searchId = cut.clone();
+                    let mut search_id = cut.clone();
 
                     for parent_level in (parent_levels.iter()).rev() {
                         let parent_level_name = LevelName {
@@ -279,7 +281,7 @@ pub fn get_relations(
 
                         let parent_id = match &level_cache.parent_map {
                             Some(parent_map) => {
-                                match parent_map.get(&searchId) {
+                                match parent_map.get(&search_id) {
                                     Some(parent_id) => parent_id.clone(),
                                     None => continue
                                 }
@@ -287,14 +289,20 @@ pub fn get_relations(
                             None => continue
                         };
 
-                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "parent".to_string(), parent_id.to_string()].to_vec());
+                        parent_entries.push([cut_key.to_string(), cut.to_string(), "parent".to_string(), parent_id.to_string()].to_vec());
 
                         // Update current level_name for the next iteration
                         level_name = parent_level_name.clone();
 
                         // The searchId in the next iteration will be the current parent
-                        searchId = parent_id;
+                        search_id = parent_id;
                     }
+
+                    // Reverse the parent_entries vector so that parent levels
+                    // are returned as they appear in the hierarchy
+                    parent_entries.reverse();
+
+                    dimensions_map.extend(parent_entries);
                 }
                 else if op.to_string() == "neighbors".to_string() {
                     // Find dimension for the level name

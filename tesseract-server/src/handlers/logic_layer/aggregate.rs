@@ -930,7 +930,7 @@ pub fn resolve_cuts(
                         continue;
                     }
 
-                    let mut searchId = cut.clone();
+                    let mut search_id = cut.clone();
 
                     for parent_level in (parent_levels.iter()).rev() {
                         let parent_level_name = LevelName {
@@ -949,7 +949,7 @@ pub fn resolve_cuts(
 
                         let parent_id = match &level_cache.parent_map {
                             Some(parent_map) => {
-                                match parent_map.get(&searchId) {
+                                match parent_map.get(&search_id) {
                                     Some(parent_id) => parent_id.clone(),
                                     None => continue
                                 }
@@ -964,7 +964,7 @@ pub fn resolve_cuts(
                         level_name = parent_level_name.clone();
 
                         // The searchId in the next iteration will be the current parent
-                        searchId = parent_id;
+                        search_id = parent_id;
                     }
 
                 } else if operation == "neighbors".to_string() {
