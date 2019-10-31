@@ -115,7 +115,7 @@ pub fn logic_layer_relations(
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string())),
     };
 
-    let final_headers: Vec<String> = ["level".to_string(), "id".to_string(), "operation".to_string(), "value".to_string()].to_vec();
+    let final_headers: Vec<String> = ["level".to_string(), "id".to_string(), "relation".to_string(), "value".to_string()].to_vec();
     let mut final_columns: Vec<Column> = vec![];
 
     let mut col_0: Vec<String> = Vec::new();
@@ -139,7 +139,7 @@ pub fn logic_layer_relations(
         column_data: ColumnData::Text(col_1)
     });
     final_columns.push(Column {
-        name: "operation".to_string(),
+        name: "relation".to_string(),
         column_data: ColumnData::Text(col_2)
     });
     final_columns.push(Column {
@@ -250,7 +250,7 @@ pub fn get_relations(
                     };
 
                     for children_id in children_ids.iter() {
-                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "children".to_string(), children_id.to_string()].to_vec())
+                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "child".to_string(), children_id.to_string()].to_vec())
                     }
 
                 }
@@ -311,7 +311,7 @@ pub fn get_relations(
                                     }
 
                                     for neighbor_id in neighbors_ids.iter() {
-                                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
+                                        dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
                                     }
 
                                 },
@@ -330,7 +330,7 @@ pub fn get_relations(
                             };
 
                             for neighbor_id in neighbors_ids.iter() {
-                                dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbors".to_string(), neighbor_id.to_string()].to_vec());
+                                dimensions_map.push([cut_key.to_string(), cut.to_string(), "neighbor".to_string(), neighbor_id.to_string()].to_vec());
                             }
                         }
                     }
