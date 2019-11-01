@@ -44,7 +44,7 @@ pub fn rows_to_df(rows: Vec<Row>, columns: &[Column]) -> DataFrame {
                     ColumnData::Float64(vec![]),
                 ));
             },
-            "text" => {
+            "text" | "varchar" => {
                 tcolumn_list.push(TesseractColumn::new(
                     col_name.to_string(),
                     ColumnData::Text(vec![]),
