@@ -65,13 +65,20 @@ pub fn rows_to_df(rows: Vec<Row>, columns: &[Column]) -> DataFrame {
                 .expect("logic checked?")
                 .column_data();
             match column_data {
+                // TODO use a macro to reduce code duplication
                 ColumnData::Int32(col_data) => {
-                    let value = row.get::<_, i32>(col_idx);
-                    col_data.push(value);
+                    let res = row.try_get::<_, i32>(col_idx);
+                    match res {
+                        Ok(value) => col_data.push(value),
+                        Err(_) => col_data.push(0)
+                    };
                 },
                 ColumnData::Int64(col_data) => {
-                    let value = row.get::<_, i64>(col_idx);
-                    col_data.push(value);
+                    let res = row.try_get::<_, i64>(col_idx);
+                    match res {
+                        Ok(value) => col_data.push(value),
+                        Err(_) => col_data.push(0)
+                    };
                 },
                 ColumnData::Float32(col_data) => {
                     let value = row.get::<_, f32>(col_idx);
