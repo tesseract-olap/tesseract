@@ -110,4 +110,22 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.block_on(future).unwrap();
     }
+
+    #[test]
+    #[ignore]
+    fn test_pg_query_with_null() {
+        let postgres_db= env::var("TESSERACT_DATABASE_URL").expect("Please provide TESSERACT_DATABASE_URL");
+        let pg = Postgres::new(&postgres_db);
+        let future = pg.exec_sql("select NULL;".to_string()).map(|df| {
+            println!("Result was: {:?}", df);
+
+            })
+            .map_err(|err| {
+               println!("Got error {:?}", err);
+                ()
+            });
+
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(future).unwrap();
+    }
 }
