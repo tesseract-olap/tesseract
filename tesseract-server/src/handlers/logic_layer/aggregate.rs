@@ -25,7 +25,7 @@ use tesseract_core::schema::{Cube, DimensionType};
 use crate::app::AppState;
 use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
-use crate::util::boxed_error;
+use crate::util::{boxed_error_string, boxed_error_http_response, verify_api_key};
 use super::super::util;
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
@@ -119,7 +119,7 @@ pub fn logic_layer_aggregation(
     let format = format.parse::<FormatType>();
     let format = match format {
         Ok(f) => f,
-        Err(err) => return boxed_error(err.to_string()),
+        Err(err) => return boxed_error_string(err.to_string()),
     };
 
     info!("Format: {:?}", format);
@@ -139,7 +139,7 @@ pub fn logic_layer_aggregation(
 
     let agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
         Ok(q) => q,
-        Err(err) => return boxed_error(err.to_string())
+        Err(err) => return boxed_error_string(err.to_string())
     };
 
     // Check to see if the logic layer config has a alias with the
@@ -156,12 +156,17 @@ pub fn logic_layer_aggregation(
 
     let cube = match schema.get_cube_by_name(&cube_name) {
         Ok(c) => c,
-        Err(err) => return boxed_error(err.to_string())
+        Err(err) => return boxed_error_string(err.to_string())
     };
+
+    match verify_api_key(&req, &cube) {
+        Ok(_) => (),
+        Err(err) => return boxed_error_http_response(err)
+    }
 
     let cube_cache = match req.state().cache.read().unwrap().find_cube_info(&cube_name) {
         Some(cube_cache) => cube_cache,
-        None => return boxed_error("Unable to access cube cache".to_string())
+        None => return boxed_error_string("Unable to access cube cache".to_string())
     };
 
     info!("Aggregate query: {:?}", agg_query);
@@ -173,11 +178,11 @@ pub fn logic_layer_aggregation(
     );
     let (ts_queries, header_map) = match ts_queries {
         Ok((ts_queries, header_map)) => (ts_queries, header_map),
-        Err(err) => return boxed_error(err.to_string())
+        Err(err) => return boxed_error_string(err.to_string())
     };
 
     if ts_queries.len() == 0 {
-        return boxed_error("Unable to generate queries".to_string())
+        return boxed_error_string("Unable to generate queries".to_string())
     }
 
     let mut sql_strings: Vec<String> = vec![];
@@ -193,7 +198,7 @@ pub fn logic_layer_aggregation(
 
         let (query_ir, headers) = match query_ir_headers {
             Ok(x) => x,
-            Err(err) => return boxed_error(err.to_string())
+            Err(err) => return boxed_error_string(err.to_string())
         };
 
         debug!("Query IR: {:?}", query_ir);

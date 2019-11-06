@@ -14,7 +14,7 @@ use serde_qs as qs;
 
 use crate::app::AppState;
 use crate::logic_layer::{LogicLayerConfig};
-use crate::util::boxed_error;
+use crate::util::boxed_error_string;
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
@@ -50,7 +50,7 @@ pub fn get_members(
     let format = format.parse::<FormatType>();
     let format = match format {
         Ok(f) => f,
-        Err(err) => return boxed_error(err.to_string()),
+        Err(err) => return boxed_error_string(err.to_string()),
     };
 
     info!("Format: {:?}", format);
@@ -70,7 +70,7 @@ pub fn get_members(
 
     let members_query = match QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(query) {
         Ok(q) => q,
-        Err(err) => return boxed_error(err.to_string())
+        Err(err) => return boxed_error_string(err.to_string())
     };
 
     let mut cube_name = members_query.cube.clone();
@@ -137,7 +137,7 @@ pub fn get_members(
 
     let level_name = match level_name {
         Some(level_name) => level_name,
-        None => return boxed_error("Unable to find a level with the name provided".to_string())
+        None => return boxed_error_string("Unable to find a level with the name provided".to_string())
     };
 
     debug!("{:?}", cube_name);
