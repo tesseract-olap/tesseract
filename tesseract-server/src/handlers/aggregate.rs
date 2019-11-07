@@ -75,11 +75,7 @@ pub fn do_aggregate(
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = ok_or_404!(ts_query);
 
-    let query_ir_headers = req
-        .state()
-        .schema.read().unwrap()
-        .sql_query(&cube, &ts_query);
-
+    let query_ir_headers = schema.sql_query(&cube, &ts_query);
     let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
     let sql = req.state()
