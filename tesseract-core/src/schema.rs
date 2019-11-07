@@ -789,6 +789,7 @@ mod test {
             cubes: vec![
                 CubeConfigJson {
                     name: "test_cube".into(),
+                    public: Some("true".into()),
                     table: TableConfigJson {
                         name: "fact_table".into(),
                         schema: None,

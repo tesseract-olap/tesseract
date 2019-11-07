@@ -220,7 +220,7 @@ fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error>
             row.push(val);
         }
 
-        seq_data.serialize_element(&row)?;;
+        seq_data.serialize_element(&row)?;
     }
 
     seq_data.end()?;

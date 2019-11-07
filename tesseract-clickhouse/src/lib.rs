@@ -38,7 +38,7 @@ impl Clickhouse {
 }
 
 impl Backend for Clickhouse {
-    fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
+    fn exec_sql(&self, sql: String) -> Box<dyn Future<Item=DataFrame, Error=Error>> {
         let time_start = Instant::now();
 
         let fut = self.pool
@@ -56,7 +56,7 @@ impl Backend for Clickhouse {
         Box::new(fut)
     }
 
-    fn exec_sql_stream(&self, sql: String) -> Box<Stream<Item=Result<DataFrame, Error>, Error=Error>> {
+    fn exec_sql_stream(&self, sql: String) -> Box<dyn Stream<Item=Result<DataFrame, Error>, Error=Error>> {
         let fut_stream = self.pool
             .get_handle()
             .and_then(move |c| {
