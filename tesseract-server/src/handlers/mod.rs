@@ -1,10 +1,11 @@
+#[macro_use]
+mod util;
 mod aggregate;
 mod aggregate_stream;
 mod flush;
 mod index;
 mod metadata;
 pub mod logic_layer;
-mod util;
 
 pub use self::aggregate::aggregate_handler;
 pub use self::aggregate::aggregate_default_handler;

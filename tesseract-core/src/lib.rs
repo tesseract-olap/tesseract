@@ -8,7 +8,6 @@ pub mod schema;
 pub mod query;
 pub mod query_ir;
 
-use std::env;
 use failure::{Error, format_err, bail};
 use log::*;
 use serde_xml_rs as serde_xml;
@@ -958,11 +957,11 @@ impl Schema {
             let captions_filtered = if parents {
                 Box::new(captions.iter()
                     .filter(|p| p.level_name.dimension == drill.0.dimension)
-                ) as Box<Iterator<Item=&Property>>
+                ) as Box<dyn Iterator<Item=&Property>>
             } else {
                 Box::new(captions.iter()
                     .filter(|p| p.level_name == drill.0)
-                ) as Box<Iterator<Item=&Property>>
+                ) as Box<dyn Iterator<Item=&Property>>
             };
 
             let caption_cols: Result<HashMap<_, _>, _> = captions_filtered

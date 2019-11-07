@@ -8,15 +8,13 @@ pub fn read_schema(schema_path: &String) -> Result<Schema, Error> {
     let schema_str = std::fs::read_to_string(&schema_path)
         .map_err(|_| format_err!("Schema file not found at {}", schema_path))?;
 
-    let mut schema: Schema;
-
-    if schema_path.ends_with("xml") {
-        schema = Schema::from_xml(&schema_str)?;
+    let schema = if schema_path.ends_with("xml") {
+        Schema::from_xml(&schema_str)?
     } else if schema_path.ends_with("json") {
-        schema = Schema::from_json(&schema_str)?;
+        Schema::from_json(&schema_str)?
     } else {
         return Err(format_err!("Schema format not supported"))
-    }
+    };
 
     // TODO Should this check be done in core?
     for cube in &schema.cubes {

@@ -49,6 +49,7 @@ pub struct EnvVars {
     pub database_url: String,
     pub geoservice_url: Option<Url>,
     pub schema_source: SchemaSource,
+    pub api_key: Option<String>,
     pub flush_secret: Option<String>,
 }
 
@@ -63,7 +64,7 @@ pub struct AppState {
     pub schema: Arc<RwLock<Schema>>,
     pub cache: Arc<RwLock<Cache>>,
     pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
-    // TODO is there a way to acces this that's not through state? Tried using closures to
+    // TODO is there a way to access this that's not through state? Tried using closures to
     // capture, but the handlers need to implement Fn, not FnOnce (which happens once capturing
     // variables from environment
     pub has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
