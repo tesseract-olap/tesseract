@@ -25,7 +25,6 @@ mod errors;
 pub mod handlers;
 mod logic_layer;
 mod schema_config;
-mod util;
 
 use actix_web::server;
 use dotenv::dotenv;

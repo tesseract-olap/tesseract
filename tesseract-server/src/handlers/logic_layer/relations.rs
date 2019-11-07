@@ -7,21 +7,21 @@ use actix_web::{
     Path,
     Result as ActixResult,
 };
-use failure::{Error, format_err, bail};
+use futures::future;
+use failure::{Error, format_err};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
 use serde_derive::Deserialize;
 use url::Url;
 
-use tesseract_core::names::{Cut, Property, LevelName, Mask};
+use tesseract_core::names::{Property, LevelName};
 use tesseract_core::format::{format_records, FormatType};
-use tesseract_core::{MeaOrCalc, DataFrame, Column, ColumnData, is_same_columndata_type};
+use tesseract_core::{DataFrame, Column, ColumnData};
 use tesseract_core::schema::{Cube, DimensionType};
 use crate::app::AppState;
-use crate::errors::ServerError;
-use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
-use super::super::util;
+use crate::logic_layer::{LogicLayerConfig, CubeCache};
+use super::super::util::{verify_api_key, format_to_content_type};
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
@@ -99,6 +99,11 @@ pub fn logic_layer_relations(
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
     };
 
+    match verify_api_key(&req, &cube) {
+        Ok(_) => (),
+        Err(err) => return Ok(err)
+    }
+
     let cube_cache = match req.state().cache.read().unwrap().find_cube_info(&cube_name) {
         Some(cube_cache) => cube_cache,
         None => return Ok(HttpResponse::NotFound().json("Unable to access cube cache".to_string()))
@@ -149,7 +154,7 @@ pub fn logic_layer_relations(
 
     let final_df = DataFrame { columns: final_columns };
 
-    let content_type = util::format_to_content_type(&format);
+    let content_type = format_to_content_type(&format);
 
     match format_records(&final_headers, final_df, format) {
         Ok(res) => {

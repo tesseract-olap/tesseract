@@ -17,7 +17,8 @@ use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
-use super::util;
+use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type};
+
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
@@ -29,20 +30,6 @@ pub fn aggregate_default_handler(
     do_aggregate(req, cube_format)
 }
 
-macro_rules! ok_or_404 {
-    ($expr:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    future::result(
-                        Ok(HttpResponse::NotFound().json(err.to_string()))
-                    )
-                );
-            }
-        }
-    };
-}
 
 /// Handles aggregation when a format is specified.
 pub fn aggregate_handler(
@@ -52,6 +39,7 @@ pub fn aggregate_handler(
     do_aggregate(req, cube_format.into_inner())
 }
 
+
 /// Performs data aggregation.
 pub fn do_aggregate(
     req: HttpRequest<AppState>,
@@ -59,6 +47,15 @@ pub fn do_aggregate(
     ) -> FutureResponse<HttpResponse>
 {
     let (cube, format) = cube_format;
+
+    // Get cube object to check for API key
+    let schema = &req.state().schema.read().unwrap().clone();
+    let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
+
+    match verify_api_key(&req, &cube_obj) {
+        Ok(_) => (),
+        Err(err) => return boxed_error_http_response(err)
+    }
 
     let format = format.parse::<FormatType>();
     let format = ok_or_404!(format);
@@ -71,6 +68,7 @@ pub fn do_aggregate(
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
     let agg_query = ok_or_404!(agg_query_res);
+
     info!("query opts:{:?}", agg_query);
 
     // Turn AggregateQueryOpt into Query
@@ -95,7 +93,7 @@ pub fn do_aggregate(
         .backend
         .exec_sql(sql)
         .and_then(move |df| {
-            let content_type = util::format_to_content_type(&format);
+            let content_type = format_to_content_type(&format);
 
             match format_records(&headers, df, format) {
                 Ok(res) => {
@@ -115,6 +113,7 @@ pub fn do_aggregate(
         })
         .responder()
 }
+
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {

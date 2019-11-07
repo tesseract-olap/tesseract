@@ -9,6 +9,7 @@ use actix_web::{
     Path,
 };
 use failure::{Error, format_err, bail};
+use futures::future;
 use futures::future::*;
 use lazy_static::lazy_static;
 use log::*;
@@ -25,8 +26,10 @@ use tesseract_core::schema::{Cube, DimensionType};
 use crate::app::AppState;
 use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
-use crate::util::{boxed_error_string, boxed_error_http_response, verify_api_key};
-use super::super::util;
+use super::super::util::{
+    boxed_error_string, boxed_error_http_response,
+    verify_api_key, format_to_content_type
+};
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
@@ -116,11 +119,7 @@ pub fn logic_layer_aggregation(
     format: String,
 ) -> FutureResponse<HttpResponse>
 {
-    let format = format.parse::<FormatType>();
-    let format = match format {
-        Ok(f) => f,
-        Err(err) => return boxed_error_string(err.to_string()),
-    };
+    let format = ok_or_404!(format.parse::<FormatType>());
 
     info!("Format: {:?}", format);
 
@@ -137,10 +136,8 @@ pub fn logic_layer_aggregation(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
-    let agg_query = match QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query) {
-        Ok(q) => q,
-        Err(err) => return boxed_error_string(err.to_string())
-    };
+    let agg_query_res = QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query);
+    let agg_query = ok_or_404!(agg_query_res);
 
     // Check to see if the logic layer config has a alias with the
     // provided cube name
@@ -154,10 +151,7 @@ pub fn logic_layer_aggregation(
         None => agg_query.cube.clone()
     };
 
-    let cube = match schema.get_cube_by_name(&cube_name) {
-        Ok(c) => c,
-        Err(err) => return boxed_error_string(err.to_string())
-    };
+    let cube = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
     match verify_api_key(&req, &cube) {
         Ok(_) => (),
@@ -176,10 +170,7 @@ pub fn logic_layer_aggregation(
         agg_query.clone(), &cube, &cube_cache,
         &logic_layer_config, &req.state().env_vars.geoservice_url
     );
-    let (ts_queries, header_map) = match ts_queries {
-        Ok((ts_queries, header_map)) => (ts_queries, header_map),
-        Err(err) => return boxed_error_string(err.to_string())
-    };
+    let (ts_queries, header_map) = ok_or_404!(ts_queries);
 
     if ts_queries.len() == 0 {
         return boxed_error_string("Unable to generate queries".to_string())
@@ -196,10 +187,7 @@ pub fn logic_layer_aggregation(
             .schema.read().unwrap()
             .sql_query(&cube_name, &ts_query);
 
-        let (query_ir, headers) = match query_ir_headers {
-            Ok(x) => x,
-            Err(err) => return boxed_error_string(err.to_string())
-        };
+        let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
         debug!("Query IR: {:?}", query_ir);
 
@@ -230,7 +218,7 @@ pub fn logic_layer_aggregation(
     debug!("Headers: {:?}", final_headers);
 
     // Joins all the futures for each TsQuery
-    let futs: JoinAll<Vec<Box<Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
+    let futs: JoinAll<Vec<Box<dyn Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
             .iter()
             .map(|sql| {
                 req.state()
@@ -325,7 +313,7 @@ pub fn logic_layer_aggregation(
 
             let final_df = DataFrame { columns: final_columns };
 
-            let content_type = util::format_to_content_type(&format);
+            let content_type = format_to_content_type(&format);
 
             match format_records(&final_headers, final_df, format) {
                 Ok(res) => {

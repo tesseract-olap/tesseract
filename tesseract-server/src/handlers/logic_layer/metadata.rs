@@ -14,12 +14,11 @@ use serde_qs as qs;
 
 use crate::app::AppState;
 use crate::logic_layer::{LogicLayerConfig};
-use crate::util::boxed_error_string;
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
 
-use super::super::util;
+use super::super::util::{boxed_error_string, format_to_content_type};
 
 
 /// Handles default members query when a format is not specified.
@@ -47,11 +46,7 @@ pub fn get_members(
     format: String,
 ) -> FutureResponse<HttpResponse>
 {
-    let format = format.parse::<FormatType>();
-    let format = match format {
-        Ok(f) => f,
-        Err(err) => return boxed_error_string(err.to_string()),
-    };
+    let format = ok_or_404!(format.parse::<FormatType>());
 
     info!("Format: {:?}", format);
 
@@ -68,10 +63,10 @@ pub fn get_members(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
-    let members_query = match QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(query) {
-        Ok(q) => q,
-        Err(err) => return boxed_error_string(err.to_string())
-    };
+    let members_query_res = QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(query);
+    let members_query = ok_or_404!(members_query_res);
+
+    // TODO: Get cube name before checking for API key
 
     let mut cube_name = members_query.cube.clone();
     let mut level_name: Option<LevelName> = None;
@@ -167,7 +162,7 @@ pub fn get_members(
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
-            let content_type = util::format_to_content_type(&format);
+            let content_type = format_to_content_type(&format);
 
             match format_records(&header, df, format) {
                 Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
