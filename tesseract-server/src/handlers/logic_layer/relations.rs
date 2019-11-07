@@ -7,7 +7,6 @@ use actix_web::{
     Path,
     Result as ActixResult,
 };
-use futures::future;
 use failure::{Error, format_err};
 use lazy_static::lazy_static;
 use log::*;
@@ -68,7 +67,7 @@ pub fn logic_layer_relations(
 
     let query = req.query_string();
     let schema = req.state().schema.read().unwrap();
-    let debug = req.state().debug;
+    let _debug = req.state().debug;
 
     lazy_static! {
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);

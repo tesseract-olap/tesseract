@@ -18,7 +18,10 @@ use crate::logic_layer::{LogicLayerConfig};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
 
-use super::super::util::{boxed_error_string, format_to_content_type};
+use super::super::util::{
+    boxed_error_string, boxed_error_http_response,
+    verify_api_key, format_to_content_type
+};
 
 
 /// Handles default members query when a format is not specified.
@@ -52,7 +55,7 @@ pub fn get_members(
 
     let query = req.query_string();
     let schema = req.state().schema.read().unwrap();
-    let debug = req.state().debug;
+    let _debug = req.state().debug;
 
     let logic_layer_config: Option<LogicLayerConfig> = match &req.state().logic_layer_config {
         Some(llc) => Some(llc.read().unwrap().clone()),
@@ -66,10 +69,16 @@ pub fn get_members(
     let members_query_res = QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(query);
     let members_query = ok_or_404!(members_query_res);
 
-    // TODO: Get cube name before checking for API key
-
     let mut cube_name = members_query.cube.clone();
     let mut level_name: Option<LevelName> = None;
+
+    // Get cube object to check for API key
+    let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
+
+    match verify_api_key(&req, &cube_obj) {
+        Ok(_) => (),
+        Err(err) => return boxed_error_http_response(err)
+    }
 
     if let Some(logic_layer_config) = &logic_layer_config {
         if let Some(aliases) = &logic_layer_config.aliases {
