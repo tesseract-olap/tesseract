@@ -280,6 +280,25 @@ impl LogicLayerConfig {
         Ok(None)
     }
 
+    /// Returns a  vector of String containing the alternative names for a given cube if there is one
+    pub fn find_cube_aliases(
+        &self, cube_name: &String,
+    ) -> Option<Vec<String>> {
+        if let Some(aliases) = &self.aliases {
+            if let Some(cubes) = &aliases.cubes{
+                for cube in cubes {
+                    if &cube.name == cube_name {
+                        let res = cube.alternatives.clone();
+                        if res.len() != 0{
+                            return Some(res)
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Returns a unique name definition for a given cube property if there is one.
     pub fn find_unique_cube_property_name(
         &self, cube_name: &String, property_name: &Property

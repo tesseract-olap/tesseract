@@ -110,7 +110,6 @@ pub fn get_members(
             }
         }
     }
-
     // If level name is not yet set, try to set it from a cube object by a direct match
     let level_name = match level_name {
         Some(level_name) => Some(level_name),
@@ -143,7 +142,7 @@ pub fn get_members(
         Some(level_name) => level_name,
         None => return boxed_error_string("Unable to find a level with the name provided".to_string())
     };
-
+    
     debug!("{:?}", cube_name);
     debug!("{:?}", level_name);
 
