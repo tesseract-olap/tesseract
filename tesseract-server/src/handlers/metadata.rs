@@ -34,7 +34,7 @@ pub fn metadata_handler(
         Some(llc) => llc.read().unwrap().clone(),
         None => return  Ok(HttpResponse::NotFound().json("Logic layer error"))
     };
-    let cube_details = get_cube_metadata(cube, ll_config);
+    let cube_details = get_cube_metadata(cube, &ll_config);
     Ok(HttpResponse::Ok().json(cube_details))
 }
 
@@ -51,7 +51,7 @@ pub fn metadata_all_handler(
     };
     let mut cubes: Vec<CubeMetadata> = Vec::new();
     for cube in schema_details.cubes.iter(){
-        cubes.push(get_cube_metadata(cube.clone(), ll_config.clone()))
+        cubes.push(get_cube_metadata(cube.clone(), &ll_config));
     }
     schema_details.cubes = cubes;
     Ok(HttpResponse::Ok().json(schema_details))
@@ -77,7 +77,7 @@ pub fn members_handler(
 
 pub fn get_cube_metadata(
     mut cube_details: CubeMetadata,
-    ll_config: LogicLayerConfig,
+    ll_config: &LogicLayerConfig,
 ) -> CubeMetadata {
     cube_details.alias = ll_config.find_cube_aliases(&cube_details.name);
     for dimension in cube_details.dimensions.iter_mut(){
