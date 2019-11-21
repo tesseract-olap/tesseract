@@ -6,3 +6,4 @@
 .idea/
 bench-data
 test-schema
+.DS_Store
