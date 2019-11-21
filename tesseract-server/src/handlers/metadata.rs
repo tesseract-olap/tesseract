@@ -32,7 +32,7 @@ pub fn metadata_handler(
     };
     let ll_config = match &req.state().logic_layer_config {
         Some(llc) => llc.read().unwrap().clone(),
-        None => return  Ok(HttpResponse::NotFound().json("Logic layer error"))
+        None => return  Ok(HttpResponse::Ok().json(cube))
     };
     let cube_details = get_cube_metadata(cube, &ll_config);
     Ok(HttpResponse::Ok().json(cube_details))
@@ -47,7 +47,7 @@ pub fn metadata_all_handler(
     let mut schema_details = req.state().schema.read().unwrap().metadata();
     let ll_config = match &req.state().logic_layer_config {
         Some(llc) => llc.read().unwrap().clone(),
-        None => return  Ok(HttpResponse::NotFound().json("Logic layer error"))
+        None => return  Ok(HttpResponse::Ok().json(schema_details))
     };
     let mut cubes: Vec<CubeMetadata> = Vec::new();
     for cube in schema_details.cubes.iter(){
