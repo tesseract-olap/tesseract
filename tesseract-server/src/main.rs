@@ -101,6 +101,19 @@ fn main() -> Result<(), Error> {
     let (db, db_url, db_type) = db_config::get_db(&db_url_full)?;
     let db_type_viz = db_type.clone();
 
+    let db_schema_table = env::var("TESSERACT_DB_SCHEMA_TABLEPATH");
+    let mut live_schema_mode = false;
+    match db_schema_table {
+        Ok(tablepath) => {
+            info!("Detect database schema! {}", tablepath);
+            live_schema_mode = true;
+            db.retrieve_schemas(&tablepath);
+        },
+        _ => {
+            info!("No DB table detected. Using filesystem...")
+        }
+    }
+
     // Schema
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
@@ -115,11 +128,11 @@ fn main() -> Result<(), Error> {
             None
         }
     };
-
-    // NOTE: Local schema is the only supported SchemaSource for now
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
-    let mut schema = schema_config::read_schema(&schema_path)?;
+    let (content, mode) = schema_config::file_path_to_string_mode(&schema_path).unwrap();
+
+    let mut schema = schema_config::read_schema(&schema_path, &"json".to_string())?;
     schema.validate()?;
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();
     let schema_arc = Arc::new(RwLock::new(schema.clone()));

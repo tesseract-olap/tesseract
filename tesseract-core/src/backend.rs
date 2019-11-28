@@ -7,6 +7,13 @@ use crate::sql;
 
 
 pub trait Backend {
+    /// Takes in a fully-qualfiied path to a table name
+    /// assumes table is in the structure of: id (integer), name (text), schema (json) 
+    /// desired query output format.
+    fn retrieve_schemas(&self, tablepath: &str) -> String {
+        unimplemented!()
+    }
+
     /// Takes in a SQL string, outputs a DataFrame, which will go on to be formatted into the
     /// desired query output format.
     fn exec_sql(&self, sql: String) -> Box<dyn Future<Item=DataFrame, Error=Error>>;

@@ -39,6 +39,7 @@ use url::Url;
 #[derive(Debug, Clone)]
 pub enum SchemaSource {
     LocalSchema { filepath: String },
+    DbSchema { content: String, table_path: String, },
     #[allow(dead_code)]
     RemoteSchema { endpoint: String },
 }

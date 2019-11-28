@@ -8,6 +8,7 @@ extern crate bb8;
 extern crate bb8_postgres;
 extern crate futures_state_stream;
 extern crate tokio;
+use tokio_postgres::{Column , Row};
 
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
@@ -55,6 +56,31 @@ impl Postgres {
 // 2. dataframe creation
 
 impl Backend for Postgres {
+    fn retrieve_schemas(&self, tablepath: &str) -> String {
+        let sql = format!("SELECT schema FROM {}", tablepath);
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(move |r| {
+                            let z: Vec<Row> = r.unwrap();
+                            let row = z.get(0).unwrap();
+                            let res: String = row.get::<usize, String>(0);
+                            Ok((res, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
+        let schema_query_result = runtime.block_on(fut).unwrap();
+        println!("RES: {:?}", schema_query_result);
+        // TODO block on future here!
+        "to".to_string()
+    }
+
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
         let fut = self.pool.run(move |mut connection| {
             connection.prepare(&sql).then( |r| match r {

@@ -44,12 +44,8 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 
         // Read schema again
         // NOTE: This logic will change once we start supporting remote schemas
-        let schema_path = match &req.state().env_vars.schema_source {
-            SchemaSource::LocalSchema { ref filepath } => filepath,
-            SchemaSource::RemoteSchema { ref endpoint } => endpoint,
-        };
-
-        let schema = match schema_config::read_schema(&schema_path) {
+        let schema_config = &req.state().env_vars.schema_source;
+        let schema = match schema_config::reload_schema(schema_config) {
             Ok(val) => val,
             Err(err) => {
                 error!("{}", err);
