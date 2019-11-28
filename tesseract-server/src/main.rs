@@ -130,9 +130,8 @@ fn main() -> Result<(), Error> {
     };
     let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
 
-    let (content, mode) = schema_config::file_path_to_string_mode(&schema_path).unwrap();
+    let mut schema = schema_config::reload_schema(&schema_source).expect("Failed to build schema");
 
-    let mut schema = schema_config::read_schema(&schema_path, &"json".to_string())?;
     schema.validate()?;
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();
     let schema_arc = Arc::new(RwLock::new(schema.clone()));

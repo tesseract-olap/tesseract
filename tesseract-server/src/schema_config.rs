@@ -33,7 +33,6 @@ pub fn read_schema(schema_content: &String, mode: &String) -> Result<Schema, Err
     } else {
         return Err(format_err!("Schema format not supported"))
     };
-
     // TODO Should this check be done in core?
     for cube in &schema.cubes {
         for dimension in &cube.dimensions {
