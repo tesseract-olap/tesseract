@@ -101,19 +101,6 @@ fn main() -> Result<(), Error> {
     let (db, db_url, db_type) = db_config::get_db(&db_url_full)?;
     let db_type_viz = db_type.clone();
 
-    let db_schema_table = env::var("TESSERACT_DB_SCHEMA_TABLEPATH");
-    let mut live_schema_mode = false;
-    match db_schema_table {
-        Ok(tablepath) => {
-            info!("Detect database schema! {}", tablepath);
-            live_schema_mode = true;
-            db.retrieve_schemas(&tablepath);
-        },
-        _ => {
-            info!("No DB table detected. Using filesystem...")
-        }
-    }
-
     // Schema
     let schema_path = env::var("TESSERACT_SCHEMA_FILEPATH")
         .expect("TESSERACT_SCHEMA_FILEPATH not found");
@@ -128,9 +115,12 @@ fn main() -> Result<(), Error> {
             None
         }
     };
-    let schema_source = SchemaSource::LocalSchema { filepath: schema_path.clone() };
-
-    let mut schema = schema_config::reload_schema(&schema_source).expect("Failed to build schema");
+    let schema_source = match env::var("TESSERACT_DB_SCHEMA_TABLEPATH") {
+        Err(_) => SchemaSource::LocalSchema { filepath: schema_path.clone() },
+        Ok(tablepath) => SchemaSource::DbSchema { tablepath }
+    };
+    // TODO confirm that db.clone only clones the Box/pointer and not the actual connection
+    let mut schema = schema_config::reload_schema(&schema_source, db.clone()).expect("Failed to build schema");
 
     schema.validate()?;
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();

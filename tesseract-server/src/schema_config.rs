@@ -1,13 +1,17 @@
 use failure::{Error, format_err};
 
-use tesseract_core::Schema;
+use tesseract_core::{Schema, Backend};
 use crate::app::{AppState, SchemaSource, EnvVars};
 
-pub fn reload_schema(schema_config: &SchemaSource) -> Result<Schema, Error> {
+pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sync + Send>) -> Result<Schema, Error> {
     match schema_config {
         SchemaSource::LocalSchema { ref filepath } => {
             let (content, mode) = self::file_path_to_string_mode(filepath).expect("parse fail");
             read_schema(&content, &mode)
+        },
+        SchemaSource::DbSchema { ref tablepath } => {
+            let content = backend.retrieve_schemas(&tablepath);
+            read_schema(&content, &"json".to_string())
         },
         _ => panic!("Invalid schema type!")
     }
