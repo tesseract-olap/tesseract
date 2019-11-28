@@ -2,6 +2,7 @@ use failure::{Error, format_err};
 
 use tesseract_core::{Schema, Backend};
 use crate::app::{AppState, SchemaSource, EnvVars};
+use log::{info};
 
 pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sync + Send>) -> Result<Schema, Error> {
     match schema_config {
@@ -10,10 +11,11 @@ pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sy
             read_schema(&content, &mode)
         },
         SchemaSource::DbSchema { ref tablepath } => {
+            info!("Reading Schema from DB...");
             let content = backend.retrieve_schemas(&tablepath);
             read_schema(&content, &"json".to_string())
         },
-        _ => panic!("Invalid schema type!")
+        _ => panic!("Unsupported schema type!")
     }
 }
 

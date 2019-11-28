@@ -76,9 +76,7 @@ impl Backend for Postgres {
         }).map_err(|err| format_err!("Postgres error {:?}", err));
         let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
         let schema_query_result = runtime.block_on(fut).unwrap();
-        println!("RES: {:?}", schema_query_result);
-        // TODO block on future here!
-        "to".to_string()
+        schema_query_result
     }
 
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
