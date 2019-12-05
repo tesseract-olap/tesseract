@@ -1,6 +1,7 @@
 use failure::{Error, format_err};
 
 use tesseract_core::{Backend, DataFrame};
+use tesseract_core::schema::metadata::SchemaPhysicalData;
 use futures::{Future, Stream};
 use tokio_postgres::NoTls;
 extern crate futures;
@@ -58,7 +59,7 @@ impl Postgres {
 // 2. dataframe creation
 
 impl Backend for Postgres {
-    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<String>, Error=Error>> {
+    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
         let sql = format!("SELECT schema FROM {}", tablepath);
         let fut = self.pool.run(move |mut connection| {
             connection.prepare(&sql).then( |r| match r {
@@ -67,7 +68,12 @@ impl Backend for Postgres {
                         .collect()
                         .then(move |r| {
                             let rows: Vec<Row> = r.expect("Failure in query of schema rows");
-                            let res = rows.into_iter().map(|row| row.get::<usize, String>(0)).collect();
+                            let res = rows.into_iter().map(|row| {
+                                SchemaPhysicalData {
+                                    content: row.get::<usize, String>(0),
+                                    format: "json".to_string(),
+                                }
+                            }).collect();
                             Ok((res, connection))
                         });
                     Either::A(f)

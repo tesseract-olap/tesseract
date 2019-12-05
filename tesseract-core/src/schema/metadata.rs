@@ -17,6 +17,12 @@ use super::{
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SchemaPhysicalData {
+    pub content: String,
+    pub format: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SchemaMetadata {
     pub name: String,
     pub cubes: Vec<CubeMetadata>,

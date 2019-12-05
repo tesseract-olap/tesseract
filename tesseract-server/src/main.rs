@@ -128,8 +128,14 @@ fn main() -> Result<(), Error> {
     { // Put runtime in limited scope so it doesn't interfere with Actix system
         let mut rt = Runtime::new().unwrap();
         let vec_schemas = rt.block_on(schema_future).expect("failed to get schemas");
-        let merged_schemas = schema_config::merge_schemas(&vec_schemas);
-        schema = schema_config::read_schema(&merged_schemas, &"json".to_string()).expect("Failed to read schema");
+
+        if vec_schemas.len() > 1 {
+            let merged_schemas = schema_config::merge_schemas(&vec_schemas);
+            schema = schema_config::read_schema(&merged_schemas, &"json".to_string()).expect("Failed to read schema");
+        } else {
+            let schema_phys = vec_schemas.get(0).unwrap();
+            schema = schema_config::read_schema(&schema_phys.content, &schema_phys.format).expect("Failed to read schema");
+        }
     }
     schema.validate()?;
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();

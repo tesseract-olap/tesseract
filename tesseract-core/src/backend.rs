@@ -4,13 +4,13 @@ use futures::{Future, Stream};
 use crate::dataframe::DataFrame;
 use crate::query_ir::QueryIr;
 use crate::sql;
-
+use crate::schema::metadata::SchemaPhysicalData;
 
 pub trait Backend {
     /// Takes in a fully-qualfiied path to a table name
     /// assumes table is in the structure of: id (integer), name (text), schema (json) 
     /// desired query output format.
-    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<String>, Error=Error>> {
+    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
         unimplemented!()
     }
 

@@ -1,15 +1,18 @@
 use failure::{Error, format_err};
 
 use tesseract_core::{Schema, Backend};
-use tesseract_core::schema::{SchemaConfigJson, json::SharedDimensionConfigJson, json::AnnotationConfigJson};
+use tesseract_core::schema::{SchemaConfigJson, metadata::SchemaPhysicalData, json::SharedDimensionConfigJson, json::AnnotationConfigJson};
 use crate::app::{AppState, SchemaSource, EnvVars};
 use log::{info};
-use futures::future::Future;
+use futures::future::{Future, ok};
 
-pub fn merge_schemas(schemas: &Vec<String>) -> String {
-    // TODO add logic to merge JSON schemas here!
-    let mut schema_objs: Vec<SchemaConfigJson> = schemas.into_iter().map(|raw_json| {
-        serde_json::from_str(raw_json).unwrap()
+pub fn merge_schemas(schemas: &Vec<SchemaPhysicalData>) -> String {
+    let mut schema_objs: Vec<SchemaConfigJson> = schemas.into_iter().map(|phys| {
+        if &phys.format == "json" {
+            serde_json::from_str(&phys.content).unwrap()
+        } else {
+            panic!("Not yet implemented for XML!");
+        }
     }).collect();
 
     // Take the first cube in the list to use as a basis. split off rest of the list
@@ -82,31 +85,33 @@ pub fn merge_schemas(schemas: &Vec<String>) -> String {
     tmp_str
 }
 
-pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sync + Send>) -> Box<dyn Future<Item=Vec<String>, Error=Error>> {
+pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sync + Send>) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
     match schema_config {
-        // SchemaSource::LocalSchema { ref filepath } => {
-            // let (content, mode) = self::file_path_to_string_mode(filepath).expect("parse fail");
-            // read_schema(&content, &mode)
-        // },
+        SchemaSource::LocalSchema { ref filepath } => {
+            let phys = self::file_path_to_string_mode(filepath).expect("parse fail");
+            Box::new(ok(vec![phys]))
+        },
         SchemaSource::DbSchema { ref tablepath } => {
             info!("Reading Schema from DB...");
-            let schemas = backend.retrieve_schemas(&tablepath);
-            // let content = merge_schemas(&schemas);
-            // read_schema(&content, &"json".to_string())
-            schemas
+            backend.retrieve_schemas(&tablepath)
         },
         _ => panic!("Unsupported schema type!")
     }
 }
 
-pub fn file_path_to_string_mode(schema_path: &String) -> Result<(String, String), Error> {
+pub fn file_path_to_string_mode(schema_path: &String) -> Result<SchemaPhysicalData, Error> {
     let schema_str = std::fs::read_to_string(&schema_path)
         .map_err(|_| format_err!("Schema file not found at {}", schema_path))?;
     let mode = match schema_path.ends_with("xml") {
         true => "xml",
         _ => "json"
     };
-    Ok((schema_str, mode.to_string()))
+    Ok(
+        SchemaPhysicalData {
+            content: schema_str,
+            format: mode.to_string(),
+        }
+    )
 }
 
 /// Reads a schema from an XML or JSON file and converts it into a `tesseract_core::Schema` object.
