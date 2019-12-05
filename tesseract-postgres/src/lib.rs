@@ -1,4 +1,5 @@
 use failure::{Error, format_err};
+
 use tesseract_core::{Backend, DataFrame};
 use futures::{Future, Stream};
 use tokio_postgres::NoTls;
@@ -8,8 +9,9 @@ extern crate bb8;
 extern crate bb8_postgres;
 extern crate futures_state_stream;
 extern crate tokio;
+use std::thread;
 use tokio_postgres::{Column , Row};
-
+use tokio::executor::current_thread;
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use futures::{
@@ -56,7 +58,7 @@ impl Postgres {
 // 2. dataframe creation
 
 impl Backend for Postgres {
-    fn retrieve_schemas(&self, tablepath: &str) -> String {
+    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<String>, Error=Error>> {
         let sql = format!("SELECT schema FROM {}", tablepath);
         let fut = self.pool.run(move |mut connection| {
             connection.prepare(&sql).then( |r| match r {
@@ -64,9 +66,8 @@ impl Backend for Postgres {
                     let f = connection.query(&select, &[])
                         .collect()
                         .then(move |r| {
-                            let z: Vec<Row> = r.unwrap();
-                            let row = z.get(0).unwrap();
-                            let res: String = row.get::<usize, String>(0);
+                            let rows: Vec<Row> = r.expect("Failure in query of schema rows");
+                            let res = rows.into_iter().map(|row| row.get::<usize, String>(0)).collect();
                             Ok((res, connection))
                         });
                     Either::A(f)
@@ -74,9 +75,7 @@ impl Backend for Postgres {
                 Err(e) => Either::B(err((e, connection))),
             })
         }).map_err(|err| format_err!("Postgres error {:?}", err));
-        let mut runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-        let schema_query_result = runtime.block_on(fut).unwrap();
-        schema_query_result
+        return Box::new(fut);
     }
 
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {

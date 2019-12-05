@@ -18,6 +18,7 @@
 //!
 //! The database is able to be declared in the schema, each fact table and dim can be from
 //! different databases. Supported: clickhouse, postgres, mysql, sqlite.
+extern crate tokio;
 
 mod app;
 mod db_config;
@@ -35,6 +36,7 @@ use structopt::StructOpt;
 use url::Url;
 
 use std::sync::{Arc, RwLock};
+use tokio::runtime::current_thread::Runtime;
 
 use crate::app::{EnvVars, SchemaSource, create_app};
 
@@ -120,8 +122,15 @@ fn main() -> Result<(), Error> {
         Ok(tablepath) => SchemaSource::DbSchema { tablepath }
     };
     // TODO confirm that db.clone only clones the Box/pointer and not the actual connection
-    let mut schema = schema_config::reload_schema(&schema_source, db.clone()).expect("Failed to build schema");
-
+    info!("Loading schema...");
+    let schema_future = schema_config::reload_schema(&schema_source, db.clone());
+    let mut schema;
+    { // Put runtime in limited scope so it doesn't interfere with Actix system
+        let mut rt = Runtime::new().unwrap();
+        let vec_schemas = rt.block_on(schema_future).expect("failed to get schemas");
+        let merged_schemas = schema_config::merge_schemas(&vec_schemas);
+        schema = schema_config::read_schema(&merged_schemas, &"json".to_string()).expect("Failed to read schema");
+    }
     schema.validate()?;
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();
     let schema_arc = Arc::new(RwLock::new(schema.clone()));

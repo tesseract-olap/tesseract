@@ -1,19 +1,99 @@
 use failure::{Error, format_err};
 
 use tesseract_core::{Schema, Backend};
+use tesseract_core::schema::{SchemaConfigJson, json::SharedDimensionConfigJson, json::AnnotationConfigJson};
 use crate::app::{AppState, SchemaSource, EnvVars};
 use log::{info};
+use futures::future::Future;
 
-pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sync + Send>) -> Result<Schema, Error> {
+pub fn merge_schemas(schemas: &Vec<String>) -> String {
+    // TODO add logic to merge JSON schemas here!
+    let mut schema_objs: Vec<SchemaConfigJson> = schemas.into_iter().map(|raw_json| {
+        serde_json::from_str(raw_json).unwrap()
+    }).collect();
+
+    // Take the first cube in the list to use as a basis. split off rest of the list
+
+    let (mut master_obj, elements) = schema_objs.split_first_mut().unwrap();
+    for obj in elements {
+            // Copy cubes
+            master_obj.cubes.extend(obj.cubes.iter().cloned());
+            // Copy shared dimensions
+            if obj.shared_dimensions.is_some() {
+                if master_obj.shared_dimensions.is_none() {
+                    master_obj.shared_dimensions = obj.shared_dimensions.clone();
+                } else {
+                    let mut new_shared: Vec<SharedDimensionConfigJson> = vec![];
+
+                    let master_shared = master_obj.shared_dimensions.as_ref();
+                    match master_shared {
+                        Some(vals) => {
+                            for v in vals {
+                                new_shared.push(v.clone());
+                            }
+                        },
+                        None => {}
+                    }
+
+                    let other_shared = obj.shared_dimensions.as_ref();
+                    match other_shared {
+                        Some(vals) => {
+                            for v in vals {
+                                new_shared.push(v.clone());
+                            }
+                        },
+                        None => {}
+                    }
+                    master_obj.shared_dimensions = Some(new_shared);
+                }
+            }
+            if obj.annotations.is_some() {
+                if master_obj.annotations.is_none() {
+                    master_obj.annotations = obj.annotations.clone();
+                } else {
+                    let mut new_shared: Vec<AnnotationConfigJson> = vec![];
+
+                    let master_shared = master_obj.annotations.as_ref();
+                    match master_shared {
+                        Some(vals) => {
+                            for v in vals {
+                                new_shared.push(v.clone());
+                            }
+                        },
+                        None => {}
+                    }
+
+                    let other_shared = obj.annotations.as_ref();
+                    match other_shared {
+                        Some(vals) => {
+                            for v in vals {
+                                new_shared.push(v.clone());
+                            }
+                        },
+                        None => {}
+                    }
+                    master_obj.annotations = Some(new_shared);
+                }
+            }
+    }
+
+    let tmp_str = serde_json::to_string(master_obj).expect("Failed to serialize schema JSON to string");
+    println!("HERE\n{}\n", tmp_str);
+    tmp_str
+}
+
+pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sync + Send>) -> Box<dyn Future<Item=Vec<String>, Error=Error>> {
     match schema_config {
-        SchemaSource::LocalSchema { ref filepath } => {
-            let (content, mode) = self::file_path_to_string_mode(filepath).expect("parse fail");
-            read_schema(&content, &mode)
-        },
+        // SchemaSource::LocalSchema { ref filepath } => {
+            // let (content, mode) = self::file_path_to_string_mode(filepath).expect("parse fail");
+            // read_schema(&content, &mode)
+        // },
         SchemaSource::DbSchema { ref tablepath } => {
             info!("Reading Schema from DB...");
-            let content = backend.retrieve_schemas(&tablepath);
-            read_schema(&content, &"json".to_string())
+            let schemas = backend.retrieve_schemas(&tablepath);
+            // let content = merge_schemas(&schemas);
+            // read_schema(&content, &"json".to_string())
+            schemas
         },
         _ => panic!("Unsupported schema type!")
     }
