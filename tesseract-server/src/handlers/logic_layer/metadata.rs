@@ -142,7 +142,7 @@ pub fn get_members(
         Some(level_name) => level_name,
         None => return boxed_error_string("Unable to find a level with the name provided".to_string())
     };
-    
+
     debug!("{:?}", cube_name);
     debug!("{:?}", level_name);
 
@@ -172,7 +172,7 @@ pub fn get_members(
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
 
-            match format_records(&header, df, format) {
+            match format_records(&header, df, format, None) {
                 Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }

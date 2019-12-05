@@ -22,6 +22,7 @@ use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
 use tesseract_core::{Query as TsQuery, MeaOrCalc, DataFrame, Column, ColumnData, is_same_columndata_type};
 use tesseract_core::schema::{Cube, DimensionType};
+use tesseract_core::schema::metadata::SourceMetadata;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
@@ -164,6 +165,9 @@ pub fn logic_layer_aggregation(
     };
 
     info!("Aggregate query: {:?}", agg_query);
+
+    // Gets the Source Data
+    let source_data = generate_source_data(&cube);
 
     // Turn AggregateQueryOpt into TsQuery
     let ts_queries = generate_ts_queries(
@@ -314,8 +318,10 @@ pub fn logic_layer_aggregation(
             let final_df = DataFrame { columns: final_columns };
 
             let content_type = format_to_content_type(&format);
+            // println!("{:?}", content_type);
+            // println!("{:?}", res);
 
-            match format_records(&final_headers, final_df, format) {
+            match format_records(&final_headers, final_df, format, source_data) {
                 Ok(res) => {
                     Ok(HttpResponse::Ok()
                         .set(content_type)
@@ -332,6 +338,35 @@ pub fn logic_layer_aggregation(
             }
         })
         .responder()
+}
+
+
+// Genrates the source data/ annotaion of the cube for which the query is executed
+fn generate_source_data(cube: &Cube) -> Option<SourceMetadata> {
+    let cube_name = &cube.name;
+    let mut measures = Vec::new();
+    // let mut annotations = HashMap::new();
+    for measure in cube.measures.iter() {
+        measures.push(measure.name.clone());
+    }
+    let annotations = match cube.annotations.clone(){
+        Some(annotations) => {
+            let mut anotate_hashmap = HashMap::new();
+            for annotation in annotations.iter(){
+                anotate_hashmap.entry(annotation.name.to_string()).or_insert(Vec::new()).push(annotation.text.to_string());
+            }
+            Some(anotate_hashmap)
+        },
+        None => None
+    };
+    // println!("{:?}", cube_name);
+    // println!("{:?}", measures);
+    // println!("{:?}", annotations);
+    Some(SourceMetadata {
+        name: cube_name.clone(),
+        measures: measures.clone(),
+        annotations: annotations.clone(),
+    })
 }
 
 

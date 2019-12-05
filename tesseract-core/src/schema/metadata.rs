@@ -240,3 +240,10 @@ impl From<&Aggregator> for AggregatorMetadata {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct SourceMetadata {
+    pub name: String,
+    pub measures: Vec<String>,
+    pub annotations: Option<HashMap<String, Vec<String>>>,
+}

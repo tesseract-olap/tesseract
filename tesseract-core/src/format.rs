@@ -5,6 +5,7 @@ use serde::Serializer;
 use serde::ser::{SerializeSeq};
 use serde_json::{Value};
 
+use crate::schema::metadata::SourceMetadata;
 use crate::dataframe::{DataFrame, ColumnData};
 
 #[derive(Debug, Clone)]
@@ -28,10 +29,10 @@ impl std::str::FromStr for FormatType {
 }
 
 /// Wrapper to format `DataFrame` to the desired output format.
-pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType) -> Result<String, Error> {
+pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType, source_data: Option<SourceMetadata>) -> Result<String, Error> {
     match format_type {
         FormatType::Csv => Ok(format_csv(headers, df)?),
-        FormatType::JsonRecords => Ok(format_jsonrecords(headers, df)?),
+        FormatType::JsonRecords => Ok(format_jsonrecords(headers, df, source_data)?),
         FormatType::JsonArrays => Ok(format_jsonarrays(headers, df)?),
     }
 }
@@ -87,7 +88,7 @@ fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
 }
 
 /// Formats response `DataFrame` to JSON records.
-fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error> {
+fn format_jsonrecords(headers: &[String], df: DataFrame, source_data: Option<SourceMetadata>) -> Result<String, Error> {
     // use streaming serializer
     // Necessary because this way we don't create a huge vec of rows containing Value
     // (very expensive)
@@ -106,8 +107,6 @@ fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error
     );
 
     let mut seq = ser.serialize_seq(Some(df.len()))?;
-
-
     // write data
     for row_idx in 0..df.len() {
         let mut row: IndexMap<&str, serde_json::Value> = IndexMap::new();
@@ -142,9 +141,14 @@ fn format_jsonrecords(headers: &[String], df: DataFrame) -> Result<String, Error
 
         seq.serialize_element(&row)?;
     }
-
     seq.end()?;
     let mut res = String::from_utf8(ser.into_inner())?;
+    let s = serde_json::to_string(&source_data)?;
+    if s != "null"{
+        res.push_str(",\n\"Source\": [\n");
+        res.push_str(&s);
+        res.push_str("\n]");
+    }
     res.push('}');
     Ok(res)
 
