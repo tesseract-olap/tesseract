@@ -2078,6 +2078,7 @@ dependencies = [
  "tesseract-core 0.1.0",
  "tesseract-mysql 0.1.0",
  "tesseract-postgres 0.1.0",
+ "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
