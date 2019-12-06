@@ -132,7 +132,11 @@ fn main() -> Result<(), Error> {
         if vec_schemas.len() > 1 {
             let merged_schemas = schema_config::merge_schemas(&vec_schemas);
             schema = schema_config::read_schema(&merged_schemas, &"json".to_string()).expect("Failed to read schema");
-        } else {
+        }
+        else if vec_schemas.len() == 0 {
+            panic!("Attempted to read schemas, but no schemas are availble! Exiting...");
+        }
+        else {
             let schema_phys = vec_schemas.get(0).unwrap();
             schema = schema_config::read_schema(&schema_phys.content, &schema_phys.format).expect("Failed to read schema");
         }
