@@ -129,7 +129,7 @@ fn generate_source_data(cube: &Cube) -> SourceMetadata {
         Some(annotations) => {
             let mut anotate_hashmap = HashMap::new();
             for annotation in annotations.iter(){
-                anotate_hashmap.entry(annotation.name.to_string()).or_insert(Vec::new()).push(annotation.text.to_string());
+                anotate_hashmap.insert(annotation.name.to_string(), annotation.text.to_string());
             }
             Some(anotate_hashmap)
         },
