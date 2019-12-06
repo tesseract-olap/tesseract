@@ -2,7 +2,7 @@ use failure::{Error, format_err};
 
 use tesseract_core::{Schema, Backend};
 use tesseract_core::schema::{SchemaConfigJson, metadata::SchemaPhysicalData, json::SharedDimensionConfigJson, json::AnnotationConfigJson};
-use crate::app::{AppState, SchemaSource, EnvVars};
+use crate::app::{SchemaSource};
 use log::{info};
 use futures::future::{Future, ok};
 
@@ -81,7 +81,6 @@ pub fn merge_schemas(schemas: &Vec<SchemaPhysicalData>) -> String {
     }
 
     let tmp_str = serde_json::to_string(master_obj).expect("Failed to serialize schema JSON to string");
-    println!("HERE\n{}\n", tmp_str);
     tmp_str
 }
 
