@@ -5,6 +5,7 @@ use actix_web::{
     HttpResponse,
     Path,
 };
+use std::collections::HashMap;
 use failure::Error;
 use futures::future::{self, Future};
 use lazy_static::lazy_static;
@@ -14,6 +15,8 @@ use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
+use tesseract_core::schema::metadata::SourceMetadata;
+use tesseract_core::schema::Cube;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
@@ -71,6 +74,10 @@ pub fn do_aggregate(
 
     info!("query opts:{:?}", agg_query);
 
+    // Gets the Source Data
+    let source_data = Some(generate_source_data(&cube_obj));
+
+
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = ok_or_404!(ts_query);
@@ -91,7 +98,7 @@ pub fn do_aggregate(
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
 
-            match format_records(&headers, df, format, None) {
+            match format_records(&headers, df, format, source_data) {
                 Ok(res) => {
                     Ok(HttpResponse::Ok()
                         .set(content_type)
@@ -108,6 +115,31 @@ pub fn do_aggregate(
             }
         })
         .responder()
+}
+
+
+// Genrates the source data/ annotaion of the cube for which the query is executed
+fn generate_source_data(cube: &Cube) -> SourceMetadata {
+    let cube_name = &cube.name;
+    let mut measures = Vec::new();
+    for measure in cube.measures.iter() {
+        measures.push(measure.name.clone());
+    }
+    let annotations = match cube.annotations.clone(){
+        Some(annotations) => {
+            let mut anotate_hashmap = HashMap::new();
+            for annotation in annotations.iter(){
+                anotate_hashmap.entry(annotation.name.to_string()).or_insert(Vec::new()).push(annotation.text.to_string());
+            }
+            Some(anotate_hashmap)
+        },
+        None => None
+    };
+    SourceMetadata {
+        name: cube_name.clone(),
+        measures: measures.clone(),
+        annotations: annotations.clone(),
+    }
 }
 
 

@@ -145,7 +145,7 @@ fn format_jsonrecords(headers: &[String], df: DataFrame, source_data: Option<Sou
     let mut res = String::from_utf8(ser.into_inner())?;
     let source_string = serde_json::to_string(&source_data)?;
     if source_string != "null" {
-        res.push_str(",\n\"Source\": [\n");
+        res.push_str(",\n\"source\": [\n");
         res.push_str(&source_string);
         res.push_str("\n]");
     }
