@@ -22,14 +22,13 @@ use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::query::{FilterQuery, GrowthQuery, RcaQuery, TopQuery, RateQuery};
 use tesseract_core::{Query as TsQuery, MeaOrCalc, DataFrame, Column, ColumnData, is_same_columndata_type};
 use tesseract_core::schema::{Cube, DimensionType};
-use tesseract_core::schema::metadata::SourceMetadata;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
-    verify_api_key, format_to_content_type
+    verify_api_key, format_to_content_type, generate_source_data
 };
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
@@ -168,7 +167,7 @@ pub fn logic_layer_aggregation(
 
     // Gets the Source Data
     let source_data = Some(generate_source_data(&cube));
-    
+
     // Turn AggregateQueryOpt into TsQuery
     let ts_queries = generate_ts_queries(
         agg_query.clone(), &cube, &cube_cache,
@@ -336,31 +335,6 @@ pub fn logic_layer_aggregation(
             }
         })
         .responder()
-}
-
-
-// Genrates the source data/ annotaion of the cube for which the query is executed
-fn generate_source_data(cube: &Cube) -> SourceMetadata {
-    let cube_name = &cube.name;
-    let mut measures = Vec::new();
-    for measure in cube.measures.iter() {
-        measures.push(measure.name.clone());
-    }
-    let annotations = match cube.annotations.clone(){
-        Some(annotations) => {
-            let mut anotate_hashmap = HashMap::new();
-            for annotation in annotations.iter(){
-                anotate_hashmap.insert(annotation.name.to_string(), annotation.text.to_string());
-            }
-            Some(anotate_hashmap)
-        },
-        None => None
-    };
-    SourceMetadata {
-        name: cube_name.clone(),
-        measures: measures.clone(),
-        annotations: annotations.clone(),
-    }
 }
 
 

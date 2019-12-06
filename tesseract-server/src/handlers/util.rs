@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use actix_web::{
     FutureResponse,
     HttpRequest,
@@ -9,6 +10,7 @@ use mime;
 
 use tesseract_core::format::FormatType;
 use tesseract_core::schema::Cube;
+use tesseract_core::schema::metadata::SourceMetadata;
 
 use crate::app::AppState;
 
@@ -38,6 +40,31 @@ pub fn boxed_error_http_response(response: HttpResponse) -> FutureResponse<HttpR
 
 
 pub const X_TESSERACT_API_KEY: &str = "x-tesseract-api-key";
+
+
+// Genrates the source data/ annotaion of the cube for which the query is executed
+pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
+    let cube_name = &cube.name;
+    let mut measures = Vec::new();
+    for measure in cube.measures.iter() {
+        measures.push(measure.name.clone());
+    }
+    let annotations = match cube.annotations.clone(){
+        Some(annotations) => {
+            let mut anotate_hashmap = HashMap::new();
+            for annotation in annotations.iter(){
+                anotate_hashmap.insert(annotation.name.to_string(), annotation.text.to_string());
+            }
+            Some(anotate_hashmap)
+        },
+        None => None
+    };
+    SourceMetadata {
+        name: cube_name.clone(),
+        measures: measures.clone(),
+        annotations: annotations.clone(),
+    }
+}
 
 
 pub fn verify_api_key(req: &HttpRequest<AppState>, cube: &Cube) -> Result<(), HttpResponse> {

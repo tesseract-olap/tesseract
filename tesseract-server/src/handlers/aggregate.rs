@@ -5,7 +5,7 @@ use actix_web::{
     HttpResponse,
     Path,
 };
-use std::collections::HashMap;
+
 use failure::Error;
 use futures::future::{self, Future};
 use lazy_static::lazy_static;
@@ -15,12 +15,11 @@ use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
-use tesseract_core::schema::metadata::SourceMetadata;
 use tesseract_core::schema::Cube;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
-use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type};
+use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type, generate_source_data};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -115,31 +114,6 @@ pub fn do_aggregate(
             }
         })
         .responder()
-}
-
-
-// Genrates the source data/ annotaion of the cube for which the query is executed
-fn generate_source_data(cube: &Cube) -> SourceMetadata {
-    let cube_name = &cube.name;
-    let mut measures = Vec::new();
-    for measure in cube.measures.iter() {
-        measures.push(measure.name.clone());
-    }
-    let annotations = match cube.annotations.clone(){
-        Some(annotations) => {
-            let mut anotate_hashmap = HashMap::new();
-            for annotation in annotations.iter(){
-                anotate_hashmap.insert(annotation.name.to_string(), annotation.text.to_string());
-            }
-            Some(anotate_hashmap)
-        },
-        None => None
-    };
-    SourceMetadata {
-        name: cube_name.clone(),
-        measures: measures.clone(),
-        annotations: annotations.clone(),
-    }
 }
 
 
