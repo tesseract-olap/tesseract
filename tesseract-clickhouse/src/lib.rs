@@ -5,6 +5,7 @@ use futures::{future, Future, Stream};
 use log::*;
 use std::time::{Duration, Instant};
 use tesseract_core::{Backend, DataFrame, QueryIr};
+use tesseract_core::schema::metadata::SchemaPhysicalData;
 
 mod df;
 mod sql;
@@ -83,6 +84,28 @@ impl Backend for Clickhouse {
         clickhouse_sql(
             &query_ir
         )
+    }
+
+    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
+        let sql = format!("SELECT schema FROM {}", tablepath);
+        let time_start = Instant::now();
+        let fut = self.pool
+            .get_handle()
+            .and_then(move |c| c.query(&sql).fetch_all())
+            .from_err()
+            .and_then(move |(_, block): (_, Block<Complex>)| {
+                let timing = time_start.elapsed();
+                info!("Time for sql schema retrieval: {}.{:03}", timing.as_secs(), timing.subsec_millis());
+                let schema_vec: Vec<SchemaPhysicalData> = block.rows().map(|row| {
+                    SchemaPhysicalData {
+                        content: row.get("schema").expect("missing"),
+                        format: "json".to_string(),
+                    }
+                }).collect();
+                Ok(schema_vec)
+            });
+
+        Box::new(fut)
     }
 }
 
