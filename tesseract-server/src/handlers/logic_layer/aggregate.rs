@@ -167,7 +167,7 @@ pub fn logic_layer_aggregation(
     info!("Aggregate query: {:?}", agg_query);
 
     // Gets the Source Data
-    let source_data = generate_source_data(&cube);
+    let source_data = Some(generate_source_data(&cube));
 
     // Turn AggregateQueryOpt into TsQuery
     let ts_queries = generate_ts_queries(
@@ -318,8 +318,6 @@ pub fn logic_layer_aggregation(
             let final_df = DataFrame { columns: final_columns };
 
             let content_type = format_to_content_type(&format);
-            // println!("{:?}", content_type);
-            // println!("{:?}", res);
 
             match format_records(&final_headers, final_df, format, source_data) {
                 Ok(res) => {
@@ -342,10 +340,9 @@ pub fn logic_layer_aggregation(
 
 
 // Genrates the source data/ annotaion of the cube for which the query is executed
-fn generate_source_data(cube: &Cube) -> Option<SourceMetadata> {
+fn generate_source_data(cube: &Cube) -> SourceMetadata {
     let cube_name = &cube.name;
     let mut measures = Vec::new();
-    // let mut annotations = HashMap::new();
     for measure in cube.measures.iter() {
         measures.push(measure.name.clone());
     }
@@ -359,14 +356,11 @@ fn generate_source_data(cube: &Cube) -> Option<SourceMetadata> {
         },
         None => None
     };
-    // println!("{:?}", cube_name);
-    // println!("{:?}", measures);
-    // println!("{:?}", annotations);
-    Some(SourceMetadata {
+    SourceMetadata {
         name: cube_name.clone(),
         measures: measures.clone(),
         annotations: annotations.clone(),
-    })
+    }
 }
 
 
