@@ -11,10 +11,9 @@ use actix_web::{
     HttpRequest,
     HttpResponse,
     FutureResponse,
-    Result as ActixResult,
 };
 
-use crate::app::{AppState, SchemaSource};
+use crate::app::{AppState};
 use crate::schema_config;
 
 
@@ -33,7 +32,6 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse>
     let query_res = QS_NON_STRICT.deserialize_str::<FlushQueryOpt>(&query);
     let query = ok_or_404!(query_res);
 
-    let db_secret_opt = &req.state().env_vars.flush_secret.as_ref();
     match &req.state().env_vars.flush_secret {
         Some(db_secret) => {
             if *db_secret != query.secret {
