@@ -105,6 +105,60 @@ impl Backend for Postgres {
     fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
         Box::new((*self).clone())
     }
+
+    fn update_schema(&self, tablepath: &str, schema_name_id: &str, schema_content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("UPDATE {} SET schema = '{}' WHERE id = '{}'", tablepath, schema_content, schema_name_id);
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(|_r| {
+                            Ok((true, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        return Box::new(fut);
+    }
+
+    fn delete_schema(&self, tablepath: &str, schema_name_id: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("DELETE FROM {} WHERE id = '{}'", tablepath, schema_name_id);
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(|_r| {
+                            Ok((true, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        return Box::new(fut);
+    }
+
+    fn add_schema(&self, tablepath: &str, schema_name_id: &str, content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("INSERT INTO {} (\"id\", \"schema\") VALUES ('{}', '{}') RETURNING \"id\"", tablepath, schema_name_id, content);
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(|_r| {
+                            Ok((true, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        return Box::new(fut);
+    }
 }
 
 
