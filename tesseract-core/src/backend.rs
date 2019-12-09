@@ -45,6 +45,19 @@ pub trait Backend {
             &query_ir.growth,
         )
     }
+
+    /// This function allows administrators to update the content of a given schema.
+    fn update_schema(&self, tablepath: &str, schema_name_id: &str, schema_content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        unimplemented!()
+    }
+
+    fn delete_schema(&self, tablepath: &str, schema_name_id: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        unimplemented!()
+    }
+
+    fn add_schema(&self, tablepath: &str,  schema_name_id: &str, schema_content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        unimplemented!()
+    }
 }
 
 impl Clone for Box<dyn Backend + Send + Sync> {
