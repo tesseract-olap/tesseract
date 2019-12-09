@@ -155,7 +155,7 @@ pub fn logic_layer_relations(
 
     let content_type = format_to_content_type(&format);
 
-    match format_records(&final_headers, final_df, format) {
+    match format_records(&final_headers, final_df, format, None) {
         Ok(res) => {
             Ok(HttpResponse::Ok()
                 .set(content_type)

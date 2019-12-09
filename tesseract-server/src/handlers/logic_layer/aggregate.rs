@@ -28,7 +28,7 @@ use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
-    verify_api_key, format_to_content_type
+    verify_api_key, format_to_content_type, generate_source_data
 };
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
@@ -164,6 +164,9 @@ pub fn logic_layer_aggregation(
     };
 
     info!("Aggregate query: {:?}", agg_query);
+
+    // Gets the Source Data
+    let source_data = Some(generate_source_data(&cube));
 
     // Turn AggregateQueryOpt into TsQuery
     let ts_queries = generate_ts_queries(
@@ -315,7 +318,7 @@ pub fn logic_layer_aggregation(
 
             let content_type = format_to_content_type(&format);
 
-            match format_records(&final_headers, final_df, format) {
+            match format_records(&final_headers, final_df, format, source_data) {
                 Ok(res) => {
                     Ok(HttpResponse::Ok()
                         .set(content_type)
