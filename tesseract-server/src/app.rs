@@ -19,6 +19,9 @@ use crate::handlers::{
     logic_layer_members_handler,
     logic_layer_members_default_handler,
     flush_handler,
+    schema_update_handler,
+    schema_add_handler,
+    schema_delete_handler,
     index_handler,
     metadata_handler,
     metadata_all_handler,
@@ -118,6 +121,15 @@ pub fn create_app(
 
         .resource("/flush", |r| {
             r.method(Method::POST).with(flush_handler)
+        })
+        .resource("/schema/update", |r| {
+            r.method(Method::POST).with(schema_update_handler)
+        })
+        .resource("/schema/add", |r| {
+            r.method(Method::POST).with(schema_add_handler)
+        })
+        .resource("/schema/delete", |r| {
+            r.method(Method::POST).with(schema_delete_handler)
         })
         // Allow the API to accept /my-path or /my-path/ for all requests
         .default_resource(|r| r.h(NormalizePath::default()));
