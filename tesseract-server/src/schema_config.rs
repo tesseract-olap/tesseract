@@ -9,11 +9,13 @@ use futures::future::{Future, ok};
 pub fn merge_schemas(schemas: &Vec<SchemaPhysicalData>) -> String {
     let mut schema_objs: Vec<SchemaConfigJson> = schemas.into_iter().map(|phys| {
         if &phys.format == "json" {
-            serde_json::from_str(&phys.content).unwrap()
+            serde_json::from_str(&phys.content)
         } else {
             panic!("Not yet implemented for XML!");
         }
-    }).collect();
+    })
+    .filter_map(Result::ok) // Ignore schemas that were not able to be parsed
+    .collect();
 
     // Take the first cube in the list to use as a basis. split off rest of the list
 
@@ -111,6 +113,17 @@ pub fn file_path_to_string_mode(schema_path: &String) -> Result<SchemaPhysicalDa
             format: mode.to_string(),
         }
     )
+}
+
+/// Creates a dummy schema to allow server to boot even if no schemas are
+/// configured yet
+pub fn placeholder() -> Schema {
+    Schema {
+        name: "placeholder".to_string(),
+        cubes: vec![],
+        annotations: None,
+        default_locale: "en".to_string()
+    }
 }
 
 /// Reads a schema from an XML or JSON file and converts it into a `tesseract_core::Schema` object.
