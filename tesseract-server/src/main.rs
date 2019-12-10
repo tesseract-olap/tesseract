@@ -134,7 +134,8 @@ fn main() -> Result<(), Error> {
             schema = schema_config::read_schema(&merged_schemas, &"json".to_string()).expect("Failed to read schema");
         }
         else if vec_schemas.len() == 0 {
-            panic!("Attempted to read schemas, but no schemas are availble! Exiting...");
+            warn!("Attempted to read schemas, but no schemas are availble! Loading placeholder schema...");
+            schema = schema_config::placeholder();
         }
         else {
             let schema_phys = vec_schemas.get(0).unwrap();
