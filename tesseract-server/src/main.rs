@@ -162,6 +162,8 @@ fn main() -> Result<(), Error> {
         Some(ll_config) => Some(Arc::new(RwLock::new(ll_config))),
         None => None
     };
+    //check the user status
+    db_config::check_user(&db_url, db.clone(), &mut sys, &db_type)?;
 
     // Initialize Server
     server::new(
