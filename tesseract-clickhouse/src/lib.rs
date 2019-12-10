@@ -107,5 +107,61 @@ impl Backend for Clickhouse {
 
         Box::new(fut)
     }
+
+    fn update_schema(&self, tablepath: &str, schema_name_id: &str, schema_content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("ALTER TABLE {} UPDATE schema = '{}' WHERE id = '{}'", tablepath, schema_content, schema_name_id);
+        let time_start = Instant::now();
+        let fut = self.pool
+            .get_handle()
+            .and_then(move |c| {
+                c.execute(sql)
+            })
+            .and_then(move |c| {
+                let timing = time_start.elapsed();
+                info!("Time for updating schema: {}.{:03}", timing.as_secs(), timing.subsec_millis());
+                Ok(true)
+            })
+            .from_err();
+
+        Box::new(fut)
+    }
+
+
+    fn add_schema(&self, tablepath: &str, schema_name_id: &str, content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let block = Block::new()
+            .column("id", vec![schema_name_id])
+            .column("schema", vec![content]);
+        let table_name_copy = tablepath.to_string();
+        let time_start = Instant::now();
+        let fut = self.pool
+            .get_handle()
+            .and_then(move |c| {
+                c.insert(table_name_copy, block)
+            })
+            .and_then(move |c| {
+                let timing = time_start.elapsed();
+                info!("Time for adding schema: {}.{:03}", timing.as_secs(), timing.subsec_millis());
+                Ok(true)
+            })
+            .from_err();
+
+        Box::new(fut)
+    }
+
+    fn delete_schema(&self, tablepath: &str, schema_name_id: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("ALTER TABLE {} DELETE WHERE id = '{}'", tablepath, schema_name_id);
+        let time_start = Instant::now();
+        let fut = self.pool
+            .get_handle()
+            .and_then(move |c| c.execute(sql))
+            .and_then(move |c| {
+                let timing = time_start.elapsed();
+                info!("Time for deleting schema: {}.{:03}", timing.as_secs(), timing.subsec_millis());
+                Ok(true)
+            })
+            .from_err();
+
+        Box::new(fut)
+    }
 }
 
