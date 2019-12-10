@@ -86,8 +86,11 @@ impl Backend for Clickhouse {
         )
     }
 
-    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
-        let sql = format!("SELECT schema FROM {}", tablepath);
+    fn retrieve_schemas(&self, tablepath: &str, id: Option<&str>) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
+        let sql = match id {
+            None => format!("SELECT id, schema FROM {}", tablepath),
+            Some(id_val) => format!("SELECT id, schema FROM {} WHERE id = '{}'", tablepath, id_val),
+        };
         let time_start = Instant::now();
         let fut = self.pool
             .get_handle()
@@ -98,7 +101,8 @@ impl Backend for Clickhouse {
                 info!("Time for sql schema retrieval: {}.{:03}", timing.as_secs(), timing.subsec_millis());
                 let schema_vec: Vec<SchemaPhysicalData> = block.rows().map(|row| {
                     SchemaPhysicalData {
-                        content: row.get("schema").expect("missing"),
+                        id: row.get("id").expect("missing id"),
+                        content: row.get("schema").expect("missing schema"),
                         format: "json".to_string(),
                     }
                 }).collect();

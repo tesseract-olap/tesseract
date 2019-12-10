@@ -94,7 +94,7 @@ pub fn reload_schema(schema_config: &SchemaSource, backend: Box<dyn Backend + Sy
         },
         SchemaSource::DbSchema { ref tablepath } => {
             info!("Reading Schema from DB...");
-            backend.retrieve_schemas(&tablepath)
+            backend.retrieve_schemas(&tablepath, None)
         },
         _ => panic!("Unsupported schema type!")
     }
@@ -109,6 +109,7 @@ pub fn file_path_to_string_mode(schema_path: &String) -> Result<SchemaPhysicalDa
     };
     Ok(
         SchemaPhysicalData {
+            id: schema_path.to_string(),
             content: schema_str,
             format: mode.to_string(),
         }

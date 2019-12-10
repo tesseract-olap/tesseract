@@ -22,6 +22,7 @@ pub use self::flush::flush_handler;
 pub use self::schema_admin::schema_update_handler;
 pub use self::schema_admin::schema_add_handler;
 pub use self::schema_admin::schema_delete_handler;
+pub use self::schema_admin::schema_info_handler;
 pub use self::index::index_handler;
 pub use self::metadata::members_handler;
 pub use self::metadata::members_default_handler;

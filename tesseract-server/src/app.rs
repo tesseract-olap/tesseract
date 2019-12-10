@@ -22,6 +22,7 @@ use crate::handlers::{
     schema_update_handler,
     schema_add_handler,
     schema_delete_handler,
+    schema_info_handler,
     index_handler,
     metadata_handler,
     metadata_all_handler,
@@ -130,6 +131,9 @@ pub fn create_app(
         })
         .resource("/schema/delete", |r| {
             r.method(Method::POST).with(schema_delete_handler)
+        })
+        .resource("/schema/list", |r| {
+            r.method(Method::GET).with(schema_info_handler)
         })
         // Allow the API to accept /my-path or /my-path/ for all requests
         .default_resource(|r| r.h(NormalizePath::default()));

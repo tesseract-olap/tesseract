@@ -31,6 +31,12 @@ pub struct SchemaUpdateOpt {
     pub content: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SchemaListOpt {
+    pub secret: String,
+    pub id: Option<String>,
+}
+
 pub fn schema_add_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     let query = req.query_string();
 
@@ -50,7 +56,7 @@ pub fn schema_add_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpResp
         },
         None => { auth_denied!("Authorization denied. No secret set.".to_string()) }
     }
-    info!("Flush internal state");
+    info!("Add schema handler");
     let debug_mode = req.state().debug;
     let backend = &req.state().backend;
 
@@ -89,7 +95,7 @@ pub fn schema_delete_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpR
         },
         None => { auth_denied!("Authorization denied. No secret set.".to_string()) }
     }
-    info!("Flush internal state");
+    info!("Delete schema handler");
     let debug_mode = req.state().debug;
     let backend = &req.state().backend;
 
@@ -129,7 +135,7 @@ pub fn schema_update_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpR
         },
         None => { auth_denied!("Authorization denied. No secret set.".to_string()) }
     }
-    info!("Flush internal state");
+    info!("Update schema handler");
     let debug_mode = req.state().debug;
     let backend = &req.state().backend;
 
@@ -138,6 +144,50 @@ pub fn schema_update_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpR
     backend.update_schema(&tablepath, &query.id, &query.content)
         .and_then(move |_result| {
             Ok(HttpResponse::Ok().body("success".to_owned()))
+        })
+        .map_err(move |e| {
+            if debug_mode {
+                ServerError::Db { cause: e.to_string() }.into()
+            } else {
+                ServerError::Db { cause: "Internal Server Error 4040".to_owned() }.into()
+            }
+        })
+        .responder()
+}
+
+pub fn schema_info_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+    let query = req.query_string();
+
+    lazy_static!{
+        static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
+    }
+
+    let query = QS_NON_STRICT.deserialize_str::<SchemaListOpt>(&query);
+    let query = ok_or_404!(query);
+
+    // For now use, flush secret as auth mechanism
+    match &req.state().env_vars.flush_secret {
+        Some(db_secret) => {
+            if *db_secret != query.secret {
+                auth_denied!("Authorization denied, bad secret.".to_string());
+            }
+        },
+        None => { auth_denied!("Authorization denied. No secret set.".to_string()) }
+    }
+    info!("Flush internal state");
+    let debug_mode = req.state().debug;
+    let backend = &req.state().backend;
+
+    let tablepath = env::var("TESSERACT_DB_SCHEMA_TABLEPATH").expect("need tablepath");
+    let value = query.id.as_ref().map(String::as_str);
+    backend.retrieve_schemas(&tablepath, value)
+        .and_then(move |schemas| {
+            // let  z = schemas.get(0).unwrap();
+            // let y: Vec<String> = schemas.clone().into_iter().map(|x| {
+                // x.content.replace(r#"\""#, "ZZZZZzzz")
+            // }).collect();
+            // println!("Ytest wuth \"quotes\"");
+            Ok(HttpResponse::Ok().body(serde_json::to_string(&schemas).unwrap()))
         })
         .map_err(move |e| {
             if debug_mode {

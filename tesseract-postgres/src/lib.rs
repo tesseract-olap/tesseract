@@ -59,8 +59,11 @@ impl Postgres {
 // 2. dataframe creation
 
 impl Backend for Postgres {
-    fn retrieve_schemas(&self, tablepath: &str) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
-        let sql = format!("SELECT schema FROM {}", tablepath);
+    fn retrieve_schemas(&self, tablepath: &str, id: Option<&str>) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
+        let sql = match id {
+            None => format!("SELECT id, schema FROM {}", tablepath),
+            Some(id_val) => format!("SELECT id, schema FROM {} WHERE id = '{}", tablepath, id_val),
+        };
         let fut = self.pool.run(move |mut connection| {
             connection.prepare(&sql).then( |r| match r {
                 Ok(select) => {
@@ -70,7 +73,8 @@ impl Backend for Postgres {
                             let rows: Vec<Row> = r.expect("Failure in query of schema rows");
                             let res = rows.into_iter().map(|row| {
                                 SchemaPhysicalData {
-                                    content: row.get::<usize, String>(0),
+                                    id: row.get::<usize, String>(0),
+                                    content: row.get::<usize, String>(1),
                                     format: "json".to_string(),
                                 }
                             }).collect();
