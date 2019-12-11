@@ -657,7 +657,7 @@ impl Schema {
             // Checking if we are going to sort by RCA or not
             let measure_name = s.measure.to_string();
             if let Some(ref rca) = query.rca {
-                if measure_name == format!("{} RCA", rca.mea.clone().to_string()){
+                if measure_name == format!("{} RCA", rca.mea.to_string()){
                     Some(SortSql {
                         direction: s.direction.clone(),
                         column: format!("rca"),
