@@ -182,11 +182,6 @@ pub fn schema_info_handler(req: HttpRequest<AppState>) -> FutureResponse<HttpRes
     let value = query.id.as_ref().map(String::as_str);
     backend.retrieve_schemas(&tablepath, value)
         .and_then(move |schemas| {
-            // let  z = schemas.get(0).unwrap();
-            // let y: Vec<String> = schemas.clone().into_iter().map(|x| {
-                // x.content.replace(r#"\""#, "ZZZZZzzz")
-            // }).collect();
-            // println!("Ytest wuth \"quotes\"");
             Ok(HttpResponse::Ok().body(serde_json::to_string(&schemas).unwrap()))
         })
         .map_err(move |e| {
