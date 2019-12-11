@@ -655,12 +655,24 @@ impl Schema {
         let sort = if let Some(ref s) = query.sort {
             // sort column needs to be named by alias
             // Checking if we are going to sort by RCA or not
-            let measure_name = &s.measure.to_string();
-            if measure_name.contains("RCA") {
-                Some(SortSql {
-                    direction: s.direction.clone(),
-                    column: format!("rca"),
-                })
+            let measure_name = s.measure.to_string();
+            if let Some(ref rca) = query.rca {
+                if measure_name == format!("{} RCA", rca.mea.clone().to_string()){
+                    Some(SortSql {
+                        direction: s.direction.clone(),
+                        column: format!("rca"),
+                    })
+                } else {
+                    let sort_column = query.measures.iter()
+                        .position(|m| m == &s.measure)
+                        .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
+
+
+                    Some(SortSql {
+                        direction: s.direction.clone(),
+                        column: format!("final_m{}", sort_column),
+                    })
+                }
             } else {
                 let sort_column = query.measures.iter()
                     .position(|m| m == &s.measure)
