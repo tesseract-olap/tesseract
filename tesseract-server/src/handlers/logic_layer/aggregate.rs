@@ -531,6 +531,26 @@ pub fn generate_ts_queries(
                 None => bail!("Unable to find drill 2 level")
             };
 
+            // helps in getting the locale captions for the given level
+            let level_1 = match cube.get_level(level_name_1) {
+                Some(level) => level,
+                None => bail!("Unable to find drill 1 level")
+            };
+            let level_2 = match cube.get_level(level_name_2) {
+                Some(level) => level,
+                None => bail!("Unabel to find drill 2 level")
+            };
+            let new_captions = level_1.get_captions(&level_name_1, &locales);
+            captions.extend_from_slice(&new_captions);
+            let new_captions = level_2.get_captions(&level_name_2, &locales);
+            captions.extend_from_slice(&new_captions);
+            // If parents is true return the parent level local captions too
+            if parents {
+                 let new_captions = get_parent_captions(&cube, &level_name_1, &locales);
+                 captions = [&captions[..], &new_captions[..]].concat();
+                 let new_captions = get_parent_captions(&cube, &level_name_2, &locales);
+                 captions = [&captions[..], &new_captions[..]].concat();
+            }
             let rca = RcaQuery::new(
                 level_name_1.dimension.clone(),
                 level_name_1.hierarchy.clone(),
