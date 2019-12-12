@@ -1,27 +1,14 @@
 [package]
-authors = ["Walther Chen <walther.chen@gmail.com>"]
+authors = [ "Walther Chen <walther.chen@gmail.com>",]
 description = "ROLAP engine for web applications, in Rust"
 license = "MIT"
 readme = "README.md"
 edition = "2018"
 name = "tesseract-olap"
-version = "0.14.7"
-
-[package.metadata.deb]
-maintainer = "Walther Chen <walther.chen@gmail.com>"
-extended-description = "Olap engine for serving web applications"
-depends = "$auto"
-section = "Web Servers"
-priority = "optional"
-assets = [
-    ["../target/release/tesseract-olap", "usr/bin/", "755"],
-    ["pkg/deb/tesseract-olap.service", "/etc/systemd/system/tesseract-olap.service", "644"],
-]
-maintainer-scripts = "pkg/deb/maintainer-scripts"
+version = "0.14.8"
 
 [dependencies]
 actix = "0.7.7"
-actix-web = { version = "0.7.18", features = ["ssl"] }
 dotenv = "0.13.0"
 failure = "0.1.2"
 futures = "0.1.25"
@@ -36,6 +23,10 @@ structopt = "0.2.13"
 mime = "0.3.13"
 url = "2.1.0"
 
+[dependencies.actix-web]
+version = "0.7.18"
+features = [ "ssl",]
+
 [dependencies.tesseract-clickhouse]
 path = "../tesseract-clickhouse"
 
@@ -47,3 +38,12 @@ path = "../tesseract-postgres"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"
+
+[package.metadata.deb]
+maintainer = "Walther Chen <walther.chen@gmail.com>"
+extended-description = "Olap engine for serving web applications"
+depends = "$auto"
+section = "Web Servers"
+priority = "optional"
+assets = [ [ "../target/release/tesseract-olap", "usr/bin/", "755",], [ "pkg/deb/tesseract-olap.service", "/etc/systemd/system/tesseract-olap.service", "644",],]
+maintainer-scripts = "pkg/deb/maintainer-scripts"
