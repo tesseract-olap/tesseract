@@ -654,15 +654,30 @@ impl Schema {
 
         let sort = if let Some(ref s) = query.sort {
             // sort column needs to be named by alias
-            let sort_column = query.measures.iter()
-                .position(|m| m == &s.measure)
-                .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
+            // Checking if we are going to sort by RCA or not
+            let measure_name = s.measure.to_string();
+            let rca_measure_name = if query.rca.is_some() {
+                query.rca.as_ref().unwrap().mea.to_string()
+            } else {
+                "".to_string()
+            };
+
+            if measure_name == format!("{} RCA", rca_measure_name) {
+                Some(SortSql {
+                    direction: s.direction.clone(),
+                    column: format!("rca"),
+                })
+            } else {
+                let sort_column = query.measures.iter()
+                    .position(|m| m == &s.measure)
+                    .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
 
 
-            Some(SortSql {
-                direction: s.direction.clone(),
-                column: format!("final_m{}", sort_column),
-            })
+                Some(SortSql {
+                    direction: s.direction.clone(),
+                    column: format!("final_m{}", sort_column),
+                })
+            }
         } else {
             None
         };
