@@ -41,6 +41,7 @@ pub struct CubeMetadata {
     pub dimensions: Vec<DimensionMetadata>,
     pub measures: Vec<MeasureMetadata>,
     pub annotations: AnnotationMetadata,
+    pub alias: Option<Vec<String>>
 }
 
 impl From<&Cube> for CubeMetadata {
@@ -52,6 +53,7 @@ impl From<&Cube> for CubeMetadata {
             dimensions: cube.dimensions.iter().map(|d| d.into()).collect(),
             measures: cube.measures.iter().map(|m| m.into()).collect(),
             annotations,
+            alias: None,
         }
     }
 }
@@ -104,6 +106,7 @@ pub struct LevelMetadata {
     pub name: String,
     pub properties: Option<Vec<PropertyMetadata>>,
     pub annotations: AnnotationMetadata,
+    pub unique_name: Option<String>,
 }
 
 impl From<&Level> for LevelMetadata {
@@ -117,6 +120,7 @@ impl From<&Level> for LevelMetadata {
             name: level.name.clone(),
             properties,
             annotations,
+            unique_name: None,
         }
     }
 }
@@ -176,6 +180,7 @@ pub struct PropertyMetadata {
     pub name: String,
     pub caption_set: Option<String>,
     pub annotations: AnnotationMetadata,
+    pub unique_name: Option<String>,
 }
 
 impl From<&Property> for PropertyMetadata {
@@ -186,6 +191,7 @@ impl From<&Property> for PropertyMetadata {
             name: property.name.clone(),
             caption_set: property.caption_set.clone(),
             annotations,
+            unique_name:None,
         }
     }
 }
@@ -233,4 +239,11 @@ impl From<&Aggregator> for AggregatorMetadata {
             name,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct SourceMetadata {
+    pub name: String,
+    pub measures: Vec<String>,
+    pub annotations: Option<HashMap<String, String>>,
 }

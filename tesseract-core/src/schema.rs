@@ -125,8 +125,21 @@ impl From<SchemaConfigJson> for Schema {
                 }
             }
 
+            // Cubes are public by default
+            let public = match cube_config.public {
+                Some(public) => {
+                    if public == "false" {
+                        false
+                    } else {
+                        true
+                    }
+                },
+                None => true
+            };
+
             cubes.push(Cube {
                 name: cube_config.name,
+                public,
                 table: cube_config.table.into(),
                 can_aggregate: false,
                 dimensions,
@@ -156,6 +169,7 @@ impl From<SchemaConfigJson> for Schema {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Cube {
     pub name: String,
+    pub public: bool,
     pub table: Table,
     pub can_aggregate: bool,
     pub dimensions: Vec<Dimension>,
@@ -775,6 +789,7 @@ mod test {
             cubes: vec![
                 CubeConfigJson {
                     name: "test_cube".into(),
+                    public: Some("true".into()),
                     table: TableConfigJson {
                         name: "fact_table".into(),
                         schema: None,

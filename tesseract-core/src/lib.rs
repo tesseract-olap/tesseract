@@ -8,7 +8,6 @@ pub mod schema;
 pub mod query;
 pub mod query_ir;
 
-use std::env;
 use failure::{Error, format_err, bail};
 use log::*;
 use serde_xml_rs as serde_xml;
@@ -655,15 +654,30 @@ impl Schema {
 
         let sort = if let Some(ref s) = query.sort {
             // sort column needs to be named by alias
-            let sort_column = query.measures.iter()
-                .position(|m| m == &s.measure)
-                .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
+            // Checking if we are going to sort by RCA or not
+            let measure_name = s.measure.to_string();
+            let rca_measure_name = if query.rca.is_some() {
+                query.rca.as_ref().unwrap().mea.to_string()
+            } else {
+                "".to_string()
+            };
+
+            if measure_name == format!("{} RCA", rca_measure_name) {
+                Some(SortSql {
+                    direction: s.direction.clone(),
+                    column: format!("rca"),
+                })
+            } else {
+                let sort_column = query.measures.iter()
+                    .position(|m| m == &s.measure)
+                    .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
 
 
-            Some(SortSql {
-                direction: s.direction.clone(),
-                column: format!("final_m{}", sort_column),
-            })
+                Some(SortSql {
+                    direction: s.direction.clone(),
+                    column: format!("final_m{}", sort_column),
+                })
+            }
         } else {
             None
         };
@@ -958,11 +972,11 @@ impl Schema {
             let captions_filtered = if parents {
                 Box::new(captions.iter()
                     .filter(|p| p.level_name.dimension == drill.0.dimension)
-                ) as Box<Iterator<Item=&Property>>
+                ) as Box<dyn Iterator<Item=&Property>>
             } else {
                 Box::new(captions.iter()
                     .filter(|p| p.level_name == drill.0)
-                ) as Box<Iterator<Item=&Property>>
+                ) as Box<dyn Iterator<Item=&Property>>
             };
 
             let caption_cols: Result<HashMap<_, _>, _> = captions_filtered

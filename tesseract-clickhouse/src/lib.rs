@@ -1,5 +1,5 @@
 use clickhouse_rs::Pool;
-use clickhouse_rs::types::Options;
+use clickhouse_rs::types::{Options, Simple, Complex, Block};
 use failure::{Error, format_err};
 use futures::{future, Future, Stream};
 use log::*;
@@ -9,7 +9,7 @@ use tesseract_core::{Backend, DataFrame, QueryIr};
 mod df;
 mod sql;
 
-use self::df::block_to_df;
+use self::df::{block_to_df};
 use self::sql::clickhouse_sql;
 
 // Ping timeout in millis
@@ -38,14 +38,14 @@ impl Clickhouse {
 }
 
 impl Backend for Clickhouse {
-    fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
+    fn exec_sql(&self, sql: String) -> Box<dyn Future<Item=DataFrame, Error=Error>> {
         let time_start = Instant::now();
 
         let fut = self.pool
             .get_handle()
             .and_then(move |c| c.query(&sql[..]).fetch_all())
             .from_err()
-            .and_then(move |(_, block)| {
+            .and_then(move |(_, block): (_, Block<Complex>)| {
                 let timing = time_start.elapsed();
                 info!("Time for sql execution: {}.{:03}", timing.as_secs(), timing.subsec_millis());
                 //debug!("Block: {:?}", block);
@@ -56,14 +56,14 @@ impl Backend for Clickhouse {
         Box::new(fut)
     }
 
-    fn exec_sql_stream(&self, sql: String) -> Box<Stream<Item=Result<DataFrame, Error>, Error=Error>> {
+    fn exec_sql_stream(&self, sql: String) -> Box<dyn Stream<Item=Result<DataFrame, Error>, Error=Error>> {
         let fut_stream = self.pool
             .get_handle()
             .and_then(move |c| {
                 future::ok(
                     c.query(&sql[..])
                         .stream_blocks()
-                        .map(move |block| {
+                        .map(move |block: Block<Simple>| {
                             block_to_df(block)
                         })
                 )

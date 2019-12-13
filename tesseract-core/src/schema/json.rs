@@ -17,6 +17,7 @@ pub struct SchemaConfigJson {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct CubeConfigJson {
     pub name: String,
+    pub public: Option<String>,
     pub table: TableConfigJson,
     pub dimensions: Option<Vec<DimensionConfigJson>>,
     pub dimension_usages: Option<Vec<DimensionUsageJson>>,

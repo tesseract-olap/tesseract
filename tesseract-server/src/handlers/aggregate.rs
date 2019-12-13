@@ -5,6 +5,7 @@ use actix_web::{
     HttpResponse,
     Path,
 };
+
 use failure::Error;
 use futures::future::{self, Future};
 use lazy_static::lazy_static;
@@ -14,10 +15,12 @@ use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
+use tesseract_core::schema::Cube;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
-use super::util;
+use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type, generate_source_data};
+
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
@@ -29,20 +32,6 @@ pub fn aggregate_default_handler(
     do_aggregate(req, cube_format)
 }
 
-macro_rules! ok_or_404 {
-    ($expr:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    future::result(
-                        Ok(HttpResponse::NotFound().json(err.to_string()))
-                    )
-                );
-            }
-        }
-    };
-}
 
 macro_rules! some_or_404 {
     ($expr:expr, $note:expr) => {
@@ -67,6 +56,7 @@ pub fn aggregate_handler(
     do_aggregate(req, cube_format.into_inner())
 }
 
+
 /// Performs data aggregation.
 pub fn do_aggregate(
     req: HttpRequest<AppState>,
@@ -74,6 +64,15 @@ pub fn do_aggregate(
     ) -> FutureResponse<HttpResponse>
 {
     let (cube, format) = cube_format;
+
+    // Get cube object to check for API key
+    let schema = &req.state().schema.read().unwrap().clone();
+    let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
+
+    match verify_api_key(&req, &cube_obj) {
+        Ok(_) => (),
+        Err(err) => return boxed_error_http_response(err)
+    }
 
     let format = format.parse::<FormatType>();
     let format = ok_or_404!(format);
@@ -86,7 +85,12 @@ pub fn do_aggregate(
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
     let agg_query = ok_or_404!(agg_query_res);
+
     info!("query opts:{:?}", agg_query);
+
+    // Gets the Source Data
+    let source_data = Some(generate_source_data(&cube_obj));
+
 
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
@@ -102,11 +106,7 @@ pub fn do_aggregate(
         ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
     }
 
-    let query_ir_headers = req
-        .state()
-        .schema.read().unwrap()
-        .sql_query(&cube, &ts_query);
-
+    let query_ir_headers = schema.sql_query(&cube, &ts_query);
     let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
     let sql = req.state()
@@ -120,9 +120,9 @@ pub fn do_aggregate(
         .backend
         .exec_sql(sql)
         .and_then(move |df| {
-            let content_type = util::format_to_content_type(&format);
+            let content_type = format_to_content_type(&format);
 
-            match format_records(&headers, df, format) {
+            match format_records(&headers, df, format, source_data) {
                 Ok(res) => {
                     Ok(HttpResponse::Ok()
                         .set(content_type)
@@ -140,6 +140,7 @@ pub fn do_aggregate(
         })
         .responder()
 }
+
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregateQueryOpt {

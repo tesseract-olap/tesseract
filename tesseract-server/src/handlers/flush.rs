@@ -21,9 +21,11 @@ pub struct FlushQueryOpt {
 
 pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let query = req.query_string();
+
     lazy_static!{
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
+
     let query_res = QS_NON_STRICT.deserialize_str::<FlushQueryOpt>(&query);
     let query = match query_res {
         Ok(q) => q,
@@ -46,6 +48,7 @@ pub fn flush_handler(req: HttpRequest<AppState>) -> ActixResult<HttpResponse> {
             SchemaSource::LocalSchema { ref filepath } => filepath,
             SchemaSource::RemoteSchema { ref endpoint } => endpoint,
         };
+
         let schema = match schema_config::read_schema(&schema_path) {
             Ok(val) => val,
             Err(err) => {

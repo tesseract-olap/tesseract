@@ -14,12 +14,14 @@ use serde_qs as qs;
 
 use crate::app::AppState;
 use crate::logic_layer::{LogicLayerConfig};
-use crate::util::boxed_error;
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
 
-use super::super::util;
+use super::super::util::{
+    boxed_error_string, boxed_error_http_response,
+    verify_api_key, format_to_content_type
+};
 
 
 /// Handles default members query when a format is not specified.
@@ -47,17 +49,13 @@ pub fn get_members(
     format: String,
 ) -> FutureResponse<HttpResponse>
 {
-    let format = format.parse::<FormatType>();
-    let format = match format {
-        Ok(f) => f,
-        Err(err) => return boxed_error(err.to_string()),
-    };
+    let format = ok_or_404!(format.parse::<FormatType>());
 
     info!("Format: {:?}", format);
 
     let query = req.query_string();
     let schema = req.state().schema.read().unwrap();
-    let debug = req.state().debug;
+    let _debug = req.state().debug;
 
     let logic_layer_config: Option<LogicLayerConfig> = match &req.state().logic_layer_config {
         Some(llc) => Some(llc.read().unwrap().clone()),
@@ -68,13 +66,19 @@ pub fn get_members(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
 
-    let members_query = match QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(query) {
-        Ok(q) => q,
-        Err(err) => return boxed_error(err.to_string())
-    };
+    let members_query_res = QS_NON_STRICT.deserialize_str::<MembersQueryOpt>(query);
+    let members_query = ok_or_404!(members_query_res);
 
     let mut cube_name = members_query.cube.clone();
     let mut level_name: Option<LevelName> = None;
+
+    // Get cube object to check for API key
+    let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
+
+    match verify_api_key(&req, &cube_obj) {
+        Ok(_) => (),
+        Err(err) => return boxed_error_http_response(err)
+    }
 
     if let Some(logic_layer_config) = &logic_layer_config {
         if let Some(aliases) = &logic_layer_config.aliases {
@@ -106,7 +110,6 @@ pub fn get_members(
             }
         }
     }
-
     // If level name is not yet set, try to set it from a cube object by a direct match
     let level_name = match level_name {
         Some(level_name) => Some(level_name),
@@ -137,7 +140,7 @@ pub fn get_members(
 
     let level_name = match level_name {
         Some(level_name) => level_name,
-        None => return boxed_error("Unable to find a level with the name provided".to_string())
+        None => return boxed_error_string("Unable to find a level with the name provided".to_string())
     };
 
     debug!("{:?}", cube_name);
@@ -167,9 +170,9 @@ pub fn get_members(
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
-            let content_type = util::format_to_content_type(&format);
+            let content_type = format_to_content_type(&format);
 
-            match format_records(&header, df, format) {
+            match format_records(&header, df, format, None) {
                 Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }

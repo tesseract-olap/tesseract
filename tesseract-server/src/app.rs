@@ -24,6 +24,10 @@ use crate::handlers::{
     metadata_all_handler,
     members_handler,
     members_default_handler,
+    logic_layer_relations_handler,
+    logic_layer_relations_default_handler,
+    logic_layer_relations_non_unique_levels_default_handler,
+    logic_layer_relations_non_unique_levels_handler
 };
 use crate::logic_layer::{Cache, LogicLayerConfig};
 
@@ -45,6 +49,7 @@ pub struct EnvVars {
     pub database_url: String,
     pub geoservice_url: Option<Url>,
     pub schema_source: SchemaSource,
+    pub api_key: Option<String>,
     pub flush_secret: Option<String>,
 }
 
@@ -59,7 +64,7 @@ pub struct AppState {
     pub schema: Arc<RwLock<Schema>>,
     pub cache: Arc<RwLock<Cache>>,
     pub logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
-    // TODO is there a way to acces this that's not through state? Tried using closures to
+    // TODO is there a way to access this that's not through state? Tried using closures to
     // capture, but the handlers need to implement Fn, not FnOnce (which happens once capturing
     // variables from environment
     pub has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
@@ -150,6 +155,12 @@ pub fn create_app(
                 .resource("/members.{format}", |r| {
                     r.method(Method::GET).with(logic_layer_members_handler)
                 })
+                .resource("/relations", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_default_handler)
+                })
+                .resource("/relations.{foramt}", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_handler)
+                })
         },
         CubeHasUniqueLevelsAndProperties::False { .. } => {
             // No Logic Layer, give error instead
@@ -165,6 +176,12 @@ pub fn create_app(
                 })
                 .resource("/members.{format}", |r| {
                     r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
+                })
+                .resource("/relations", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_non_unique_levels_default_handler)
+                })
+                .resource("/relations.{foramt}", |r| {
+                    r.method(Method::GET).with(logic_layer_relations_non_unique_levels_handler)
                 })
         },
     }

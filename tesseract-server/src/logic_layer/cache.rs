@@ -788,22 +788,18 @@ pub fn get_neighbors_map(distinct_ids: &Vec<String>) -> HashMap<String, Vec<Stri
 
     while !done {
         // Before
-        let mut before: Vec<String> = vec![];
-
-        if prev == 0 && curr <= 1 {
-            before = distinct_ids[0..curr].to_vec();
+        let before = if prev == 0 && curr <= 1 {
+            distinct_ids[0..curr].to_vec()
         } else {
-            before = distinct_ids[prev..curr].to_vec();
-        }
+            distinct_ids[prev..curr].to_vec()
+        };
 
         // After
-        let mut after: Vec<String> = vec![];
-
-        if next >= max_index {
-            after = distinct_ids[curr+1..].to_vec();
+        let after = if next >= max_index {
+            distinct_ids[curr+1..].to_vec()
         } else {
-            after = distinct_ids[curr+1..next+1].to_vec();
-        }
+            distinct_ids[curr+1..next+1].to_vec()
+        };
 
         neighbors_map.insert(distinct_ids[curr].clone(), [&before[..], &after[..]].concat());
 

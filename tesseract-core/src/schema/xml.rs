@@ -32,6 +32,7 @@ pub struct SchemaConfigXML {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct CubeConfigXML {
     pub name: String,
+    pub public: Option<String>,
     #[serde(rename(deserialize="Table"))]
     pub table: TableConfigXML,
     #[serde(rename(deserialize="Dimension"))]
