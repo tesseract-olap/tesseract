@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use actix::SystemRunner;
 use failure::{Error, format_err};
-use log::info;
+use log::{info, debug};
+use std::time::Instant;
 
 use serde_derive::Deserialize;
 
@@ -234,7 +235,7 @@ impl CubeCache {
     // The next step is to figure out how to architecture this cache so that it can be used even in
     // non-logic layer setups, but also be used for members endpoint (which requires label also)
     pub fn members_for_level(&self, level_name: &LevelName) -> Option<&HashSet<String>> {
-        println!("{:?}", self.level_caches);
+        debug!("Level Caches: {:?}", self.level_caches);
         self.level_caches.get(&level_name.level)
             .map(|level_cache| &level_cache.members)
     }
@@ -266,6 +267,7 @@ pub fn populate_cache(
         sys: &mut SystemRunner
 ) -> Result<Cache, Error> {
     info!("Populating cache...");
+    let time_start = Instant::now();
 
     let time_column_names = vec![
         "Year".to_string(),
@@ -445,8 +447,8 @@ pub fn populate_cache(
         })
     }
 
-    info!("Cache ready!");
-
+    let timing = time_start.elapsed();
+    info!("Cache ready! (Time elapsed: {}.{:03})", timing.as_secs(), timing.subsec_millis());
     Ok(Cache { cubes })
 }
 
