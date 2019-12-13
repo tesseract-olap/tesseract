@@ -33,6 +33,25 @@ use super::super::util::{
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
+macro_rules! some_or_bail {
+    ($input:expr) => {
+        match $input {
+            Some(l) => l,
+            None => bail!("Unrecognized level in calculation.")
+        }
+    }
+}
+
+macro_rules! some_or_break {
+    ($input:expr) => {
+        match $input {
+            Some(l) => l,
+            None => break
+        }
+    }
+}
+
+
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
 pub fn logic_layer_default_handler(
@@ -382,15 +401,9 @@ pub fn generate_ts_queries(
                     None => level_value.clone()
                 };
 
-                let level_name = match level_map.get(&level_key) {
-                    Some(level_name) => level_name,
-                    None => break
-                };
+                let level_name = some_or_break!(level_map.get(&level_key));
 
-                let level = match cube.get_level(level_name) {
-                    Some(level) => level,
-                    None => break
-                };
+                let level = some_or_break!(cube.get_level(level_name));
 
                 drilldowns.push(Drilldown(level_name.clone()));
 
@@ -431,10 +444,7 @@ pub fn generate_ts_queries(
 
             for property_value in LogicLayerQueryOpt::deserialize_args(ps) {
                 // TODO: Break or bail?
-                let property = match property_map.get(&property_value) {
-                    Some(p) => p,
-                    None => break
-                };
+                let property = some_or_break!(property_map.get(&property_value));
 
                 properties.push(property.clone());
             }
@@ -454,10 +464,7 @@ pub fn generate_ts_queries(
                 return Err(format_err!("Bad formatting for top param."));
             }
 
-            let level_name = match level_map.get(&top_split[1]) {
-                Some(l) => l,
-                None => bail!("Unable to find top level")
-            };
+            let level_name = some_or_bail!(level_map.get(&top_split[1]));
 
             let mea_or_calc: MeaOrCalc = top_split[2].parse()?;
 
@@ -492,10 +499,7 @@ pub fn generate_ts_queries(
             let level_key = gro_split[0].clone();
             let measure = gro_split[1].clone();
 
-            let level_name = match level_map.get(&level_key) {
-                Some(l) => l,
-                None => bail!("Unable to find growth level")
-            };
+            let level_name = some_or_bail!(level_map.get(&level_key));
 
             let growth = GrowthQuery::new(
                 level_name.dimension.clone(),
@@ -521,25 +525,13 @@ pub fn generate_ts_queries(
             let drill2_level_key = rca_split[1].clone();
             let measure = rca_split[2].clone();
 
-            let level_name_1 = match level_map.get(&drill1_level_key) {
-                Some(l) => l,
-                None => bail!("Unable to find drill 1 level")
-            };
+            let level_name_1 = some_or_bail!(level_map.get(&drill1_level_key));
 
-            let level_name_2 = match level_map.get(&drill2_level_key) {
-                Some(l) => l,
-                None => bail!("Unable to find drill 2 level")
-            };
+            let level_name_2 = some_or_bail!(level_map.get(&drill2_level_key));
 
             // helps in getting the locale captions for the given level
-            let level_1 = match cube.get_level(level_name_1) {
-                Some(level) => level,
-                None => bail!("Unable to find drill 1 level")
-            };
-            let level_2 = match cube.get_level(level_name_2) {
-                Some(level) => level,
-                None => bail!("Unabel to find drill 2 level")
-            };
+            let level_1 = some_or_bail!(cube.get_level(level_name_1));
+            let level_2 = some_or_bail!(cube.get_level(level_name_2));
             let new_captions = level_1.get_captions(&level_name_1, &locales);
             captions.extend_from_slice(&new_captions);
             let new_captions = level_2.get_captions(&level_name_2, &locales);
@@ -669,10 +661,7 @@ pub fn generate_ts_queries(
                 if added_drilldowns.contains(&cut.level_name) {
                     drills.push(Drilldown(cut.level_name.clone()));
 
-                    let level = match cube.get_level(&cut.level_name) {
-                        Some(level) => level,
-                        None => break
-                    };
+                    let level = some_or_break!(cube.get_level(&cut.level_name));
 
                     // Add captions for this level
                     let new_captions = level.get_captions(&cut.level_name, &locales);
