@@ -15,8 +15,7 @@ use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
-use tesseract_core::schema::Cube;
-
+use crate::handlers::util::validate_members;
 use crate::app::AppState;
 use crate::errors::ServerError;
 use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type, generate_source_data};
@@ -266,20 +265,3 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
     }
 }
 
-use failure::{bail, format_err};
-use tesseract_core::names::Cut;
-use crate::logic_layer::CubeCache;
-
-fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Error> {
-    for cut in cuts {
-        // get level cache
-        let member_cache = cube_cache.members_for_level(&cut.level_name)
-            .ok_or_else(|| format_err!("Level not found in cache"))?;
-        for member in &cut.members {
-            if !member_cache.contains(member) {
-                bail!("Cut member not found");
-            }
-        }
-    }
-    Ok(())
-}
