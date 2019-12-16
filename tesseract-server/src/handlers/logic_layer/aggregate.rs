@@ -453,8 +453,9 @@ pub fn generate_ts_queries(
         })
         .unwrap_or(vec![]);
 
-    // TODO: Implement
-    let filters: Vec<FilterQuery>= vec![];
+    let filters: Vec<FilterQuery> = agg_query_opt.filters
+        .map(|fs| LogicLayerQueryOpt::deserialize_args(fs).iter().map(|f| f.parse()).collect())
+        .unwrap_or(Ok(vec![]))?;
 
     let top: Option<TopQuery> = agg_query_opt.top.clone()
         .map(|t| {

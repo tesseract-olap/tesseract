@@ -104,4 +104,3 @@ pub fn wrap_options(
 
     final_sql
 }
-

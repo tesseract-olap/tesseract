@@ -291,7 +291,7 @@ impl FromStr for LimitQuery {
 #[derive(Debug, Clone)]
 pub struct SortQuery {
     pub direction: SortDirection,
-    pub measure: Measure,
+    pub measure: MeaOrCalc,
 }
 
 impl FromStr for SortQuery {
@@ -300,7 +300,7 @@ impl FromStr for SortQuery {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match &s.split(".").collect::<Vec<_>>()[..] {
             [measure, direction] => {
-                let measure = measure.parse::<Measure>()?;
+                let measure = measure.parse::<MeaOrCalc>()?;
                 let direction = direction.parse::<SortDirection>()?;
                 Ok(SortQuery {
                     direction,
@@ -437,7 +437,7 @@ impl FromStr for FilterQuery {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match &s.split(",").collect::<Vec<_>>()[..] {
+        match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
             [by_mea, constraint] => {
 
                 let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;

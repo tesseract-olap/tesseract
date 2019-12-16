@@ -46,7 +46,27 @@ use self::query_ir::{
 };
 pub use self::query::{Query, MeaOrCalc, FilterQuery};
 pub use self::query_ir::QueryIr;
-
+macro_rules! mea_or_calc {
+    ($m_or_c:expr, $query:expr) => {
+        match $m_or_c {
+            MeaOrCalc::Mea(m) => {
+                $query.measures.iter()
+                    .position(|col| col == m )
+                    .map(|idx|{
+                        let idx = if $query.rca.is_some() {
+                            idx + 1
+                        } else {
+                            idx
+                        };
+                        format!("final_m{}", idx)})
+                    .ok_or(format_err!("measure {} must be in measures or if sorting on RCA column use \"rca\"", m))
+            },
+            MeaOrCalc::Calc(c) => {
+                Ok(c.sql_string())
+            }
+        }
+    }
+}
 
 impl Schema {
     /// Deserializes JSON schema into a `Schema`.
@@ -534,23 +554,7 @@ impl Schema {
             // want the index so that we can use `m0` etc.
             let top_sort_columns: Result<Vec<_>, _> = t.sort_mea_or_calc.iter()
                 .map(|m_or_c| {
-                    match m_or_c {
-                        MeaOrCalc::Mea(m) => {
-                            // NOTE: rca mea does not return the actual value, only rca. Since
-                            // mea value must be retrieved through explicit drilldown,
-                            // don't need to do an extra rca check here.
-
-                            // TODO idx should be +1 if Some(rca)
-                            // check topWhere implementation
-                            query.measures.iter()
-                                .position(|col| col == m )
-                                .map(|idx| format!("final_m{}", idx))
-                                .ok_or(format_err!("measure {} for Top must be in measures", m))
-                        },
-                        MeaOrCalc::Calc(c) => {
-                            Ok(c.sql_string())
-                        }
-                    }
+                    mea_or_calc!(m_or_c, query)
                 })
                 .collect();
             let top_sort_columns = top_sort_columns?;
@@ -584,29 +588,7 @@ impl Schema {
 
         // TopWhere, from Query to Query IR
         let top_where = if let Some(ref tw) = query.top_where {
-            let by_column = match &tw.by_mea_or_calc {
-                MeaOrCalc::Mea(m) => {
-                    // NOTE: rca mea does not return the actual value, only rca. Since
-                    // mea value must be retrieved through explicit drilldown,
-                    // don't need to do an extra rca check here.
-
-                    query.measures.iter()
-                        .position(|col| col == m )
-                        .map(|idx| {
-                            let idx = if query.rca.is_some() {
-                                idx + 1
-                            } else {
-                                idx
-                            };
-                            format!("final_m{}", idx)
-                        })
-                        .ok_or(format_err!("measure {} for Top must be in measures", m))?
-                },
-                MeaOrCalc::Calc(c) => {
-                    c.sql_string()
-                }
-            };
-
+            let by_column = mea_or_calc!(&tw.by_mea_or_calc, query)?;
             Some(TopWhereSql {
                 by_column,
                 constraint: tw.constraint.clone(),
@@ -618,28 +600,7 @@ impl Schema {
         // Filter, from Query to Query IR. Should be exactly the same as TopWhere
         let filters = query.filters.iter()
             .map(|filter| {
-                let by_column = match &filter.by_mea_or_calc {
-                    MeaOrCalc::Mea(m) => {
-                        // NOTE: rca mea does not return the actual value, only rca. Since
-                        // mea value must be retrieved through explicit drilldown,
-                        // don't need to do an extra rca check here.
-
-                        query.measures.iter()
-                            .position(|col| col == m )
-                            .map(|idx| {
-                                let idx = if query.rca.is_some() {
-                                    idx + 1
-                                } else {
-                                    idx
-                                };
-                                format!("final_m{}", idx)
-                            })
-                            .ok_or(format_err!("measure {} for Top must be in measures", m))
-                    },
-                    MeaOrCalc::Calc(c) => {
-                        Ok(c.sql_string())
-                    }
-                };
+                let by_column = mea_or_calc!(&filter.by_mea_or_calc, query);
 
                 by_column
                     .map(|by_column| {
@@ -654,30 +615,11 @@ impl Schema {
 
         let sort = if let Some(ref s) = query.sort {
             // sort column needs to be named by alias
-            // Checking if we are going to sort by RCA or not
-            let measure_name = s.measure.to_string();
-            let rca_measure_name = if query.rca.is_some() {
-                query.rca.as_ref().unwrap().mea.to_string()
-            } else {
-                "".to_string()
-            };
-
-            if measure_name == format!("{} RCA", rca_measure_name) {
-                Some(SortSql {
-                    direction: s.direction.clone(),
-                    column: format!("rca"),
-                })
-            } else {
-                let sort_column = query.measures.iter()
-                    .position(|m| m == &s.measure)
-                    .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
-
-
-                Some(SortSql {
-                    direction: s.direction.clone(),
-                    column: format!("final_m{}", sort_column),
-                })
-            }
+            let sort_column = mea_or_calc!(&s.measure, query)?;
+            Some(SortSql {
+                direction: s.direction.clone(),
+                column: sort_column,
+            })
         } else {
             None
         };
