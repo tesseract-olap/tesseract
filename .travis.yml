@@ -2,9 +2,6 @@ language: rust
 rust:
   - stable
 cache: cargo
-before_script:
-  - git clone https://github.com/tesseract-olap/tesseract-example-app.git
-  - cat tesseract-example-app/sql/schema.sql | clickhouse-client -mn
 script:
   - cargo test --all --verbose
 services:
