@@ -67,10 +67,10 @@ fn test_query() {
     let status = match res {
         Ok(val) => {
             println!("Value={:?}", val);
-            true
+            val.len() == 12
         }
         Err(err) => {
-            println!("ERROR={:?}", err);
+            println!("Query failed. Error={:?}", err);
             false
         }
     };
