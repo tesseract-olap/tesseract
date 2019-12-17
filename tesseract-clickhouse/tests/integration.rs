@@ -43,13 +43,13 @@ fn test_ping() {
 fn test_query() {
     #[derive(Debug, Clone, PartialEq)]
     pub struct RowResult {
-        pub id_count: i64,
+        pub month_name: String,
     }
 
     // This test is meant as a sanity check
     // to ensure the SQL ingestion worked
     let pool = Pool::new(database_url());
-    let sql = "SELECT COUNT(*) as id_count FROM tesseract_webshop_time;";
+    let sql = "SELECT month_name FROM tesseract_webshop_time;";
     let fut = pool.get_handle()
         .and_then(move |c| {
             c.query(&sql).fetch_all()
@@ -57,7 +57,7 @@ fn test_query() {
         .and_then(move |(_, block): (_, Block<Complex>)| {
             let schema_vec: Vec<RowResult> = block.rows().map(|row| {
                 RowResult {
-                    id_count: row.get("id_count").expect("missing id_count"),
+                    month_name: row.get("month_name").expect("missing month_name"),
                 }
             }).collect();
             Ok(schema_vec)
