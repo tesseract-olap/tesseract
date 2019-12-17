@@ -63,7 +63,16 @@ fn test_query() {
             Ok(schema_vec)
         });
 
-    let res = run(fut).unwrap();
-    println!("RES={:?}", res);
-    // assert!(res.get(0).unwrap().id_count > 0);
+    let res = run(fut);
+    let status = match res {
+        Ok(val) => {
+            println!("Value={:?}", val);
+            true
+        }
+        Err(err) => {
+            println!("ERROR={:?}", err);
+            false
+        }
+    };
+    assert!(status);
 }
