@@ -4,6 +4,18 @@ edition = "2018"
 name = "integration-tests"
 version = "0.1.0"
 
+[dependencies]
+actix = "0.7.7"
+failure = "0.1.2"
+log = "0.4.3"
+
+[dependencies.actix-web]
+version = "0.7.18"
+features = [ "ssl",]
+
+[dependencies.tesseract-olap]
+path = "../tesseract-server"
+
 [dev-dependencies.tesseract-clickhouse]
 path = "../tesseract-clickhouse"
 
