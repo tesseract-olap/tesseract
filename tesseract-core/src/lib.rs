@@ -15,6 +15,7 @@ use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
 use std::str::FromStr;
 use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTableColumnDefinition};
+use crate::query::*;
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
@@ -607,6 +608,8 @@ impl Schema {
                         FilterSql {
                             by_column,
                             constraint: filter.constraint.clone(),
+                            operator: filter.operator.clone(),
+                            constraint2: filter.constraint2.clone()
                         }
                     })
             })
@@ -1340,5 +1343,331 @@ mod test {
         println!("{:#?}", schema);
         let dm = schema.cubes[0].dimensions[0].hierarchies[0].default_member.clone();
         assert_eq!(dm.unwrap(), "Race.Race.Race.Total".to_owned());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sort_rca() {
+        let s = r##"
+        <Schema name="Webshop">
+            <SharedDimension name="Geography" type="geo">
+                <Hierarchy name="Geography">
+                    <Table name="tesseract_webshop_geographies" />
+
+
+                    <Level name="Continent" key_column="continent_id" name_column="continent_name"
+                            key_type="text">
+                        <Property name="Continent PT" column="continent_name_pt" caption_set="pt" />
+                        <Property name="Continent ES" column="continent_name_es" caption_set="es" />
+                    </Level>
+                    <Level name="Country" key_column="country_id" name_column="country_name"
+                            key_type="nontext">
+                        <Property name="Country PT" column="country_name_pt" caption_set="pt" />
+                        <Property name="Country ES" column="country_name_es" caption_set="es" />
+                    </Level>
+                </Hierarchy>
+            </SharedDimension>
+
+            <Cube name="Sales">
+                <Table name="tesseract_webshop_sales" />
+
+                <DimensionUsage foreign_key="country_id" name="Geography" source="Geography" />
+
+                <Dimension name="Year" foreign_key="year">
+                    <Hierarchy name="Year">
+                        <Level name="Year" key_column="year" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Month" foreign_key="month_id">
+                    <Hierarchy name="Month">
+                        <Table name="tesseract_webshop_time" />
+
+                        <Level name="Month" key_column="month_id" name_column="month_name">
+                            <Property name="Month PT" column="month_name_pt" caption_set="pt" />
+                        </Level>
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Category" foreign_key="category_id">
+                    <Hierarchy name="Category">
+                        <InlineTable alias="tesseract_webshop_categories">
+                            <ColumnDef name="category_name" key_type="text" />
+                            <ColumnDef name="category_name_pt" key_type="text" caption_set="pt" />
+                            <ColumnDef name="category_name_es" key_type="text" caption_set="es" />
+                            <ColumnDef name="category_idx" key_type="nontext" key_column_type="Int32" />
+
+                            <Row>
+                                <Value column="category_name">Books</Value>
+                                <Value column="category_name_pt">Livros</Value>
+                                <Value column="category_name_es">Libros</Value>
+                                <Value column="category_idx">1</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Sports</Value>
+                                <Value column="category_name_pt">Esportes</Value>
+                                <Value column="category_name_es">Deportes</Value>
+                                <Value column="category_idx">2</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Various</Value>
+                                <Value column="category_name_pt">Vários</Value>
+                                <Value column="category_name_es">Varios</Value>
+                                <Value column="category_idx">3</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Videos</Value>
+                                <Value column="category_name_pt">Vídeos</Value>
+                                <Value column="category_name_es">Videos</Value>
+                                <Value column="category_idx">4</Value>
+                            </Row>
+                        </InlineTable>
+
+                        <!-- <Level name="Category" key_column="category_id" name_column="category_name" key_type="nontext" /> -->
+
+                        <Level name="Category" key_column="category_idx" name_column="category_name" key_type="nontext" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Measure name="Price Total" column="price_total" aggregator="sum" />
+                <Measure name="Quantity" column="quantity" aggregator="sum" />
+            </Cube>
+        </Schema>
+        "##;
+        let query = Query {
+            drilldowns: [Drilldown(LevelName{
+                dimension: "Year".to_string(),
+                hierarchy: "Year".to_string(),
+                level: "Year".to_string(),
+            })].to_vec(),
+            cuts: vec![],
+            measures: [Measure("Price Total".to_string())].to_vec(),
+            properties: vec![],
+            filters: vec![],
+            captions: vec![],
+            parents: false,
+            top: None,
+            top_where: None,
+            sort: Some(SortQuery{
+                direction: SortDirection::Asc,
+                measure: MeaOrCalc::Mea(Measure("Price Total".to_string()))
+            }),
+            limit: None,
+            rca: Some(RcaQuery{
+                drill_1: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                drill_2: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                mea: Measure("Price Total".to_string())
+            }),
+            growth: None,
+            rate: None,
+            debug: false,
+            sparse: false,
+            exclude_default_members: false,
+        };
+        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
+        let (query_ir, headers) = query_ir_headers.unwrap();
+        assert_eq!(query_ir.sort, Some(SortSql{direction: SortDirection::Asc, column: "final_m0".to_string()}))
+    }
+
+    #[test]
+    fn test_filter_query() {
+        let s = r##"
+        <Schema name="Webshop">
+            <SharedDimension name="Geography" type="geo">
+                <Hierarchy name="Geography">
+                    <Table name="tesseract_webshop_geographies" />
+
+
+                    <Level name="Continent" key_column="continent_id" name_column="continent_name"
+                            key_type="text">
+                        <Property name="Continent PT" column="continent_name_pt" caption_set="pt" />
+                        <Property name="Continent ES" column="continent_name_es" caption_set="es" />
+                    </Level>
+                    <Level name="Country" key_column="country_id" name_column="country_name"
+                            key_type="nontext">
+                        <Property name="Country PT" column="country_name_pt" caption_set="pt" />
+                        <Property name="Country ES" column="country_name_es" caption_set="es" />
+                    </Level>
+                </Hierarchy>
+            </SharedDimension>
+
+            <Cube name="Sales">
+                <Table name="tesseract_webshop_sales" />
+
+                <DimensionUsage foreign_key="country_id" name="Geography" source="Geography" />
+
+                <Dimension name="Year" foreign_key="year">
+                    <Hierarchy name="Year">
+                        <Level name="Year" key_column="year" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Month" foreign_key="month_id">
+                    <Hierarchy name="Month">
+                        <Table name="tesseract_webshop_time" />
+
+                        <Level name="Month" key_column="month_id" name_column="month_name">
+                            <Property name="Month PT" column="month_name_pt" caption_set="pt" />
+                        </Level>
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Category" foreign_key="category_id">
+                    <Hierarchy name="Category">
+                        <InlineTable alias="tesseract_webshop_categories">
+                            <ColumnDef name="category_name" key_type="text" />
+                            <ColumnDef name="category_name_pt" key_type="text" caption_set="pt" />
+                            <ColumnDef name="category_name_es" key_type="text" caption_set="es" />
+                            <ColumnDef name="category_idx" key_type="nontext" key_column_type="Int32" />
+
+                            <Row>
+                                <Value column="category_name">Books</Value>
+                                <Value column="category_name_pt">Livros</Value>
+                                <Value column="category_name_es">Libros</Value>
+                                <Value column="category_idx">1</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Sports</Value>
+                                <Value column="category_name_pt">Esportes</Value>
+                                <Value column="category_name_es">Deportes</Value>
+                                <Value column="category_idx">2</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Various</Value>
+                                <Value column="category_name_pt">Vários</Value>
+                                <Value column="category_name_es">Varios</Value>
+                                <Value column="category_idx">3</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Videos</Value>
+                                <Value column="category_name_pt">Vídeos</Value>
+                                <Value column="category_name_es">Videos</Value>
+                                <Value column="category_idx">4</Value>
+                            </Row>
+                        </InlineTable>
+
+                        <!-- <Level name="Category" key_column="category_id" name_column="category_name" key_type="nontext" /> -->
+
+                        <Level name="Category" key_column="category_idx" name_column="category_name" key_type="nontext" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Measure name="Price Total" column="price_total" aggregator="sum" />
+                <Measure name="Quantity" column="quantity" aggregator="sum" />
+            </Cube>
+        </Schema>
+        "##;
+        let query = Query {
+            drilldowns: [Drilldown(LevelName{
+                dimension: "Year".to_string(),
+                hierarchy: "Year".to_string(),
+                level: "Year".to_string(),
+            })].to_vec(),
+            cuts: vec![],
+            measures: [Measure("Price Total".to_string()), Measure("Quantity".to_string())].to_vec(),
+            properties: vec![],
+            filters: [FilterQuery{
+                by_mea_or_calc: MeaOrCalc::Mea(Measure("Price Total".to_string())),
+                constraint: Constraint{
+                    comparison: Comparison::LessThan,
+                    n: 100
+                },
+                operator: Some(Operator::Or),
+                constraint2: Some(Constraint{
+                    comparison: Comparison::GreaterThan,
+                    n: 200
+                }),
+            },
+            FilterQuery{
+                by_mea_or_calc: MeaOrCalc::Mea(Measure("Quantity".to_string())),
+                constraint: Constraint{
+                    comparison: Comparison::GreaterThan,
+                    n: 40
+                },
+                operator: None,
+                constraint2: None,
+            },
+            FilterQuery{
+                by_mea_or_calc: MeaOrCalc::Calc(Calculation::Rca),
+                constraint: Constraint{
+                    comparison: Comparison::GreaterThan,
+                    n: 1
+                },
+                operator: None,
+                constraint2: None,
+            }
+            ].to_vec(),
+            captions: vec![],
+            parents: false,
+            top: None,
+            top_where: None,
+            sort: Some(SortQuery{
+                direction: SortDirection::Asc,
+                measure: MeaOrCalc::Mea(Measure("Price Total".to_string()))
+            }),
+            limit: None,
+            rca: Some(RcaQuery{
+                drill_1: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                drill_2: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                mea: Measure("Price Total".to_string())
+            }),
+            growth: None,
+            rate: None,
+            debug: false,
+            sparse: false,
+            exclude_default_members: false,
+        };
+        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
+        let (query_ir, headers) = query_ir_headers.unwrap();
+        assert_eq!(query_ir.filters, [FilterSql {
+            by_column: "final_m1".to_string(),
+            constraint: Constraint {
+                comparison: Comparison::LessThan,
+                n: 100,
+            },
+            operator: Some(
+                Operator::Or,
+            ),
+            constraint2: Some(
+                Constraint {
+                    comparison: Comparison::GreaterThan,
+                    n: 200,
+                },
+            ),
+        },
+        FilterSql {
+            by_column: "final_m2".to_string(),
+            constraint: Constraint {
+                comparison: Comparison::GreaterThan,
+                n: 40,
+            },
+            operator: None,
+            constraint2: None,
+        },
+        FilterSql {
+            by_column: "rca".to_string(),
+            constraint: Constraint {
+                comparison: Comparison::GreaterThan,
+                n: 1,
+            },
+            operator: None,
+            constraint2: None,
+        }].to_vec())
     }
 }

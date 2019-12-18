@@ -189,7 +189,7 @@ impl FromStr for TopWhereQuery {
 // Constraint: less than, greater than a number
 // This is a little less straightforward, so we should
 // probably test this
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Constraint {
     pub comparison: Comparison,
     pub n: i64,
@@ -221,7 +221,7 @@ impl FromStr for Constraint {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Comparison {
     Equal,
     NotEqual,
@@ -313,7 +313,7 @@ impl FromStr for SortQuery {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SortDirection {
     Asc,
     Desc,
@@ -425,11 +425,42 @@ impl FromStr for GrowthQuery {
     }
 }
 
+/// For using an operator such as AND and OR in a sql query
+/// Currently used for the Fitler and inner queries only
+#[derive(Debug, Clone, PartialEq)]
+pub enum Operator{
+    And,
+    Or,
+}
+
+impl Operator {
+    pub fn sql_string(&self) -> String {
+        match self {
+            Operator::And => "and".to_owned(),
+            Operator::Or => "or".to_owned(),
+        }
+    }
+}
+
+impl FromStr for Operator {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "and" => Operator::And,
+            "or" => Operator::Or,
+            _ => bail!("Could not parse sort direction"),
+        })
+    }
+}
+
 /// For filtering on a measure after Top is calculated (wrapper around end aggregation)
 #[derive(Debug, Clone)]
 pub struct FilterQuery {
     pub by_mea_or_calc: MeaOrCalc,
     pub constraint: Constraint,
+    pub operator: Option<Operator>,
+    pub constraint2: Option<Constraint>
 }
 
 // Currently only allows one sort_measure
@@ -437,18 +468,37 @@ impl FromStr for FilterQuery {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
-            [by_mea, constraint] => {
+        if s.contains(".and.") || s.contains(".or.") {
+            let filter_split: Vec<String> = s.split(".").map(|f| f.to_string()).collect();
+            if filter_split.len() != 6 {
+                bail!("Could not parse a filter query")
+            }
+            let by_mea_or_calc = filter_split[0].parse::<MeaOrCalc>()?;
+            let constraint = join(&filter_split[1..3], ".").parse::<Constraint>()?;
+            let operator = Some(filter_split[3].parse::<Operator>()?);
+            let constraint2 = Some(join(&filter_split[4..6], ".").parse::<Constraint>()?);
+            Ok(FilterQuery {
+                by_mea_or_calc,
+                constraint,
+                operator,
+                constraint2,
+            })
+        } else {
+            match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
+                [by_mea, constraint] => {
 
-                let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
-                let constraint = constraint.parse::<Constraint>()?;
+                    let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
+                    let constraint = constraint.parse::<Constraint>()?;
 
-                Ok(FilterQuery {
-                    by_mea_or_calc,
-                    constraint,
-                })
-            },
-            _ => bail!("Could not parse a filter query"),
+                    Ok(FilterQuery {
+                        by_mea_or_calc,
+                        constraint,
+                        operator: None,
+                        constraint2: None
+                    })
+                },
+                _ => bail!("Could not parse a filter query"),
+            }
         }
     }
 }

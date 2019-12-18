@@ -200,7 +200,6 @@ pub fn logic_layer_aggregation(
 
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
-
     for ts_query in &ts_queries {
         debug!("Tesseract query: {:?}", ts_query);
 

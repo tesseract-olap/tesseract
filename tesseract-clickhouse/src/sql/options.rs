@@ -1,5 +1,5 @@
 use itertools::join;
-use tesseract_core::query::{Comparison, Constraint};
+use tesseract_core::query::{Comparison, Constraint, Operator};
 use tesseract_core::{QueryIr};
 
 use super::{
@@ -76,7 +76,14 @@ pub fn wrap_options(
 
     let mut filters_sql = if !filters.is_empty() {
         let filter_clauses = filters.iter()
-            .map(|f| format!("{} {}", f.by_column, f.constraint.sql_string()));
+            .map(|f| {
+                if let Some(o) = &f.operator {
+                    let c2 = f.constraint2.as_ref().unwrap();
+                    format!("({} {} {} {} {})", f.by_column, f.constraint.sql_string(), o.sql_string(), f.by_column, c2.sql_string())
+                } else {
+                    format!("{} {}", f.by_column, f.constraint.sql_string())
+                }
+            });
         format!("where {}", join(filter_clauses, " and "))
     }
     else {
