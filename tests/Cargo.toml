@@ -21,7 +21,3 @@ path = "../tesseract-clickhouse"
 
 [dev-dependencies.tesseract-core]
 path = "../tesseract-core"
-
-[dev-dependencies]
-tokio = "0.1.22"
-
