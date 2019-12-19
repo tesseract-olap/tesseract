@@ -192,7 +192,7 @@ impl FromStr for TopWhereQuery {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Constraint {
     pub comparison: Comparison,
-    pub n: i64,
+    pub n: f64,
 }
 
 impl Constraint {
@@ -205,11 +205,11 @@ impl FromStr for Constraint {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match &s.split(".").collect::<Vec<_>>()[..] {
+        match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
             [comparison, n] => {
 
                 let comparison = comparison.parse::<Comparison>()?;
-                let n = n.parse::<i64>()?;
+                let n = n.parse::<f64>()?;
 
                 Ok(Constraint {
                     comparison,
@@ -454,6 +454,19 @@ impl FromStr for Operator {
     }
 }
 
+fn get_filter(filter_split: Vec<String>, split_int: usize) -> Result<FilterQuery, Error> {
+    let by_mea_or_calc = filter_split[0].parse::<MeaOrCalc>()?;
+    let constraint = join(&filter_split[1..split_int], ".").parse::<Constraint>()?;
+    let operator = Some(filter_split[split_int].parse::<Operator>()?);
+    let constraint2 = Some(join(&filter_split[split_int+1..], ".").parse::<Constraint>()?);
+    Ok(FilterQuery {
+        by_mea_or_calc,
+        constraint,
+        operator,
+        constraint2,
+    })
+}
+
 /// For filtering on a measure after Top is calculated (wrapper around end aggregation)
 #[derive(Debug, Clone)]
 pub struct FilterQuery {
@@ -470,19 +483,22 @@ impl FromStr for FilterQuery {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains(".and.") || s.contains(".or.") {
             let filter_split: Vec<String> = s.split(".").map(|f| f.to_string()).collect();
-            if filter_split.len() != 6 {
-                bail!("Could not parse a filter query")
+            match filter_split.len() {
+                6 => {
+                    get_filter(filter_split, 3)
+                },
+                7 => {
+                    if filter_split[3] == "or" || filter_split[3] == "and" {
+                        get_filter(filter_split, 3)
+                    } else {
+                        get_filter(filter_split, 4)
+                    }
+                },
+                8 => {
+                    get_filter(filter_split, 4)
+                },
+                _ => bail!("Could not parse a filter query"),
             }
-            let by_mea_or_calc = filter_split[0].parse::<MeaOrCalc>()?;
-            let constraint = join(&filter_split[1..3], ".").parse::<Constraint>()?;
-            let operator = Some(filter_split[3].parse::<Operator>()?);
-            let constraint2 = Some(join(&filter_split[4..6], ".").parse::<Constraint>()?);
-            Ok(FilterQuery {
-                by_mea_or_calc,
-                constraint,
-                operator,
-                constraint2,
-            })
         } else {
             match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
                 [by_mea, constraint] => {
