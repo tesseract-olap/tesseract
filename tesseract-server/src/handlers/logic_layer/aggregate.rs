@@ -264,7 +264,6 @@ pub fn logic_layer_aggregation(
                 if same_type {
                     let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
 
-                    // TODO: Process nullable columns
                     match first_col.column_data {
                         ColumnData::Int8(_) => {
                             column_data = ColumnData::Int8(col_data.iter().map(|x| x.parse::<i8>().unwrap()).collect());
@@ -296,6 +295,105 @@ pub fn logic_layer_aggregation(
                         ColumnData::Float64(_) => {
                             column_data = ColumnData::Float64(col_data.iter().map(|x| x.parse::<f64>().unwrap()).collect());
                         },
+                        ColumnData::NullableInt8(_) => {
+                            column_data = ColumnData::NullableInt8(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<i8>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableInt16(_) => {
+                            column_data = ColumnData::NullableInt16(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<i16>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableInt32(_) => {
+                            column_data = ColumnData::NullableInt32(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<i32>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableInt64(_) => {
+                            column_data = ColumnData::NullableInt64(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<i64>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableUInt8(_) => {
+                            column_data = ColumnData::NullableUInt8(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<u8>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableUInt16(_) => {
+                            column_data = ColumnData::NullableUInt16(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<u16>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableUInt32(_) => {
+                            column_data = ColumnData::NullableUInt32(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<u32>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableUInt64(_) => {
+                            column_data = ColumnData::NullableUInt64(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<u64>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableFloat32(_) => {
+                            column_data = ColumnData::NullableFloat32(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<f32>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableFloat64(_) => {
+                            column_data = ColumnData::NullableFloat64(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.parse::<f64>().unwrap())
+                                }
+                            }).collect());
+                        },
+                        ColumnData::NullableText(_) => {
+                            column_data = ColumnData::NullableText(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.clone())
+                                }
+                            }).collect());
+                        }
                         _ => ()
                     }
 
