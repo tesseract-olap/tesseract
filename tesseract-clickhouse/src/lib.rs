@@ -84,5 +84,31 @@ impl Backend for Clickhouse {
             &query_ir
         )
     }
-}
 
+    fn check_user(&self) -> Box<dyn Future<Item=(), Error= Error>> {
+        let index_sql = "select Settings.Values as values, Settings.Names as names from system.processes";
+        let f = self.pool
+            .get_handle()
+            .and_then(move |c| c.query(index_sql).fetch_all())
+            .and_then(move |(_, block): (_, Block<Complex>)| {
+                let values: Vec<&str> = block.get(0, "values")?;
+                let names: Vec<&str> = block.get(0, "names")?;
+                if names.contains(&"readonly") && names.contains(&"allow_ddl") {
+                    let rd_index = names.iter().position(|&r| r=="readonly").unwrap();
+                    let ad_index = names.iter().position(|&r| r=="allow_ddl").unwrap();
+                    // let rd_value = values.get(rd_index).parse::<u32>().unwrap();
+                    // let ad_value = values.get(ad_index).parse::<u32>().unwrap();
+                    let rd_value = values.get(rd_index).unwrap();
+                    let ad_value = values.get(ad_index).unwrap();
+                    if rd_value != &"1" && ad_value != &"0" {
+                        warn!("Warning: Database connection has write access. Users may be able to modify data.");
+                    }
+                } else {
+                    warn!("Warning: Database connection has write access. Users may be able to modify data.");
+                }
+                Ok(())
+            })
+            .map_err(|err| format_err!("{}", err));
+        Box::new(f)
+    }
+}

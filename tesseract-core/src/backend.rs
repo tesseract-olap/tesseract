@@ -38,6 +38,10 @@ pub trait Backend {
             &query_ir.growth,
         )
     }
+
+    fn check_user(&self) -> Box<dyn Future<Item=(), Error= Error>> {
+        unimplemented!()
+    }
 }
 
 impl Clone for Box<dyn Backend + Send + Sync> {

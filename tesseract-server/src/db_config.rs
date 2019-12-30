@@ -16,13 +16,11 @@
 use failure::{Error, format_err};
 use std::fmt;
 use std::str::FromStr;
-use log::*;
 
 use tesseract_clickhouse::Clickhouse;
-use tesseract_core::{Backend, ColumnData};
+use tesseract_core::Backend;
 use tesseract_mysql::MySql;
 use tesseract_postgres::Postgres;
-use actix::SystemRunner;
 
 /// from a full url e.g. clickhouse://127.0.0.1:9000 returns
 /// the db client, url, and database type.
@@ -73,61 +71,6 @@ pub fn get_db(db_url_full: &str) -> Result<(Box<dyn Backend + Send + Sync>, Stri
     };
 
     Ok((db, db_url, db_type))
-}
-
-pub fn check_user(db_url: &str, backend: Box<dyn Backend + Sync + Send>, sys: &mut SystemRunner, db_type: &Database) -> Result<(), Error> {
-    match db_type {
-        Database::Clickhouse => {
-            let db_url_split:Vec<_> = db_url.split(":").collect();
-            let db_username = db_url_split[0];
-            let index_sql = "select indexOf(Settings.Names, 'readonly')as rd, indexOf(Settings.Names, 'allow_ddl') as ad from system.processes";
-            let future = backend.exec_sql(index_sql.to_string());
-            let df = match sys.block_on(future) {
-                Ok(df) => df,
-                Err(err) => {
-                    return Err(format_err!("Error populating cache with backend data: {}", err));
-                }
-            };
-            let index_readonly = match &df.columns[0].column_data{
-                ColumnData::UInt64(x) => x[0],
-                _=> 0
-            };
-            let index_allowddl = match &df.columns[1].column_data{
-                ColumnData::UInt64(x) => x[0],
-                _=> 0
-            };
-
-            if index_allowddl != 0 && index_readonly != 0 {
-                let sql = format!("select user, Settings.Values[{}] as rd_value, Settings.Values[{}] as ad_value from system.processes", index_readonly, index_allowddl);
-                let future = backend.exec_sql(sql);
-                let df = match sys.block_on(future) {
-                    Ok(df) => df,
-                    Err(err) => {
-                        return Err(format_err!("Error populating cache with backend data: {}", err));
-                    }
-                };
-                let username = match &df.columns[0].column_data {
-                    ColumnData::Text(x) => x[0].to_string(),
-                    _=> "default".to_string()
-                };
-                let rd_value = match &df.columns[1].column_data {
-                    ColumnData::Text(x) => x[0].parse::<i32>()?,
-                    _=> 0
-                };
-                let ad_value = match &df.columns[2].column_data {
-                    ColumnData::Text(x) => x[0].parse::<i32>()?,
-                    _=> 1
-                };
-                if db_username == username && rd_value != 1 && ad_value != 0 {
-                    warn!("Warning: Database connection has write access. Users may be able to modify data.");
-                }
-            } else {
-                warn!("Warning: Database connection has write access. Users may be able to modify data.");
-            }
-            Ok(())
-        },
-        _ => Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]

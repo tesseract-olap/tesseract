@@ -163,7 +163,7 @@ fn main() -> Result<(), Error> {
         None => None
     };
     //check the user status
-    db_config::check_user(&db_url, db.clone(), &mut sys, &db_type)?;
+    sys.block_on(db.check_user())?;
 
     // Initialize Server
     server::new(
