@@ -1,14 +1,14 @@
 use itertools::join;
-use tesseract_core::query::{Comparison, Constraint, Operator};
+// use tesseract_core::query::{Comparison, Constraint, Operator};
 use tesseract_core::{QueryIr};
 
-use super::{
-    LimitSql,
-    SortSql,
-    TopSql,
-    TopWhereSql,
-    FilterSql,
-};
+// use super::{
+//     LimitSql,
+//     SortSql,
+//     TopSql,
+//     TopWhereSql,
+//     FilterSql,
+// };
 
 pub fn wrap_options(
     final_sql: String,

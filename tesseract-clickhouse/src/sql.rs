@@ -12,13 +12,13 @@ use tesseract_core::query_ir::{
     DrilldownSql,
     MeasureSql,
     HiddenDrilldownSql,
-    TopSql,
-    TopWhereSql,
-    SortSql,
-    LimitSql,
+    // TopSql,
+    // TopWhereSql,
+    // SortSql,
+    // LimitSql,
     RcaSql,
     GrowthSql,
-    FilterSql,
+    // FilterSql,
     RateSql,
     dim_subquery,
 };
@@ -144,4 +144,3 @@ mod test {
     }
 
 }
-

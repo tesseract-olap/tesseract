@@ -23,7 +23,7 @@ pub fn rate_calculation(
 {
     // Add a drilldown on the level we are getting the rate for
     let mut new_drills: Vec<DrilldownSql> = vec![];
-    let mut found_rate_drill = false;
+    let found_rate_drill = false;
 
     for drill in drills {
         if drill == &rate.drilldown_sql {
@@ -37,7 +37,7 @@ pub fn rate_calculation(
     }
 
     // Call primary agg
-    let (mut final_sql, mut final_drill_cols) = {
+    let (final_sql, _final_drill_cols) = {
         primary_agg(table, cuts, &new_drills, meas, None)
     };
 

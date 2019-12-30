@@ -14,8 +14,7 @@ use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
 use std::str::FromStr;
-use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTableColumnDefinition};
-use crate::query::*;
+use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
@@ -1227,7 +1226,8 @@ pub enum CubeHasUniqueLevelsAndProperties {
 #[cfg(test)]
 mod test {
     use super::*;
-    use serde_json;
+    // use serde_json;
+    use crate::query::*;
 
     const SCHEMA_STR_MULTIPLE_HIER_NO_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
     const SCHEMA_STR_MULTIPLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
@@ -1473,7 +1473,7 @@ mod test {
             exclude_default_members: false,
         };
         let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
-        let (query_ir, headers) = query_ir_headers.unwrap();
+        let (query_ir, _headers) = query_ir_headers.unwrap();
         assert_eq!(query_ir.sort, Some(SortSql{direction: SortDirection::Asc, column: "final_m0".to_string()}))
     }
 
@@ -1578,19 +1578,19 @@ mod test {
                 by_mea_or_calc: MeaOrCalc::Mea(Measure("Price Total".to_string())),
                 constraint: Constraint{
                     comparison: Comparison::LessThan,
-                    n: 100
+                    n: 100.0
                 },
                 operator: Some(Operator::Or),
                 constraint2: Some(Constraint{
                     comparison: Comparison::GreaterThan,
-                    n: 200
+                    n: 200.0
                 }),
             },
             FilterQuery{
                 by_mea_or_calc: MeaOrCalc::Mea(Measure("Quantity".to_string())),
                 constraint: Constraint{
                     comparison: Comparison::GreaterThan,
-                    n: 40
+                    n: 40.0
                 },
                 operator: None,
                 constraint2: None,
@@ -1599,7 +1599,7 @@ mod test {
                 by_mea_or_calc: MeaOrCalc::Calc(Calculation::Rca),
                 constraint: Constraint{
                     comparison: Comparison::GreaterThan,
-                    n: 1
+                    n: 1.0
                 },
                 operator: None,
                 constraint2: None,
@@ -1634,12 +1634,12 @@ mod test {
             exclude_default_members: false,
         };
         let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
-        let (query_ir, headers) = query_ir_headers.unwrap();
+        let (query_ir, _headers) = query_ir_headers.unwrap();
         assert_eq!(query_ir.filters, [FilterSql {
             by_column: "final_m1".to_string(),
             constraint: Constraint {
                 comparison: Comparison::LessThan,
-                n: 100,
+                n: 100.0,
             },
             operator: Some(
                 Operator::Or,
@@ -1647,7 +1647,7 @@ mod test {
             constraint2: Some(
                 Constraint {
                     comparison: Comparison::GreaterThan,
-                    n: 200,
+                    n: 200.0,
                 },
             ),
         },
@@ -1655,7 +1655,7 @@ mod test {
             by_column: "final_m2".to_string(),
             constraint: Constraint {
                 comparison: Comparison::GreaterThan,
-                n: 40,
+                n: 40.0,
             },
             operator: None,
             constraint2: None,
@@ -1664,7 +1664,7 @@ mod test {
             by_column: "rca".to_string(),
             constraint: Constraint {
                 comparison: Comparison::GreaterThan,
-                n: 1,
+                n: 1.0,
             },
             operator: None,
             constraint2: None,

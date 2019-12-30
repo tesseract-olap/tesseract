@@ -816,7 +816,7 @@ pub fn resolve_cuts(
         cube: &Cube,
         cube_cache: &CubeCache,
         level_map: &HashMap<String, LevelName>,
-        property_map: &HashMap<String, Property>,
+        _property_map: &HashMap<String, Property>,
         geoservice_url: &Option<Url>
 ) -> Result<(HashMap<String, HashMap<LevelName, Vec<String>>>, HashMap<String, String>), Error> {
     // HashMap of cuts for each dimension.
