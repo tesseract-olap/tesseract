@@ -15,7 +15,7 @@ The base URL for the logic layer is `/data`. The accepted parameters are:
 - `time` (list): Comma separated list of time cuts in the format `precision.value`, where precision could be one of `year`, `quarter`, `month`, `week`, or `day`, and value is either `latest` or `oldest`.
 - `measures` (list): Comma separated list of measure names. Follows the square brackets convention.
 - `properties` (list): : Comma separated list of property names. Follows the square brackets convention.
-- `filters`: Not yet implemented.
+- `filters`(list): Comma seprated list of filters in the format of `measure1.constraint.value` and to support `or` for the same measure `measure1.constraint1.value1.or.constraint2.value2` (Note: `value` in the filters can be float values such as(10.25, 10.0, .5)
 - `parents`: See [Tesseract docs](https://github.com/hwchen/tesseract/blob/master/tesseract-server/README.md#parents).
 - `top`: See [Tesseract docs](https://github.com/hwchen/tesseract/blob/master/tesseract-server/README.md#top).
 - `top_where`: 
