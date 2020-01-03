@@ -54,6 +54,22 @@ impl Query {
             exclude_default_members: false,
         }
     }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.drilldowns.is_empty() { bail!("query requires drilldown (got empty vec)") }
+        if self.measures.is_empty() { bail!("query requires measures (got empty vec)") }
+        if self.rca.is_none() { return Ok(()); }
+
+        let rca = self.rca.as_ref().unwrap();
+        let dupe = self.drilldowns.iter().find(|&drilldown| {
+            rca.drill_1 == *drilldown || rca.drill_2 == *drilldown
+        });
+        
+        match dupe {
+            None => Ok(()),
+            Some(drilldown) => bail!("duplicate drilldown in RCA and drilldowns: {:?}", drilldown)
+        }
+    }
 }
 
 // TODO: Move ClickHouse specific queries away from ts-core
@@ -488,5 +504,40 @@ impl FromStr for RateQuery {
             level_name,
             values
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_query_validate() {
+        let mut q = Query::new();
+        assert_eq!(
+            q.validate().unwrap_err().to_string(),
+            "query requires drilldown (got empty vec)"
+        );
+
+        q.drilldowns = vec![ Drilldown::new("1", "2", "3") ];
+        assert_eq!(
+            q.validate().unwrap_err().to_string(),
+            "query requires measures (got empty vec)"
+        );
+
+        q.measures = vec![ Measure::new("1") ];
+        assert!(q.validate().is_ok());
+
+        let bad_rca = RcaQuery::new("1", "2", "3", "cant", "duplicate", "drilldowns", "");
+        q.rca = Some(bad_rca);
+
+        assert_eq!(
+            q.validate().unwrap_err().to_string(),
+            format!("duplicate drilldown in RCA and drilldowns: {:?}", q.rca.unwrap().drill_1)
+        );
+
+        let good_rca = RcaQuery::new("drilldowns", "arent", "duplicates", "", "", "", "");
+        q.rca = Some(good_rca);
+        assert!(q.validate().is_ok());
     }
 }
