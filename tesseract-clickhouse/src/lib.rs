@@ -96,8 +96,6 @@ impl Backend for Clickhouse {
                 if names.contains(&"readonly") && names.contains(&"allow_ddl") {
                     let rd_index = names.iter().position(|&r| r=="readonly").unwrap();
                     let ad_index = names.iter().position(|&r| r=="allow_ddl").unwrap();
-                    // let rd_value = values.get(rd_index).parse::<u32>().unwrap();
-                    // let ad_value = values.get(ad_index).parse::<u32>().unwrap();
                     let rd_value = values.get(rd_index).unwrap();
                     let ad_value = values.get(ad_index).unwrap();
                     if rd_value != &"1" && ad_value != &"0" {
