@@ -113,6 +113,28 @@ impl LogicLayerQueryOpt {
 }
 
 
+macro_rules! consolidate_column_data {
+    ($col_data:expr, $col_type:ty) => {{
+        $col_data.iter().map(|x| {
+            x.parse::<$col_type>().expect("Unable to parse column data")
+        }).collect()
+    }};
+}
+
+
+macro_rules! consolidate_null_column_data {
+    ($col_data:expr, $col_type:ty) => {{
+        $col_data.iter().map(|x| {
+            if x == "" {
+                None
+            } else {
+                Some(x.parse::<$col_type>().expect("Unable to parse column data"))
+            }
+        }).collect()
+    }};
+}
+
+
 /// Performs data aggregation.
 pub fn logic_layer_aggregation(
     req: HttpRequest<AppState>,
@@ -261,129 +283,73 @@ pub fn logic_layer_aggregation(
                     col_data = [&col_data[..], &rows[..]].concat()
                 }
 
+                // When returning data from multiple levels from the same
+                // hierarchy, there is a chance that this column will have
+                // multiple data types. In those cases, we will convert the
+                // whole column to string values.
                 if same_type {
                     let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
 
                     match first_col.column_data {
                         ColumnData::Int8(_) => {
-                            column_data = ColumnData::Int8(col_data.iter().map(|x| x.parse::<i8>().unwrap()).collect());
+                            column_data = ColumnData::Int8(consolidate_column_data!(&col_data, i8));
                         },
                         ColumnData::Int16(_) => {
-                            column_data = ColumnData::Int16(col_data.iter().map(|x| x.parse::<i16>().unwrap()).collect());
+                            column_data = ColumnData::Int16(consolidate_column_data!(&col_data, i16));
                         },
                         ColumnData::Int32(_) => {
-                            column_data = ColumnData::Int32(col_data.iter().map(|x| x.parse::<i32>().unwrap()).collect());
+                            column_data = ColumnData::Int32(consolidate_column_data!(&col_data, i32));
                         },
                         ColumnData::Int64(_) => {
-                            column_data = ColumnData::Int64(col_data.iter().map(|x| x.parse::<i64>().unwrap()).collect());
+                            column_data = ColumnData::Int64(consolidate_column_data!(&col_data, i64));
                         },
                         ColumnData::UInt8(_) => {
-                            column_data = ColumnData::UInt8(col_data.iter().map(|x| x.parse::<u8>().unwrap()).collect());
+                            column_data = ColumnData::UInt8(consolidate_column_data!(&col_data, u8));
                         },
                         ColumnData::UInt16(_) => {
-                            column_data = ColumnData::UInt16(col_data.iter().map(|x| x.parse::<u16>().unwrap()).collect());
+                            column_data = ColumnData::UInt16(consolidate_column_data!(&col_data, u16));
                         },
                         ColumnData::UInt32(_) => {
-                            column_data = ColumnData::UInt32(col_data.iter().map(|x| x.parse::<u32>().unwrap()).collect());
+                            column_data = ColumnData::UInt32(consolidate_column_data!(&col_data, u32));
                         },
                         ColumnData::UInt64(_) => {
-                            column_data = ColumnData::UInt64(col_data.iter().map(|x| x.parse::<u64>().unwrap()).collect());
+                            column_data = ColumnData::UInt64(consolidate_column_data!(&col_data, u64));
                         },
                         ColumnData::Float32(_) => {
-                            column_data = ColumnData::Float32(col_data.iter().map(|x| x.parse::<f32>().unwrap()).collect());
+                            column_data = ColumnData::Float32(consolidate_column_data!(&col_data, f32));
                         },
                         ColumnData::Float64(_) => {
-                            column_data = ColumnData::Float64(col_data.iter().map(|x| x.parse::<f64>().unwrap()).collect());
+                            column_data = ColumnData::Float64(consolidate_column_data!(&col_data, f64));
                         },
                         ColumnData::NullableInt8(_) => {
-                            column_data = ColumnData::NullableInt8(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<i8>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableInt8(consolidate_null_column_data!(&col_data, i8));
                         },
                         ColumnData::NullableInt16(_) => {
-                            column_data = ColumnData::NullableInt16(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<i16>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableInt16(consolidate_null_column_data!(&col_data, i16));
                         },
                         ColumnData::NullableInt32(_) => {
-                            column_data = ColumnData::NullableInt32(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<i32>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableInt32(consolidate_null_column_data!(&col_data, i32));
                         },
                         ColumnData::NullableInt64(_) => {
-                            column_data = ColumnData::NullableInt64(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<i64>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableInt64(consolidate_null_column_data!(&col_data, i64));
                         },
                         ColumnData::NullableUInt8(_) => {
-                            column_data = ColumnData::NullableUInt8(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<u8>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableUInt8(consolidate_null_column_data!(&col_data, u8));
                         },
                         ColumnData::NullableUInt16(_) => {
-                            column_data = ColumnData::NullableUInt16(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<u16>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableUInt16(consolidate_null_column_data!(&col_data, u16));
                         },
                         ColumnData::NullableUInt32(_) => {
-                            column_data = ColumnData::NullableUInt32(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<u32>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableUInt32(consolidate_null_column_data!(&col_data, u32));
                         },
                         ColumnData::NullableUInt64(_) => {
-                            column_data = ColumnData::NullableUInt64(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<u64>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableUInt64(consolidate_null_column_data!(&col_data, u64));
                         },
                         ColumnData::NullableFloat32(_) => {
-                            column_data = ColumnData::NullableFloat32(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<f32>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableFloat32(consolidate_null_column_data!(&col_data, f32));
                         },
                         ColumnData::NullableFloat64(_) => {
-                            column_data = ColumnData::NullableFloat64(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.parse::<f64>().unwrap())
-                                }
-                            }).collect());
+                            column_data = ColumnData::NullableFloat64(consolidate_null_column_data!(&col_data, f64));
                         },
                         ColumnData::NullableText(_) => {
                             column_data = ColumnData::NullableText(col_data.iter().map(|x| {
