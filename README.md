@@ -35,14 +35,11 @@ brew install tesseract-olap
 ```
 
 #### Linux
-
-You should check the exact release on the releases page. v0.12.0 is just the first version that a deb package is available.
-
 For now, just `wget` and `dpkg -i`. In the future, a ppa may be set up.
 
 ```
-wget https://github.com/tesseract-olap/tesseract/releases/download/v0.14.2/tesseract-olap_0.14.2_amd64.deb
-dpkg -i tesseract-olap_0.14.2_amd64.deb
+wget https://github.com/tesseract-olap/tesseract/releases/latest/download/tesseract-olap.deb
+dpkg -i tesseract-olap.deb
 ```
 
 You can then run the binary `tesseract-olap`.
@@ -91,10 +88,7 @@ From the repo root:
 - `just check`: an alias for `watchexec cargo check`
 
 ## Contributors
-
-Thanks to @Datawheel for supporting this work.
-
-Also thanks to @MarcioPorto and @jspeis for contributing.
+Tesseract was originally created by @hwchen and is currently maintained by @Datawheel developers @jspeis and @MarcioPorto.
 
 ## License
 
