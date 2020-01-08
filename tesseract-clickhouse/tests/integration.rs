@@ -11,7 +11,6 @@ use clickhouse_rs::{
     types::Block, ClientHandle, Pool,
 };
 use clickhouse_rs::types::Complex;
-// use failure::{Error, format_err};
 
 fn database_url() -> String {
     let tmp = env::var("TESSERACT_DATABASE_URL").unwrap_or_else(|_| "tcp://localhost:9000?compression=lz4".into());
