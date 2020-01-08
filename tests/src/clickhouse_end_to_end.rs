@@ -208,7 +208,7 @@ mod tests {
                 .map_err(|_| ())
                 .and_then(|response| {
                     assert_eq!(response.status(), 200);
-                    let res = response.body().wait().expect("failed");
+                    let res = response.body().wait().expect("Failed to parse test API response body");
                     let expected = "{\"data\":[{\"Year\":2017,\"Quantity\":266.0}],\n\"source\": [\n{\"name\":\"Sales\",\"measures\":[\"Price Total\",\"Quantity\"],\"annotations\":null}\n]}";
                     assert_eq!(res, expected);
                     actix::System::current().stop();
