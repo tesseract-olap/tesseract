@@ -125,15 +125,11 @@ pub fn find_unique_property_name<T>(
     Ok(None)
 }
 
-/// Reads Logic Layer Config JSON file.
-pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
-    let config_str = std::fs::read_to_string(&config_path)
-        .map_err(|_| format_err!("Logic layer config file not found at {}", config_path))?;
-
+pub fn read_config_str(config_str: &str) -> Result<LogicLayerConfig, Error> {
     let config = match serde_json::from_str::<LogicLayerConfig>(&config_str) {
         Ok(config) => config,
         Err(err) => {
-            return Err(format_err!("Unable to read logic layer config at {}: {}", config_path, err))
+            return Err(format_err!("Unable to read logic layer config: {}", err))
         }
     };
 
@@ -151,6 +147,14 @@ pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
     } else {
         return Ok(config)
     }
+}
+
+/// Reads Logic Layer Config JSON file.
+pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
+    let config_str = std::fs::read_to_string(&config_path)
+        .map_err(|_| format_err!("Logic layer config file not found at {}", config_path))?;
+
+    read_config_str(&config_str)
 }
 
 impl LogicLayerConfig {

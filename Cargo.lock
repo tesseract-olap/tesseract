@@ -935,8 +935,14 @@ dependencies = [
 name = "integration-tests"
 version = "0.1.0"
 dependencies = [
+ "actix 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "actix-web 0.7.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "tesseract-clickhouse 0.1.0",
  "tesseract-core 0.1.0",
+ "tesseract-olap 0.14.8",
 ]
 
 [[package]]
