@@ -497,7 +497,7 @@ impl FromStr for FilterQuery {
             let length = filter_split.len();
             if length >= 6 || length <= 8 {
                 let op_index = filter_split.iter().position(|&s| s == "and" || s=="or").unwrap();
-                get_filter(filter_split, op_index);
+                get_filter(filter_split, op_index)
             } else {
                 bail!("Could not parse a filter query")
             }
