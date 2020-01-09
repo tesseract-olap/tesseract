@@ -12,13 +12,8 @@ use tesseract_core::query_ir::{
     DrilldownSql,
     MeasureSql,
     HiddenDrilldownSql,
-    // TopSql,
-    // TopWhereSql,
-    // SortSql,
-    // LimitSql,
     RcaSql,
     GrowthSql,
-    // FilterSql,
     RateSql,
     dim_subquery,
 };
