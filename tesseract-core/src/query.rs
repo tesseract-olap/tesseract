@@ -593,4 +593,21 @@ mod tests {
         };
         assert_eq!(filter, target);
     }
+
+    #[test]
+    fn test_simple_gt_filter() {
+        let m = Measure("Hello".to_owned());
+        let filter = FilterQuery::from_str("Hello.gt..2").unwrap();
+
+        let target = FilterQuery {
+            by_mea_or_calc: MeaOrCalc::Mea(m),
+            constraint: Constraint {
+                comparison: Comparison::GreaterThan,
+                n: 0.2,
+            },
+            operator: None,
+            constraint2: None,
+        };
+        assert_eq!(filter, target);
+    }
 }
