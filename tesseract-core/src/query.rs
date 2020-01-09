@@ -111,7 +111,7 @@ impl FromStr for TopQuery {
 // Just for TopQuery
 /// Currently rca and growth will be reserved keywords. This may be changed in the future,
 /// to allow measures that are named rca and growth
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MeaOrCalc {
     Mea(Measure),
     Calc(Calculation),
@@ -131,7 +131,7 @@ impl FromStr for MeaOrCalc {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Calculation {
     Rca,
     Growth,
@@ -476,6 +476,17 @@ pub struct FilterQuery {
     pub constraint2: Option<Constraint>
 }
 
+impl PartialEq for FilterQuery {
+    fn eq(&self, other: &Self) -> bool {
+        self.constraint.n == other.constraint.n &&
+        self.constraint.comparison == other.constraint.comparison &&
+        self.by_mea_or_calc == other.by_mea_or_calc
+    }
+}
+
+impl Eq for FilterQuery {}
+
+
 // Currently only allows one sort_measure
 impl FromStr for FilterQuery {
     type Err = Error;
@@ -554,5 +565,32 @@ impl FromStr for RateQuery {
             level_name,
             values
         })
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::FilterQuery;
+    use super::Measure;
+    use crate::query::MeaOrCalc;
+    use crate::query::{Constraint, Comparison};
+    use std::str::FromStr;
+
+    #[test]
+    fn test_simple_filter() {
+        let m = Measure("Hello".to_owned());
+        let filter = FilterQuery::from_str("Hello.eq.45.2").unwrap();
+
+        let target = FilterQuery {
+            by_mea_or_calc: MeaOrCalc::Mea(m),
+            constraint: Constraint {
+                comparison: Comparison::Equal,
+                n: 45.2,
+            },
+            operator: None,
+            constraint2: None,
+        };
+        assert_eq!(filter, target);
     }
 }
