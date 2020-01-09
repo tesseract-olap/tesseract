@@ -494,21 +494,12 @@ impl FromStr for FilterQuery {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains(".and.") || s.contains(".or.") {
             let filter_split: Vec<String> = s.split(".").map(|f| f.to_string()).collect();
-            match filter_split.len() {
-                6 => {
-                    get_filter(filter_split, 3)
-                },
-                7 => {
-                    if filter_split[3] == "or" || filter_split[3] == "and" {
-                        get_filter(filter_split, 3)
-                    } else {
-                        get_filter(filter_split, 4)
-                    }
-                },
-                8 => {
-                    get_filter(filter_split, 4)
-                },
-                _ => bail!("Could not parse a filter query"),
+            let length = filter_split.len();
+            if length >= 6 || length <= 8 {
+                let op_index = filter_split.iter().position(|&s| s == "and" || s=="or").unwrap();
+                get_filter(filter_split, op_index);
+            } else {
+                bail!("Could not parse a filter query")
             }
         } else {
             match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
