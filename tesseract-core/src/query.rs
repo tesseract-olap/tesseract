@@ -491,12 +491,12 @@ impl Eq for FilterQuery {}
 impl FromStr for FilterQuery {
     type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Selfcmd::Err> {
         if s.contains(".and.") || s.contains(".or.") {
             let filter_split: Vec<String> = s.split(".").map(|f| f.to_string()).collect();
             let length = filter_split.len();
             if length >= 6 || length <= 8 {
-                let op_index = filter_split.iter().position(|&s| s == "and" || s=="or").unwrap();
+                let op_index = filter_split.iter().position(|s| s == "and" || s=="or").unwrap();
                 get_filter(filter_split, op_index)
             } else {
                 bail!("Could not parse a filter query")
