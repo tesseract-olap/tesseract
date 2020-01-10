@@ -49,6 +49,16 @@ You can then run the binary `tesseract-olap`.
 
 Note that a systemd `.service` is also installed. You will probably need to modify the defaults, and you can do so at the install script prompt. To start the tesseract service, use `systemctl start tesseract-olap`.
 
+#### Docker
+
+Clone this repository and build the docker image using the command `docker build -t tesseract:latest .`
+
+Then you can run a container using the command
+```
+docker run [-e ENV_VAR=value] tesseract:latest
+```
+
+Don't forget to set the needed [environment variables](#environment-variables). The container will expose the server in port 7000. You can then bind the port to the host machine or connect another container.
 
 ### Environment Variables
 - `TESSERACT_DATABASE_URL`: required, is the address of the database; make sure to include the user, password, and database name.
