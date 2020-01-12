@@ -11,5 +11,5 @@ RUN groupadd -r tesseract &&\
     rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/cargo/bin/tesseract-olap /usr/local/bin/tesseract-olap
 USER tesseract
-EXPOSE 7000
-CMD ["tesseract-olap", "-a", "0.0.0.0:7000"]
+EXPOSE 7777
+CMD ["tesseract-olap", "-a", "0.0.0.0:7777"]

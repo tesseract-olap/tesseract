@@ -58,7 +58,7 @@ Then you can run a container using the command
 docker run [-e ENV_VAR=value] tesseract:latest
 ```
 
-Don't forget to set the needed [environment variables](#environment-variables). The container will expose the server in port 7000. You can then bind the port to the host machine or connect another container.
+Don't forget to set the needed [environment variables](#environment-variables). The container will expose the server in port 7777. You can then bind the port to the host machine or connect another container.
 
 ### Environment Variables
 - `TESSERACT_DATABASE_URL`: required, is the address of the database; make sure to include the user, password, and database name.
