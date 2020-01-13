@@ -32,21 +32,6 @@ pub fn aggregate_default_handler(
 }
 
 
-macro_rules! some_or_404 {
-    ($expr:expr, $note:expr) => {
-        match $expr {
-            Some(val) => val,
-            None => {
-                return Box::new(
-                    future::result(
-                        Ok(HttpResponse::NotFound().json($note.to_string()))
-                    )
-                );
-            }
-        }
-    };
-}
-
 /// Handles aggregation when a format is specified.
 pub fn aggregate_handler(
     (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)

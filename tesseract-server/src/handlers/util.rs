@@ -140,6 +140,23 @@ macro_rules! ok_or_404 {
 }
 
 
+#[macro_export]
+macro_rules! some_or_404 {
+    ($expr:expr, $note:expr) => {
+        match $expr {
+            Some(val) => val,
+            None => {
+                return Box::new(
+                    future::result(
+                        Ok(HttpResponse::NotFound().json($note.to_string()))
+                    )
+                );
+            }
+        }
+    };
+}
+
+
 pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Error> {
     for cut in cuts {
         // get level cache
