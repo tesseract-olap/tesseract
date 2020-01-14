@@ -426,7 +426,7 @@ impl FromStr for GrowthQuery {
 }
 
 /// For using an operator such as AND and OR in a sql query
-/// Currently used for the Fitler and inner queries only
+/// Currently used for the Filter and inner queries only
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator{
     And,
@@ -504,7 +504,6 @@ impl FromStr for FilterQuery {
         } else {
             match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
                 [by_mea, constraint] => {
-
                     let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
                     let constraint = constraint.parse::<Constraint>()?;
 

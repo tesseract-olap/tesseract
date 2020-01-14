@@ -453,7 +453,28 @@ pub fn generate_ts_queries(
         .unwrap_or(vec![]);
 
     let filters: Vec<FilterQuery> = agg_query_opt.filters
-        .map(|fs| LogicLayerQueryOpt::deserialize_args(fs).iter().map(|f| f.parse()).collect())
+        .map(|fs| LogicLayerQueryOpt::deserialize_args(fs).iter().map(|f| {
+            // Validate that the measure provided is an actual measure for this cube
+            match &f.splitn(2, ".").collect::<Vec<_>>()[..] {
+                [filter_measure, _] => {
+                    let mut found = false;
+
+                    for mea in &cube.measures {
+                        if &mea.name == filter_measure {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        return Err(format_err!("The measure name provided in the `filter` param is not valid."))
+                    }
+                },
+                _ => return Err(format_err!("Could not parse a filter query"))
+            }
+
+            f.parse()
+        }).collect())
         .unwrap_or(Ok(vec![]))?;
 
     let top: Option<TopQuery> = agg_query_opt.top.clone()
