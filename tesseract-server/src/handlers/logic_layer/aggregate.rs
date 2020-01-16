@@ -222,7 +222,6 @@ pub fn logic_layer_aggregation(
 
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
-
     for ts_query in &ts_queries {
         debug!("Tesseract query: {:?}", ts_query);
 
@@ -517,8 +516,30 @@ pub fn generate_ts_queries(
         })
         .unwrap_or(vec![]);
 
-    // TODO: Implement
-    let filters: Vec<FilterQuery>= vec![];
+    let filters: Vec<FilterQuery> = agg_query_opt.filters
+        .map(|fs| LogicLayerQueryOpt::deserialize_args(fs).iter().map(|f| {
+            // Validate that the measure provided is an actual measure for this cube
+            match &f.splitn(2, ".").collect::<Vec<_>>()[..] {
+                [filter_measure, _] => {
+                    let mut found = false;
+
+                    for mea in &cube.measures {
+                        if &mea.name == filter_measure {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        return Err(format_err!("The measure name provided in the `filter` param is not valid."))
+                    }
+                },
+                _ => return Err(format_err!("Could not parse a filter query"))
+            }
+
+            f.parse()
+        }).collect())
+        .unwrap_or(Ok(vec![]))?;
 
     let top: Option<TopQuery> = agg_query_opt.top.clone()
         .map(|t| {
@@ -880,7 +901,7 @@ pub fn resolve_cuts(
         cube: &Cube,
         cube_cache: &CubeCache,
         level_map: &HashMap<String, LevelName>,
-        property_map: &HashMap<String, Property>,
+        _property_map: &HashMap<String, Property>,
         geoservice_url: &Option<Url>
 ) -> Result<(HashMap<String, HashMap<LevelName, Vec<String>>>, HashMap<String, String>), Error> {
     // HashMap of cuts for each dimension.

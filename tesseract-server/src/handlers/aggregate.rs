@@ -15,7 +15,7 @@ use serde_qs as qs;
 use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
-use tesseract_core::schema::Cube;
+
 
 use crate::app::AppState;
 use crate::errors::ServerError;

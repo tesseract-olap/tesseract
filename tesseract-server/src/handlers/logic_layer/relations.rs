@@ -171,7 +171,7 @@ pub fn get_relations(
     cube: &Cube,
     cube_cache: &CubeCache,
     level_map: &HashMap<String, LevelName>,
-    property_map: &HashMap<String, Property>,
+    _property_map: &HashMap<String, Property>,
     geoservice_url: &Option<Url>
 ) -> Result<Vec<Vec<String>>, Error> {
 
@@ -230,7 +230,7 @@ pub fn get_relations(
                         None => continue  // This level has no child
                     };
 
-                    let child_level_name = LevelName {
+                    let _child_level_name = LevelName {
                         dimension: level_name.dimension.clone(),
                         hierarchy: level_name.hierarchy.clone(),
                         level: child_level.name.clone()
