@@ -107,6 +107,6 @@ mod test {
         // if token is none, all requests are OK
         let jwt_secret = None;
         let result = validate_web_token(&jwt_secret, "");
-        assert_eq!(result, false);
+        assert_eq!(result, true);
     }
 }
