@@ -1,4 +1,4 @@
-FROM rust:1.39 as builder
+FROM rust:1.40 as builder
 WORKDIR /opt/tesseract
 COPY . .
 RUN cargo install --path ./tesseract-server
