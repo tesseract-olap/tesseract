@@ -8,7 +8,7 @@ use mysql_async::Value::*;
 use std::str;
 use tesseract_core::{DataFrame, Column, ColumnData};
 
-pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future<Item=DataFrame, Error=Error>> {
+pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<dyn Future<Item=DataFrame, Error=Error>> {
     let mut tcolumn_list = vec![];
     let columns = query_result.columns_ref();
 
@@ -82,7 +82,8 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     match raw_value {
                         Int(y) => {
                             let raw_val: i8 = *y as i8;
-                            Some(col_data.push(raw_val))
+                            col_data.push(raw_val);
+                            Some(())
                         },
                         _s => None
                     };
@@ -92,7 +93,8 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     match raw_value {
                         Int(y) => {
                             let raw_val: i16 = *y as i16;
-                            Some(col_data.push(raw_val))
+                            col_data.push(raw_val);
+                            Some(())
                         },
                         _s => None
                     };
@@ -102,7 +104,8 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     match raw_value {
                         Int(y) => {
                             let raw_val: i32 = *y as i32;
-                            Some(col_data.push(raw_val))
+                            col_data.push(raw_val);
+                            Some(())
                         },
                         _s => None
                     };
@@ -110,7 +113,10 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                 ColumnData::Int64(col_data) => {
                     let raw_value = row.get(col_idx).unwrap();
                     match raw_value {
-                        Int(y) => Some(col_data.push(*y)),
+                        Int(y) => {
+                            col_data.push(*y);
+                            Some(())
+                        },
                         _s => None
                     };
                 },
@@ -119,7 +125,8 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                     match raw_value {
                         Float(y) => {
                             let raw_val: f32 = *y as f32;
-                            Some(col_data.push(raw_val))
+                            col_data.push(raw_val);
+                            Some(())
                         },
                         _s => None
                     };
@@ -127,10 +134,14 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                 ColumnData::Float64(col_data) => {
                     let raw_value = row.get(col_idx).unwrap();
                     match raw_value {
-                        Float(y) => Some(col_data.push(*y)),
+                        Float(y) => {
+                            col_data.push(*y);
+                            Some(())
+                        },
                         Bytes(y) => {
                             let tmp_val = str::from_utf8(y).unwrap().parse().unwrap();
-                            Some(col_data.push(tmp_val))
+                            col_data.push(tmp_val);
+                            Some(())
                         },
                         _s => None
                     };
@@ -142,7 +153,8 @@ pub fn rows_to_df(query_result: QueryResult<Conn, BinaryProtocol>) -> Box<Future
                             let tmp_str = str::from_utf8(y).unwrap();
                             // TODO is there a more memory efficient way to handle this
                             // other than copying the strings into the dataframe
-                            Some(col_data.push(tmp_str.to_string()))
+                            col_data.push(tmp_str.to_string());
+                            Some(())
                         },
                         _s => None
                     };

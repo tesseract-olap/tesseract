@@ -26,10 +26,10 @@ impl MySql {
 }
 
 impl Backend for MySql {
-    fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
+    fn exec_sql(&self, sql: String) -> Box<dyn Future<Item=DataFrame, Error=Error>> {
         let future = self.pool.get_conn()
             .and_then(move |conn| {
-                conn.prep_exec(sql.to_string(), ())
+                conn.prep_exec(sql, ())
             })
             .map_err(|e| {
                 format_err!("{}", e.description().to_string())
