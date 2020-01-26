@@ -2,15 +2,8 @@ use itertools::join;
 
 use crate::Aggregator;
 use crate::query_ir::{
-    TableSql,
-    CutSql,
-    DrilldownSql,
     MeasureSql,
-    TopSql,
-    SortSql,
-    LimitSql,
-    RcaSql,
-    GrowthSql,
+    QueryIr
 };
 
 /// Error checking is done before this point. This string formatter
@@ -18,16 +11,7 @@ use crate::query_ir::{
 /// Currently just does the standard aggregation.
 /// No calculations, primary aggregation is not split out.
 pub(crate) fn standard_sql(
-    table: &TableSql,
-    cuts: &[CutSql],
-    drills: &[DrilldownSql],
-    meas: &[MeasureSql],
-    // TODO put Filters and Calculations into own structs
-    _top: &Option<TopSql>,
-    _sort: &Option<SortSql>,
-    _limit: &Option<LimitSql>,
-    _rca: &Option<RcaSql>,
-    _growth: &Option<GrowthSql>,
+    query_ir: &QueryIr
     ) -> String
 {
     // hack for now... remove later
@@ -40,20 +24,20 @@ pub(crate) fn standard_sql(
             Aggregator::Max => format!("max({})", &m.column),
             Aggregator::Min => format!("min({})", &m.column),
             // median doesn't work like this
-            Aggregator::BasicGroupedMedian { .. } => format!("median"),
-            Aggregator::WeightedAverage {..} => format!("avg"),
+            Aggregator::BasicGroupedMedian { .. } => "median".to_string(),
+            Aggregator::WeightedAverage {..} => "avg".to_string(),
             Aggregator::WeightedSum {..} => format!(""),
             Aggregator::ReplicateWeightMoe {..} => format!(""),
             Aggregator::Moe {..} => format!(""),
             Aggregator::WeightedAverageMoe {..} => format!(""),
-            Aggregator::Custom(s) => format!("{}", s),
+            Aggregator::Custom(s) => s.to_string(),
         }
     }
 
     // --------------------------------------------------
     // copied from primary_agg for clickhouse
-    let ext_drills: Vec<_> = drills.iter()
-        .filter(|d| d.table.name != table.name)
+    let ext_drills: Vec<_> = query_ir.drills.iter()
+        .filter(|d| d.table.name != query_ir.table.name)
         .collect();
 
     //let ext_cuts: Vec<_> = cuts.iter()
@@ -70,13 +54,13 @@ pub(crate) fn standard_sql(
     //    .collect();
     // --------------------------------------------------
 
-    let drill_cols = join(drills.iter().map(|d| d.col_qual_string()), ", ");
-    let mea_cols = join(meas.iter().map(|m| agg_sql_string(m)), ", ");
+    let drill_cols = join(query_ir.drills.iter().map(|d| d.col_qual_string()), ", ");
+    let mea_cols = join(query_ir.meas.iter().map(|m| agg_sql_string(m)), ", ");
 
     let mut final_sql = format!("select {}, {} from {}",
         drill_cols,
         mea_cols,
-        table.name,
+        query_ir.table.name,
     );
 
     // join external dims
@@ -87,14 +71,14 @@ pub(crate) fn standard_sql(
                     d.table.full_name(),
                     d.table.full_name(),
                     d.primary_key,
-                    table.name,
+                    query_ir.table.name,
                     d.foreign_key,
                 )
         }), ", ");
 
         final_sql = format!("{} {}", final_sql, join_ext_dim_clauses);
     }
-
+    let cuts = &query_ir.cuts;
     if !cuts.is_empty() {
         let cut_clauses = join(cuts.iter().map(|c| format!("{} in ({})", c.col_qual_string(), c.members_string())), " and ");
         final_sql = format!("{} where {}", final_sql, cut_clauses);

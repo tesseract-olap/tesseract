@@ -14,7 +14,7 @@ pub trait Backend {
     /// Takes in a SQL string, outputs a stream of
     /// DataFrames, which will go on to be formatted into the
     /// desired query output format.
-    fn exec_sql_stream(&self, sql: String) -> Box<dyn Stream<Item=Result<DataFrame, Error>, Error=Error>> {
+    fn exec_sql_stream(&self, _sql: String) -> Box<dyn Stream<Item=Result<DataFrame, Error>, Error=Error>> {
         unimplemented!()
     }
 
@@ -27,15 +27,7 @@ pub trait Backend {
     fn generate_sql(&self, query_ir: QueryIr) -> String {
         // standard sql implementation
         sql::standard_sql(
-            &query_ir.table,
-            &query_ir.cuts,
-            &query_ir.drills,
-            &query_ir.meas,
-            &query_ir.top,
-            &query_ir.sort,
-            &query_ir.limit,
-            &query_ir.rca,
-            &query_ir.growth,
+            &query_ir,
         )
     }
 }
