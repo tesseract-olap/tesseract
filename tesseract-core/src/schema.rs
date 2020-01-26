@@ -55,7 +55,7 @@ impl From<SchemaConfigJson> for Schema {
 
         for cube_config in schema_config.cubes {
             let mut dimensions: Vec<_> = cube_config.dimensions
-                .unwrap_or(vec![])
+                .unwrap_or_else(|| vec![])
                 .into_iter()
                 .map(|dim| dim.into())
                 .collect();
@@ -108,7 +108,7 @@ impl From<SchemaConfigJson> for Schema {
                                         })
                                     });
 
-                                let dim_type = shared_dim_config.dim_type.clone().unwrap_or(DimensionType::default());
+                                let dim_type = shared_dim_config.dim_type.clone().unwrap_or_else(DimensionType::default);
 
                                 dimensions.push(Dimension {
                                     name: dim_name.clone(),
@@ -127,13 +127,7 @@ impl From<SchemaConfigJson> for Schema {
 
             // Cubes are public by default
             let public = match cube_config.public {
-                Some(public) => {
-                    if public == "false" {
-                        false
-                    } else {
-                        true
-                    }
-                },
+                Some(public) => public != "false",
                 None => true
             };
 
@@ -365,7 +359,7 @@ impl From<DimensionConfigJson> for Dimension {
                     .collect()
             });
 
-        let dim_type = dimension_config.dim_type.unwrap_or(DimensionType::default());
+        let dim_type = dimension_config.dim_type.unwrap_or_else(DimensionType::default);
 
         Dimension {
             name: dimension_config.name,
