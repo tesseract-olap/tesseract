@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use csv;
-use failure::{Error, format_err};
+use failure::Error;
 use futures::{Stream, Async, Poll};
 use indexmap::IndexMap;
 use serde::Serializer;
@@ -44,6 +44,7 @@ impl<S> RecordBlockStream<S>
     }
 }
 
+#[allow(clippy::never_loop)]
 impl<S> Stream for RecordBlockStream<S>
     where S: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
 {
@@ -108,7 +109,6 @@ impl<S> Stream for RecordBlockStream<S>
                     self.sent_header = true;
                     return Ok(Async::Ready(Some(bytes)));
                 },
-                _ => return Err(format_err!("just csv first")),
             }
         }
 
@@ -138,7 +138,6 @@ impl<S> Stream for RecordBlockStream<S>
                             let res = b"]}".to_vec().into();
                             return Ok(Async::Ready(Some(res)));
                         },
-                        _ => return Err(format_err!("just csv first")),
                     }
                 },
             };
@@ -159,9 +158,9 @@ impl<S> Stream for RecordBlockStream<S>
 
                             let lead_byte = if !self.sent_first_chunk {
                                 self.sent_first_chunk = true;
-                                ' ' as u8
+                                b' '
                             } else {
-                                ',' as u8
+                                b','
                             };
 
                             let body = format_jsonrecords_body(&self.headers, df, lead_byte)?;
@@ -179,16 +178,15 @@ impl<S> Stream for RecordBlockStream<S>
 
                             let lead_byte = if !self.sent_first_chunk {
                                 self.sent_first_chunk = true;
-                                ' ' as u8
+                                b' '
                             } else {
-                                ',' as u8
+                                b','
                             };
 
                             let body = format_jsonarrays_body(&self.headers, df, lead_byte)?;
 
                             return Ok(Async::Ready(Some(body)));
                         }
-                        _ => return Err(format_err!("just csv first")),
                     };
 
                     return Ok(Async::Ready(Some(formatted)));
@@ -223,17 +221,17 @@ fn format_csv_body(df: DataFrame) -> Result<Bytes, Error>
                 ColumnData::Float32(ref ns) => ns[row_idx].to_string(),
                 ColumnData::Float64(ref ns) => ns[row_idx].to_string(),
                 ColumnData::Text(ref ss) =>    ss[row_idx].to_string(),
-                ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or("".into()),
-                ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().unwrap_or("".into()),
+                ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.to_string()).unwrap_or_else(|| "".into()),
+                ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().unwrap_or_else(|| "".into()),
             };
 
             row_buf.push(val);
@@ -261,7 +259,7 @@ fn format_jsonrecords_body(headers: &[String], df: DataFrame, lead_byte: u8) -> 
     // write data
     for row_idx in 0..df.len() {
         let mut row: IndexMap<&str, serde_json::Value> = IndexMap::new();
-        for col_idx in 0..df.columns.len() {
+        for (col_idx, header_item) in headers.iter().enumerate().take(df.columns.len()) {
             let val = match df.columns[col_idx].column_data {
                 ColumnData::Int8(ref ns) =>    ns[row_idx].clone().into(),
                 ColumnData::Int16(ref ns) =>   ns[row_idx].clone().into(),
@@ -274,20 +272,20 @@ fn format_jsonrecords_body(headers: &[String], df: DataFrame, lead_byte: u8) -> 
                 ColumnData::Float32(ref ns) => ns[row_idx].clone().into(),
                 ColumnData::Float64(ref ns) => ns[row_idx].clone().into(),
                 ColumnData::Text(ref ss) =>    ss[row_idx].clone().into(),
-                ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().map(|n| n.into()).unwrap_or(Value::Null),
+                ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().map(|n| n.into()).unwrap_or_else(|| Value::Null),
             };
 
-            row.insert(&headers[col_idx], val);
+            row.insert(&header_item, val);
         }
 
         seq.serialize_element(&row)?;
@@ -333,17 +331,17 @@ fn format_jsonarrays_body(_headers: &[String], df: DataFrame, lead_byte: u8) -> 
                 ColumnData::Float32(ref ns) => ns[row_idx].clone().into(),
                 ColumnData::Float64(ref ns) => ns[row_idx].clone().into(),
                 ColumnData::Text(ref ss) =>    ss[row_idx].clone().into(),
-                ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or(Value::Null),
-                ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().map(|n| n.into()).unwrap_or(Value::Null),
+                ColumnData::NullableInt8(ref ns) =>    ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableInt16(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableInt32(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableInt64(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt8(ref ns) =>   ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt16(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt32(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableUInt64(ref ns) =>  ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableFloat32(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableFloat64(ref ns) => ns[row_idx].map(|n| n.clone().into()).unwrap_or_else(|| Value::Null),
+                ColumnData::NullableText(ref ss) =>    ss[row_idx].clone().map(|n| n.into()).unwrap_or_else(|| Value::Null),
             };
 
             row.push(val);
