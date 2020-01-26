@@ -94,6 +94,12 @@ mod test {
     use crate::names::Mask;
     use crate::query_ir::{MemberType, LevelColumn};
     use crate::Table;
+    use crate::query_ir::{
+        QueryIr,
+        TableSql,
+        CutSql,
+        DrilldownSql,
+    };
 
     #[test]
     /// Tests:
@@ -143,8 +149,24 @@ mod test {
             MeasureSql { aggregator: Aggregator::Sum, column: "commits".into() }
         ];
 
+        let query_ir = QueryIr {
+            table,
+            cuts,
+            drills,
+            meas,
+            hidden_drills: vec![],
+            filters: vec![],
+            top: None,
+            top_where: None,
+            sort: None,
+            limit: None,
+            rca: None,
+            growth: None,
+            rate: None,
+            sparse: false,
+        };
         assert_eq!(
-            standard_sql(&table, &cuts, &drills, &meas, &None, &None, &None, &None, &None),
+            standard_sql(&query_ir),
             "select valid_projects.id, valid_projects.name, sum(commits) from project_facts inner join valid_projects on valid_projects.id = project_facts.project_id where valid_projects.id in (3) group by valid_projects.id, valid_projects.name;".to_owned()
         );
     }
