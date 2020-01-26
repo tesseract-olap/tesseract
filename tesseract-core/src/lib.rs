@@ -59,7 +59,7 @@ macro_rules! mea_or_calc {
                             idx
                         };
                         format!("final_m{}", idx)})
-                    .ok_or(format_err!("measure {} must be in measures or if sorting on RCA column use \"rca\"", m))
+                    .ok_or_else(|| format_err!("measure {} must be in measures or if sorting on RCA column use \"rca\"", m))
             },
             MeaOrCalc::Calc(c) => {
                 Ok(c.sql_string())
@@ -243,18 +243,18 @@ impl Schema {
         let locales: Vec<String> = locale.split(",").map(|s| s.to_string()).collect();
 
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let dim = cube.dimensions.iter()
             .find(|dim| dim.name == level_name.dimension)
-            .ok_or(format_err!("could not find dimension for level name"))?;
+            .ok_or_else(|| format_err!("could not find dimension for level name"))?;
         let hier = dim.hierarchies.iter()
             .find(|hier| hier.name == level_name.hierarchy)
-            .ok_or(format_err!("could not find hierarchy for level name"))?;
+            .ok_or_else(|| format_err!("could not find hierarchy for level name"))?;
         let level = hier.levels.iter()
             .find(|lvl| lvl.name == level_name.level)
-            .ok_or(format_err!("could not find level for level name"))?;
+            .ok_or_else(|| format_err!("could not find level for level name"))?;
 
         let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
 
@@ -327,7 +327,7 @@ impl Schema {
     /// cut string to flip the logic in order to exclude the default member from being returned in queries.
     fn build_default_member_cuts(&self, schema_cube: &Cube, query: &Query, negate: bool) -> Result<Vec<Cut>, Error> {
         let target_dims = self.get_dims_for_default_member(schema_cube, query, negate);
-        let result = target_dims.iter().filter_map(|dim| {
+        target_dims.iter().filter_map(|dim| {
             let target_hierarchy_name = match &dim.default_hierarchy {
                 Some(hierarchy_name) => hierarchy_name,
                 None => &dim.hierarchies.get(0).unwrap().name
@@ -349,9 +349,7 @@ impl Schema {
                 Cut::from_str(&new_cut_str)
             })
         })
-        .collect::<Result<Vec<_>,_>>();
-
-        result
+        .collect::<Result<Vec<_>,_>>()
     }
 
     /// Helper function for build_default_member_cuts to get a list of dimensions.
@@ -360,7 +358,7 @@ impl Schema {
     /// In a negate mode, the idea is to build a cut which will exclude the default member when
     /// drilling down which is why in negate mode the logic for the dimension filter differs.
     fn get_dims_for_default_member<'a>(&self, schema_cube: &'a Cube, query: &Query, negate: bool) -> Vec<&'a Dimension> {
-        let dims = schema_cube.dimensions.iter()
+        schema_cube.dimensions.iter()
             .filter(|dim| {
                 // filter out dims that have a drilldown or cut
                 let dim_contains_drill = query.drilldowns.iter()
@@ -376,8 +374,7 @@ impl Schema {
             // OR have only one hierarchy. Note that due to the schema validation process,
             // if a dimension has more than one hierarchy, it must have a default hierarchy specified.
             .filter(|dim| dim.default_hierarchy.is_some() || dim.hierarchies.len() == 1)
-            .collect();
-        dims
+            .collect()
     }
 
     pub fn sql_query(
@@ -491,7 +488,7 @@ impl Schema {
 
         // now get the database metadata
         let table = self.cube_table(&cube)
-            .ok_or(format_err!("No table found for cube {}", cube))?;
+            .ok_or_else(|| format_err!("No table found for cube {}", cube))?;
 
         let mut cut_cols = self.cube_cut_cols(&cube, &query.cuts)
             .map_err(|err| format_err!("Error getting cut cols: {}", err))?;
@@ -568,12 +565,12 @@ impl Schema {
                 d.iter()
                     .map(|d| &d.0)
                     .find(|name| **name == t.by_dimension)
-                    .ok_or(format_err!("Top by_dimension must be in drilldowns (including rca)"))?;
+                    .ok_or_else(|| format_err!("Top by_dimension must be in drilldowns (including rca)"))?;
             } else {
                 query.drilldowns.iter()
                     .map(|d| &d.0)
                     .find(|name| **name == t.by_dimension)
-                    .ok_or(format_err!("Top by_dimension must be in drilldowns"))?;
+                    .ok_or_else(|| format_err!("Top by_dimension must be in drilldowns"))?;
             }
 
             Some(TopSql {
@@ -633,7 +630,7 @@ impl Schema {
 
             let mea = self.cube_mea_cols(&cube, &[rca.mea.clone()])?
                 .get(0)
-                .ok_or(format_err!("no measure found for rca"))?
+                .ok_or_else(|| format_err!("no measure found for rca"))?
                 .clone();
 
             Some(RcaSql {
@@ -649,14 +646,14 @@ impl Schema {
         let growth = if let Some(ref growth) = query.growth {
             let time_drill = self.cube_drill_cols(&cube, &[growth.time_drill.clone()], &query.properties, &query.captions, query.parents)?
                 .get(0)
-                .ok_or(format_err!("no measure found for growth"))?
+                .ok_or_else(|| format_err!("no measure found for growth"))?
                 .clone();
 
             // just want the measure id, not the actual measure col
             let mea = query.measures.iter()
                     .position(|mea| *mea == growth.mea )
                     .map(|idx| format!("final_m{}", idx))
-                    .ok_or(format_err!("measure for Growth must be in measures"))?;
+                    .ok_or_else(|| format_err!("measure for Growth must be in measures"))?;
 
             Some(GrowthSql {
                 time_drill,
@@ -725,7 +722,7 @@ impl Schema {
             // swapping around measure headers. growth mea moves to back.
             let g_mea_idx = query.measures.iter()
                     .position(|mea| *mea == growth.mea )
-                    .ok_or(format_err!("measure for Growth must be in measures"))?;
+                    .ok_or_else(|| format_err!("measure for Growth must be in measures"))?;
 
             let moved_mea = mea_headers.remove(g_mea_idx);
             mea_headers.push(moved_mea);
@@ -740,7 +737,7 @@ impl Schema {
                 .map(|th| {
                     drill_headers.iter()
                         .position(|h| h == th)
-                        .ok_or(format_err!("Growth, cannot find time header {} in drill headers", th))
+                        .ok_or_else(|| format_err!("Growth, cannot find time header {} in drill headers", th))
                 })
                 .collect();
             let time_header_idxs = time_header_idxs?;
@@ -788,7 +785,7 @@ impl Schema {
 impl Schema {
     fn cube_table(&self, cube_name: &str) -> Option<TableSql> {
         self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
+            .find(|cube| cube.name == cube_name)
             .map(|cube| {
                 TableSql {
                     name: cube.table.name.clone(),
@@ -799,26 +796,26 @@ impl Schema {
 
     fn cube_cut_cols(&self, cube_name: &str, cuts: &[Cut]) -> Result<Vec<CutSql>, Error> {
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let mut res = vec![];
 
         for cut in cuts {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == cut.level_name.dimension)
-                .ok_or(format_err!("could not find dimension for cut {}", cut.level_name))?;
+                .ok_or_else(|| format_err!("could not find dimension for cut {}", cut.level_name))?;
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == cut.level_name.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for cut {}", cut.level_name))?;
+                .ok_or_else(|| format_err!("could not find hierarchy for cut {}", cut.level_name))?;
             let level = hier.levels.iter()
                 .find(|lvl| lvl.name == cut.level_name.level)
-                .ok_or(format_err!("could not find level for cut {}", cut.level_name))?;
+                .ok_or_else(|| format_err!("could not find level for cut {}", cut.level_name))?;
 
             // No table (means inline table) will replace with fact table
             let table = hier.table
                 .clone()
-                .unwrap_or(cube.table.clone());
+                .unwrap_or_else(|| cube.table.clone());
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
@@ -826,10 +823,10 @@ impl Schema {
 
             let foreign_key = dim.foreign_key
                 .clone()
-                .ok_or(format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
+                .ok_or_else(|| format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
 
             let column = if cut.for_match {
-                level.name_column.clone().unwrap_or(level.key_column.clone())
+                level.name_column.clone().unwrap_or_else(|| level.key_column.clone())
             } else {
                 level.key_column.clone()
             };
@@ -868,8 +865,8 @@ impl Schema {
         ) -> Result<Vec<DrilldownSql>, Error>
     {
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let mut res = vec![];
 
@@ -877,10 +874,10 @@ impl Schema {
         for drill in drills {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == drill.0.dimension)
-                .ok_or(format_err!("could not find dimension for drill {}", drill.0))?;
+                .ok_or_else(|| format_err!("could not find dimension for drill {}", drill.0))?;
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == drill.0.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for drill {}", drill.0))?;
+                .ok_or_else(|| format_err!("could not find hierarchy for drill {}", drill.0))?;
             let levels = &hier.levels;
 
             // for this drill, get related properties.
@@ -901,7 +898,7 @@ impl Schema {
                             }
                         })
                         .map(|p| p.column.clone())
-                        .ok_or(format_err!("cannot find property for {}", p))
+                        .ok_or_else(|| format_err!("cannot find property for {}", p))
                 })
                 .collect();
             let property_columns = property_columns?;
@@ -938,7 +935,7 @@ impl Schema {
                             }
                         })
                         .map(|(lvl, p)| (lvl.name.clone(), p.column.clone()) )
-                        .ok_or(format_err!("cannot find property-caption for {}", p))
+                        .ok_or_else(|| format_err!("cannot find property-caption for {}", p))
                 })
                 .collect();
             let caption_cols = caption_cols?;
@@ -949,7 +946,7 @@ impl Schema {
             // No table (means inline table) will replace with fact table
             let table = hier.table
                 .clone()
-                .unwrap_or(cube.table.clone());
+                .unwrap_or_else(|| cube.table.clone());
 
             // primary key is currently required in hierarchy. because inline dim is not yet
             // allowed
@@ -957,14 +954,14 @@ impl Schema {
 
             let foreign_key = dim.foreign_key
                 .clone()
-                .ok_or(format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
+                .ok_or_else(|| format_err!("No foreign key; it's required for now (until inline dim implemented)"))?;
 
             // logic for getting level columns.
             // if parents = true, then get all columns down to level
             // if not,then just level
             let level_idx = levels.iter()
                 .position(|lvl| lvl.name == drill.0.level)
-                .ok_or(format_err!("could not find level for drill {}", drill.0))?;
+                .ok_or_else(|| format_err!("could not find level for drill {}", drill.0))?;
 
             let mut level_columns = vec![];
 
@@ -1013,15 +1010,15 @@ impl Schema {
 
     fn cube_mea_cols(&self, cube_name: &str, meas: &[Measure]) -> Result<Vec<MeasureSql>, Error> {
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let mut res = vec![];
 
         for measure in meas {
             let mea = cube.measures.iter()
                 .find(|m| m.name == measure.0)
-                .ok_or(format_err!("could not find measure for {}", measure.0))?;
+                .ok_or_else(|| format_err!("could not find measure for {}", measure.0))?;
 
             res.push(MeasureSql {
                 column: mea.column.clone(),
@@ -1044,18 +1041,18 @@ impl Schema {
         ) -> Result<Vec<String>, Error>
     {
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let mut level_headers = vec![];
 
         for drill in drills {
             let dim = cube.dimensions.iter()
                 .find(|dim| dim.name == drill.0.dimension)
-                .ok_or(format_err!("could not find dimension for drill"))?;
+                .ok_or_else(|| format_err!("could not find dimension for drill"))?;
             let hier = dim.hierarchies.iter()
                 .find(|hier| hier.name == drill.0.hierarchy)
-                .ok_or(format_err!("could not find hierarchy for drill"))?;
+                .ok_or_else(|| format_err!("could not find hierarchy for drill"))?;
             let levels = &hier.levels;
 
             // logic for getting level names.
@@ -1063,7 +1060,7 @@ impl Schema {
             // if not,then just level name
             let level_idx = hier.levels.iter()
                 .position(|lvl| lvl.name == drill.0.level)
-                .ok_or(format_err!("could not find hierarchy for drill"))?;
+                .ok_or_else(|| format_err!("could not find hierarchy for drill"))?;
 
 
             // In this section, need to watch out for whether there's both a
@@ -1100,7 +1097,7 @@ impl Schema {
                             }
                         })
                         .map(|p| p.name.clone())
-                        .ok_or(format_err!("cannot find property for {}", p))
+                        .ok_or_else(|| format_err!("cannot find property for {}", p))
                 })
                 .collect();
             let property_columns = property_columns?;
@@ -1113,15 +1110,15 @@ impl Schema {
 
     fn cube_mea_headers(&self, cube_name: &str, meas: &[Measure]) -> Result<Vec<String>, Error> {
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let mut res = vec![];
 
         for measure in meas {
             let mea = cube.measures.iter()
                 .find(|m| m.name == measure.0)
-                .ok_or(format_err!("could not find measure in cube"))?;
+                .ok_or_else(|| format_err!("could not find measure in cube"))?;
 
             res.push(mea.name.clone());
         }
@@ -1131,18 +1128,18 @@ impl Schema {
 
     fn get_dim_col_table(&self, cube_name: &str, level_name: &LevelName) -> Result<MembersQueryIR, Error> {
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let dim = cube.dimensions.iter()
             .find(|dim| dim.name == level_name.dimension)
-            .ok_or(format_err!("could not find dimension for level name"))?;
+            .ok_or_else(|| format_err!("could not find dimension for level name"))?;
         let hier = dim.hierarchies.iter()
             .find(|hier| hier.name == level_name.hierarchy)
-            .ok_or(format_err!("could not find hierarchy for level name"))?;
+            .ok_or_else(|| format_err!("could not find hierarchy for level name"))?;
         let level = hier.levels.iter()
             .find(|lvl| lvl.name == level_name.level)
-            .ok_or(format_err!("could not find level for level name"))?;
+            .ok_or_else(|| format_err!("could not find level for level name"))?;
 
         let table = hier.table.clone().unwrap_or_else(|| cube.table.clone());
 
@@ -1166,18 +1163,18 @@ impl Schema {
 
     fn get_dim_col_alias(&self, cube_name: &str, level_name: &LevelName) -> Result<String, Error> {
         let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
+            .find(|cube| cube.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))?;
 
         let dim = cube.dimensions.iter()
             .find(|dim| dim.name == level_name.dimension)
-            .ok_or(format_err!("could not find dimension for level name"))?;
+            .ok_or_else(|| format_err!("could not find dimension for level name"))?;
         let hier = dim.hierarchies.iter()
             .find(|hier| hier.name == level_name.hierarchy)
-            .ok_or(format_err!("could not find hierarchy for level name"))?;
+            .ok_or_else(|| format_err!("could not find hierarchy for level name"))?;
         let level = hier.levels.iter()
             .find(|lvl| lvl.name == level_name.level)
-            .ok_or(format_err!("could not find level for level name"))?;
+            .ok_or_else(|| format_err!("could not find level for level name"))?;
 
         // TODO centralize where to get the alias
         let column = format!("{}_{}", level.key_column, dim.name.replace(" ", "_"));
@@ -1185,24 +1182,10 @@ impl Schema {
         Ok(column)
     }
 
-    fn get_mea_col(&self, cube_name: &str, measure: &Measure) -> Result<String, Error> {
-        let cube = self.cubes.iter()
-            .find(|cube| &cube.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))?;
-
-        let mea = cube.measures.iter()
-            .find(|m| m.name == measure.0)
-            .ok_or(format_err!("could not find level for level name"))?;
-
-        let column = mea.column.clone();
-
-        Ok(column)
-    }
-
     pub fn get_cube_by_name(&self, cube_name: &str) -> Result<&Cube, Error> {
         self.cubes.iter()
-            .find(|c| &c.name == &cube_name)
-            .ok_or(format_err!("Could not find cube"))
+            .find(|c| c.name == cube_name)
+            .ok_or_else(|| format_err!("Could not find cube"))
     }
 }
 
