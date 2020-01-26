@@ -1,7 +1,7 @@
 use failure::{Error, format_err};
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DataFrame {
     pub columns: Vec<Column>,
 }
@@ -17,6 +17,10 @@ impl DataFrame {
         DataFrame {
             columns
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() > 0
     }
 
     pub fn len(&self) -> usize {
@@ -110,7 +114,7 @@ impl Column {
     /// DataFrame columns can come in many different types. This function converts
     /// all data to a common type (String).
     pub fn stringify_column_data(&self) -> Vec<String> {
-        return match &self.column_data {
+        match &self.column_data {
             ColumnData::Int8(v) => v.iter().map(|&e| e.to_string()).collect(),
             ColumnData::Int16(v) => v.iter().map(|&e| e.to_string()).collect(),
             ColumnData::Int32(v) => v.iter().map(|&e| e.to_string()).collect(),
