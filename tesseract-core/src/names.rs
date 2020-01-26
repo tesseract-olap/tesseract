@@ -125,7 +125,7 @@ impl Drilldown {
     /// Names must have already been trimmed of [] delimiters.
     pub fn from_vec<S: Into<String> + Clone>(drilldown: Vec<S>) -> Result<Self, Error> 
     {
-        LevelName::from_vec(drilldown).map(|x| Drilldown(x))
+        LevelName::from_vec(drilldown).map(Drilldown)
     }
 }
 
@@ -139,7 +139,7 @@ impl FromStr for Drilldown {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<LevelName>().map(|level_name| Drilldown(level_name))
+        s.parse::<LevelName>().map(Drilldown)
     }
 }
 
