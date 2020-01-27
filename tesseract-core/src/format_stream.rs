@@ -238,7 +238,7 @@ fn format_csv_body(df: DataFrame) -> Result<Bytes, Error>
 
             row_buf.push(val);
         }
-        wtr.write_record(&row_buf);
+        wtr.write_record(&row_buf)?;
 
         row_buf.clear();
     }
@@ -309,7 +309,7 @@ fn format_jsonrecords_body(headers: &[String], df: DataFrame, lead_byte: u8) -> 
 }
 
 /// Formats response `DataFrame` to JSON arrays.
-fn format_jsonarrays_body(headers: &[String], df: DataFrame, lead_byte: u8) -> Result<Bytes, Error> {
+fn format_jsonarrays_body(_headers: &[String], df: DataFrame, lead_byte: u8) -> Result<Bytes, Error> {
     // use streaming serializer
     // Necessary because this way we don't create a huge vec of rows containing Value
     // (very expensive)
@@ -366,4 +366,3 @@ fn format_jsonarrays_body(headers: &[String], df: DataFrame, lead_byte: u8) -> R
 
     Ok(res.into())
 }
-

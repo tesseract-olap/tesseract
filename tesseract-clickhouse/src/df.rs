@@ -209,7 +209,7 @@ def_column_builder! {
 pub fn block_to_df<K: ColumnBuilder>(block: Block<K>) -> Result<DataFrame, Error> {
     let mut df = Vec::with_capacity(block.column_count());
 
-    for (index, col) in block.columns().iter().enumerate() {
+    for (index, _col) in block.columns().iter().enumerate() {
         df.push(K::build(index, &block)?);
     }
 

@@ -34,6 +34,25 @@ use super::super::util::{
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
+macro_rules! some_or_bail {
+    ($input:expr) => {
+        match $input {
+            Some(l) => l,
+            None => bail!("Unrecognized level in calculation.")
+        }
+    }
+}
+
+macro_rules! some_or_break {
+    ($input:expr) => {
+        match $input {
+            Some(l) => l,
+            None => break
+        }
+    }
+}
+
+
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
 pub fn logic_layer_default_handler(
@@ -114,6 +133,28 @@ impl LogicLayerQueryOpt {
 }
 
 
+macro_rules! consolidate_column_data {
+    ($col_data:expr, $col_type:ty) => {{
+        $col_data.iter().map(|x| {
+            x.parse::<$col_type>().expect("Unable to parse column data")
+        }).collect()
+    }};
+}
+
+
+macro_rules! consolidate_null_column_data {
+    ($col_data:expr, $col_type:ty) => {{
+        $col_data.iter().map(|x| {
+            if x == "" {
+                None
+            } else {
+                Some(x.parse::<$col_type>().expect("Unable to parse column data"))
+            }
+        }).collect()
+    }};
+}
+
+
 /// Performs data aggregation.
 pub fn logic_layer_aggregation(
     req: HttpRequest<AppState>,
@@ -182,7 +223,6 @@ pub fn logic_layer_aggregation(
 
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
-
     for ts_query in &ts_queries {
         // SQL injection mitigation
         ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
@@ -268,41 +308,83 @@ pub fn logic_layer_aggregation(
                     col_data = [&col_data[..], &rows[..]].concat()
                 }
 
+                // When returning data from multiple levels from the same
+                // hierarchy, there is a chance that this column will have
+                // multiple data types. In those cases, we will convert the
+                // whole column to string values.
                 if same_type {
                     let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
 
-                    // TODO: Process nullable columns
                     match first_col.column_data {
                         ColumnData::Int8(_) => {
-                            column_data = ColumnData::Int8(col_data.iter().map(|x| x.parse::<i8>().unwrap()).collect());
+                            column_data = ColumnData::Int8(consolidate_column_data!(&col_data, i8));
                         },
                         ColumnData::Int16(_) => {
-                            column_data = ColumnData::Int16(col_data.iter().map(|x| x.parse::<i16>().unwrap()).collect());
+                            column_data = ColumnData::Int16(consolidate_column_data!(&col_data, i16));
                         },
                         ColumnData::Int32(_) => {
-                            column_data = ColumnData::Int32(col_data.iter().map(|x| x.parse::<i32>().unwrap()).collect());
+                            column_data = ColumnData::Int32(consolidate_column_data!(&col_data, i32));
                         },
                         ColumnData::Int64(_) => {
-                            column_data = ColumnData::Int64(col_data.iter().map(|x| x.parse::<i64>().unwrap()).collect());
+                            column_data = ColumnData::Int64(consolidate_column_data!(&col_data, i64));
                         },
                         ColumnData::UInt8(_) => {
-                            column_data = ColumnData::UInt8(col_data.iter().map(|x| x.parse::<u8>().unwrap()).collect());
+                            column_data = ColumnData::UInt8(consolidate_column_data!(&col_data, u8));
                         },
                         ColumnData::UInt16(_) => {
-                            column_data = ColumnData::UInt16(col_data.iter().map(|x| x.parse::<u16>().unwrap()).collect());
+                            column_data = ColumnData::UInt16(consolidate_column_data!(&col_data, u16));
                         },
                         ColumnData::UInt32(_) => {
-                            column_data = ColumnData::UInt32(col_data.iter().map(|x| x.parse::<u32>().unwrap()).collect());
+                            column_data = ColumnData::UInt32(consolidate_column_data!(&col_data, u32));
                         },
                         ColumnData::UInt64(_) => {
-                            column_data = ColumnData::UInt64(col_data.iter().map(|x| x.parse::<u64>().unwrap()).collect());
+                            column_data = ColumnData::UInt64(consolidate_column_data!(&col_data, u64));
                         },
                         ColumnData::Float32(_) => {
-                            column_data = ColumnData::Float32(col_data.iter().map(|x| x.parse::<f32>().unwrap()).collect());
+                            column_data = ColumnData::Float32(consolidate_column_data!(&col_data, f32));
                         },
                         ColumnData::Float64(_) => {
-                            column_data = ColumnData::Float64(col_data.iter().map(|x| x.parse::<f64>().unwrap()).collect());
+                            column_data = ColumnData::Float64(consolidate_column_data!(&col_data, f64));
                         },
+                        ColumnData::NullableInt8(_) => {
+                            column_data = ColumnData::NullableInt8(consolidate_null_column_data!(&col_data, i8));
+                        },
+                        ColumnData::NullableInt16(_) => {
+                            column_data = ColumnData::NullableInt16(consolidate_null_column_data!(&col_data, i16));
+                        },
+                        ColumnData::NullableInt32(_) => {
+                            column_data = ColumnData::NullableInt32(consolidate_null_column_data!(&col_data, i32));
+                        },
+                        ColumnData::NullableInt64(_) => {
+                            column_data = ColumnData::NullableInt64(consolidate_null_column_data!(&col_data, i64));
+                        },
+                        ColumnData::NullableUInt8(_) => {
+                            column_data = ColumnData::NullableUInt8(consolidate_null_column_data!(&col_data, u8));
+                        },
+                        ColumnData::NullableUInt16(_) => {
+                            column_data = ColumnData::NullableUInt16(consolidate_null_column_data!(&col_data, u16));
+                        },
+                        ColumnData::NullableUInt32(_) => {
+                            column_data = ColumnData::NullableUInt32(consolidate_null_column_data!(&col_data, u32));
+                        },
+                        ColumnData::NullableUInt64(_) => {
+                            column_data = ColumnData::NullableUInt64(consolidate_null_column_data!(&col_data, u64));
+                        },
+                        ColumnData::NullableFloat32(_) => {
+                            column_data = ColumnData::NullableFloat32(consolidate_null_column_data!(&col_data, f32));
+                        },
+                        ColumnData::NullableFloat64(_) => {
+                            column_data = ColumnData::NullableFloat64(consolidate_null_column_data!(&col_data, f64));
+                        },
+                        ColumnData::NullableText(_) => {
+                            column_data = ColumnData::NullableText(col_data.iter().map(|x| {
+                                if x == "" {
+                                    None
+                                } else {
+                                    Some(x.clone())
+                                }
+                            }).collect());
+                        }
                         _ => ()
                     }
 
@@ -386,15 +468,9 @@ pub fn generate_ts_queries(
                     None => level_value.clone()
                 };
 
-                let level_name = match level_map.get(&level_key) {
-                    Some(level_name) => level_name,
-                    None => break
-                };
+                let level_name = some_or_break!(level_map.get(&level_key));
 
-                let level = match cube.get_level(level_name) {
-                    Some(level) => level,
-                    None => break
-                };
+                let level = some_or_break!(cube.get_level(level_name));
 
                 drilldowns.push(Drilldown(level_name.clone()));
 
@@ -435,10 +511,7 @@ pub fn generate_ts_queries(
 
             for property_value in LogicLayerQueryOpt::deserialize_args(ps) {
                 // TODO: Break or bail?
-                let property = match property_map.get(&property_value) {
-                    Some(p) => p,
-                    None => break
-                };
+                let property = some_or_break!(property_map.get(&property_value));
 
                 properties.push(property.clone());
             }
@@ -447,8 +520,30 @@ pub fn generate_ts_queries(
         })
         .unwrap_or(vec![]);
 
-    // TODO: Implement
-    let filters: Vec<FilterQuery>= vec![];
+    let filters: Vec<FilterQuery> = agg_query_opt.filters
+        .map(|fs| LogicLayerQueryOpt::deserialize_args(fs).iter().map(|f| {
+            // Validate that the measure provided is an actual measure for this cube
+            match &f.splitn(2, ".").collect::<Vec<_>>()[..] {
+                [filter_measure, _] => {
+                    let mut found = false;
+
+                    for mea in &cube.measures {
+                        if &mea.name == filter_measure {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        return Err(format_err!("The measure name provided in the `filter` param is not valid."))
+                    }
+                },
+                _ => return Err(format_err!("Could not parse a filter query"))
+            }
+
+            f.parse()
+        }).collect())
+        .unwrap_or(Ok(vec![]))?;
 
     let top: Option<TopQuery> = agg_query_opt.top.clone()
         .map(|t| {
@@ -458,10 +553,7 @@ pub fn generate_ts_queries(
                 return Err(format_err!("Bad formatting for top param."));
             }
 
-            let level_name = match level_map.get(&top_split[1]) {
-                Some(l) => l,
-                None => bail!("Unable to find top level")
-            };
+            let level_name = some_or_bail!(level_map.get(&top_split[1]));
 
             let mea_or_calc: MeaOrCalc = top_split[2].parse()?;
 
@@ -496,10 +588,7 @@ pub fn generate_ts_queries(
             let level_key = gro_split[0].clone();
             let measure = gro_split[1].clone();
 
-            let level_name = match level_map.get(&level_key) {
-                Some(l) => l,
-                None => bail!("Unable to find growth level")
-            };
+            let level_name = some_or_bail!(level_map.get(&level_key));
 
             let growth = GrowthQuery::new(
                 level_name.dimension.clone(),
@@ -525,16 +614,24 @@ pub fn generate_ts_queries(
             let drill2_level_key = rca_split[1].clone();
             let measure = rca_split[2].clone();
 
-            let level_name_1 = match level_map.get(&drill1_level_key) {
-                Some(l) => l,
-                None => bail!("Unable to find drill 1 level")
-            };
+            let level_name_1 = some_or_bail!(level_map.get(&drill1_level_key));
 
-            let level_name_2 = match level_map.get(&drill2_level_key) {
-                Some(l) => l,
-                None => bail!("Unable to find drill 2 level")
-            };
+            let level_name_2 = some_or_bail!(level_map.get(&drill2_level_key));
 
+            // helps in getting the locale captions for the given level
+            let level_1 = some_or_bail!(cube.get_level(level_name_1));
+            let level_2 = some_or_bail!(cube.get_level(level_name_2));
+            let new_captions = level_1.get_captions(&level_name_1, &locales);
+            captions.extend_from_slice(&new_captions);
+            let new_captions = level_2.get_captions(&level_name_2, &locales);
+            captions.extend_from_slice(&new_captions);
+            // If parents is true return the parent level local captions too
+            if parents {
+                 let new_captions = get_parent_captions(&cube, &level_name_1, &locales);
+                 captions = [&captions[..], &new_captions[..]].concat();
+                 let new_captions = get_parent_captions(&cube, &level_name_2, &locales);
+                 captions = [&captions[..], &new_captions[..]].concat();
+            }
             let rca = RcaQuery::new(
                 level_name_1.dimension.clone(),
                 level_name_1.hierarchy.clone(),
@@ -653,10 +750,7 @@ pub fn generate_ts_queries(
                 if added_drilldowns.contains(&cut.level_name) {
                     drills.push(Drilldown(cut.level_name.clone()));
 
-                    let level = match cube.get_level(&cut.level_name) {
-                        Some(level) => level,
-                        None => break
-                    };
+                    let level = some_or_break!(cube.get_level(&cut.level_name));
 
                     // Add captions for this level
                     let new_captions = level.get_captions(&cut.level_name, &locales);
@@ -811,7 +905,7 @@ pub fn resolve_cuts(
         cube: &Cube,
         cube_cache: &CubeCache,
         level_map: &HashMap<String, LevelName>,
-        property_map: &HashMap<String, Property>,
+        _property_map: &HashMap<String, Property>,
         geoservice_url: &Option<Url>
 ) -> Result<(HashMap<String, HashMap<LevelName, Vec<String>>>, HashMap<String, String>), Error> {
     // HashMap of cuts for each dimension.

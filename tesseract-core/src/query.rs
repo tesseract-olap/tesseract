@@ -111,7 +111,7 @@ impl FromStr for TopQuery {
 // Just for TopQuery
 /// Currently rca and growth will be reserved keywords. This may be changed in the future,
 /// to allow measures that are named rca and growth
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MeaOrCalc {
     Mea(Measure),
     Calc(Calculation),
@@ -131,7 +131,7 @@ impl FromStr for MeaOrCalc {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Calculation {
     Rca,
     Growth,
@@ -189,10 +189,10 @@ impl FromStr for TopWhereQuery {
 // Constraint: less than, greater than a number
 // This is a little less straightforward, so we should
 // probably test this
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Constraint {
     pub comparison: Comparison,
-    pub n: i64,
+    pub n: f64,
 }
 
 impl Constraint {
@@ -205,11 +205,11 @@ impl FromStr for Constraint {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match &s.split(".").collect::<Vec<_>>()[..] {
+        match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
             [comparison, n] => {
 
                 let comparison = comparison.parse::<Comparison>()?;
-                let n = n.parse::<i64>()?;
+                let n = n.parse::<f64>()?;
 
                 Ok(Constraint {
                     comparison,
@@ -221,7 +221,7 @@ impl FromStr for Constraint {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Comparison {
     Equal,
     NotEqual,
@@ -291,7 +291,7 @@ impl FromStr for LimitQuery {
 #[derive(Debug, Clone)]
 pub struct SortQuery {
     pub direction: SortDirection,
-    pub measure: Measure,
+    pub measure: MeaOrCalc,
 }
 
 impl FromStr for SortQuery {
@@ -300,7 +300,7 @@ impl FromStr for SortQuery {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match &s.split(".").collect::<Vec<_>>()[..] {
             [measure, direction] => {
-                let measure = measure.parse::<Measure>()?;
+                let measure = measure.parse::<MeaOrCalc>()?;
                 let direction = direction.parse::<SortDirection>()?;
                 Ok(SortQuery {
                     direction,
@@ -313,7 +313,7 @@ impl FromStr for SortQuery {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SortDirection {
     Asc,
     Desc,
@@ -425,30 +425,97 @@ impl FromStr for GrowthQuery {
     }
 }
 
+/// For using an operator such as AND and OR in a sql query
+/// Currently used for the Filter and inner queries only
+#[derive(Debug, Clone, PartialEq)]
+pub enum Operator{
+    And,
+    Or,
+}
+
+impl Operator {
+    pub fn sql_string(&self) -> String {
+        match self {
+            Operator::And => "and".to_owned(),
+            Operator::Or => "or".to_owned(),
+        }
+    }
+}
+
+impl FromStr for Operator {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "and" => Operator::And,
+            "or" => Operator::Or,
+            _ => bail!("Could not parse sort direction"),
+        })
+    }
+}
+
+fn get_filter(filter_split: Vec<String>, split_int: usize) -> Result<FilterQuery, Error> {
+    let by_mea_or_calc = filter_split[0].parse::<MeaOrCalc>()?;
+    let constraint = join(&filter_split[1..split_int], ".").parse::<Constraint>()?;
+    let operator = Some(filter_split[split_int].parse::<Operator>()?);
+    let constraint2 = Some(join(&filter_split[split_int+1..], ".").parse::<Constraint>()?);
+    Ok(FilterQuery {
+        by_mea_or_calc,
+        constraint,
+        operator,
+        constraint2,
+    })
+}
+
 /// For filtering on a measure after Top is calculated (wrapper around end aggregation)
 #[derive(Debug, Clone)]
 pub struct FilterQuery {
     pub by_mea_or_calc: MeaOrCalc,
     pub constraint: Constraint,
+    pub operator: Option<Operator>,
+    pub constraint2: Option<Constraint>
 }
+
+impl PartialEq for FilterQuery {
+    fn eq(&self, other: &Self) -> bool {
+        self.constraint.n == other.constraint.n &&
+        self.constraint.comparison == other.constraint.comparison &&
+        self.by_mea_or_calc == other.by_mea_or_calc
+    }
+}
+
+impl Eq for FilterQuery {}
+
 
 // Currently only allows one sort_measure
 impl FromStr for FilterQuery {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match &s.split(",").collect::<Vec<_>>()[..] {
-            [by_mea, constraint] => {
+        if s.contains(".and.") || s.contains(".or.") {
+            let filter_split: Vec<String> = s.split(".").map(|f| f.to_string()).collect();
+            let length = filter_split.len();
+            if length >= 6 || length <= 8 {
+                let op_index = filter_split.iter().position(|s| s == "and" || s=="or").unwrap();
+                get_filter(filter_split, op_index)
+            } else {
+                bail!("Could not parse a filter query")
+            }
+        } else {
+            match &s.splitn(2, ".").collect::<Vec<_>>()[..] {
+                [by_mea, constraint] => {
+                    let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
+                    let constraint = constraint.parse::<Constraint>()?;
 
-                let by_mea_or_calc = by_mea.parse::<MeaOrCalc>()?;
-                let constraint = constraint.parse::<Constraint>()?;
-
-                Ok(FilterQuery {
-                    by_mea_or_calc,
-                    constraint,
-                })
-            },
-            _ => bail!("Could not parse a filter query"),
+                    Ok(FilterQuery {
+                        by_mea_or_calc,
+                        constraint,
+                        operator: None,
+                        constraint2: None
+                    })
+                },
+                _ => bail!("Could not parse a filter query"),
+            }
         }
     }
 }
@@ -488,5 +555,49 @@ impl FromStr for RateQuery {
             level_name,
             values
         })
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::FilterQuery;
+    use super::Measure;
+    use crate::query::MeaOrCalc;
+    use crate::query::{Constraint, Comparison};
+    use std::str::FromStr;
+
+    #[test]
+    fn test_simple_filter() {
+        let m = Measure("Hello".to_owned());
+        let filter = FilterQuery::from_str("Hello.eq.45.2").unwrap();
+
+        let target = FilterQuery {
+            by_mea_or_calc: MeaOrCalc::Mea(m),
+            constraint: Constraint {
+                comparison: Comparison::Equal,
+                n: 45.2,
+            },
+            operator: None,
+            constraint2: None,
+        };
+        assert_eq!(filter, target);
+    }
+
+    #[test]
+    fn test_simple_gt_filter() {
+        let m = Measure("Hello".to_owned());
+        let filter = FilterQuery::from_str("Hello.gt..2").unwrap();
+
+        let target = FilterQuery {
+            by_mea_or_calc: MeaOrCalc::Mea(m),
+            constraint: Constraint {
+                comparison: Comparison::GreaterThan,
+                n: 0.2,
+            },
+            operator: None,
+            constraint2: None,
+        };
+        assert_eq!(filter, target);
     }
 }

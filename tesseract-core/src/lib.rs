@@ -14,7 +14,7 @@ use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
 use std::str::FromStr;
-use crate::schema::{SchemaConfigJson, SchemaConfigXML, InlineTableColumnDefinition};
+use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
@@ -46,7 +46,27 @@ use self::query_ir::{
 };
 pub use self::query::{Query, MeaOrCalc, FilterQuery};
 pub use self::query_ir::QueryIr;
-
+macro_rules! mea_or_calc {
+    ($m_or_c:expr, $query:expr) => {
+        match $m_or_c {
+            MeaOrCalc::Mea(m) => {
+                $query.measures.iter()
+                    .position(|col| col == m )
+                    .map(|idx|{
+                        let idx = if $query.rca.is_some() {
+                            idx + 1
+                        } else {
+                            idx
+                        };
+                        format!("final_m{}", idx)})
+                    .ok_or(format_err!("measure {} must be in measures or if sorting on RCA column use \"rca\"", m))
+            },
+            MeaOrCalc::Calc(c) => {
+                Ok(c.sql_string())
+            }
+        }
+    }
+}
 
 impl Schema {
     /// Deserializes JSON schema into a `Schema`.
@@ -534,23 +554,7 @@ impl Schema {
             // want the index so that we can use `m0` etc.
             let top_sort_columns: Result<Vec<_>, _> = t.sort_mea_or_calc.iter()
                 .map(|m_or_c| {
-                    match m_or_c {
-                        MeaOrCalc::Mea(m) => {
-                            // NOTE: rca mea does not return the actual value, only rca. Since
-                            // mea value must be retrieved through explicit drilldown,
-                            // don't need to do an extra rca check here.
-
-                            // TODO idx should be +1 if Some(rca)
-                            // check topWhere implementation
-                            query.measures.iter()
-                                .position(|col| col == m )
-                                .map(|idx| format!("final_m{}", idx))
-                                .ok_or(format_err!("measure {} for Top must be in measures", m))
-                        },
-                        MeaOrCalc::Calc(c) => {
-                            Ok(c.sql_string())
-                        }
-                    }
+                    mea_or_calc!(m_or_c, query)
                 })
                 .collect();
             let top_sort_columns = top_sort_columns?;
@@ -584,29 +588,7 @@ impl Schema {
 
         // TopWhere, from Query to Query IR
         let top_where = if let Some(ref tw) = query.top_where {
-            let by_column = match &tw.by_mea_or_calc {
-                MeaOrCalc::Mea(m) => {
-                    // NOTE: rca mea does not return the actual value, only rca. Since
-                    // mea value must be retrieved through explicit drilldown,
-                    // don't need to do an extra rca check here.
-
-                    query.measures.iter()
-                        .position(|col| col == m )
-                        .map(|idx| {
-                            let idx = if query.rca.is_some() {
-                                idx + 1
-                            } else {
-                                idx
-                            };
-                            format!("final_m{}", idx)
-                        })
-                        .ok_or(format_err!("measure {} for Top must be in measures", m))?
-                },
-                MeaOrCalc::Calc(c) => {
-                    c.sql_string()
-                }
-            };
-
+            let by_column = mea_or_calc!(&tw.by_mea_or_calc, query)?;
             Some(TopWhereSql {
                 by_column,
                 constraint: tw.constraint.clone(),
@@ -618,34 +600,15 @@ impl Schema {
         // Filter, from Query to Query IR. Should be exactly the same as TopWhere
         let filters = query.filters.iter()
             .map(|filter| {
-                let by_column = match &filter.by_mea_or_calc {
-                    MeaOrCalc::Mea(m) => {
-                        // NOTE: rca mea does not return the actual value, only rca. Since
-                        // mea value must be retrieved through explicit drilldown,
-                        // don't need to do an extra rca check here.
-
-                        query.measures.iter()
-                            .position(|col| col == m )
-                            .map(|idx| {
-                                let idx = if query.rca.is_some() {
-                                    idx + 1
-                                } else {
-                                    idx
-                                };
-                                format!("final_m{}", idx)
-                            })
-                            .ok_or(format_err!("measure {} for Top must be in measures", m))
-                    },
-                    MeaOrCalc::Calc(c) => {
-                        Ok(c.sql_string())
-                    }
-                };
+                let by_column = mea_or_calc!(&filter.by_mea_or_calc, query);
 
                 by_column
                     .map(|by_column| {
                         FilterSql {
                             by_column,
                             constraint: filter.constraint.clone(),
+                            operator: filter.operator.clone(),
+                            constraint2: filter.constraint2.clone()
                         }
                     })
             })
@@ -654,30 +617,11 @@ impl Schema {
 
         let sort = if let Some(ref s) = query.sort {
             // sort column needs to be named by alias
-            // Checking if we are going to sort by RCA or not
-            let measure_name = s.measure.to_string();
-            let rca_measure_name = if query.rca.is_some() {
-                query.rca.as_ref().unwrap().mea.to_string()
-            } else {
-                "".to_string()
-            };
-
-            if measure_name == format!("{} RCA", rca_measure_name) {
-                Some(SortSql {
-                    direction: s.direction.clone(),
-                    column: format!("rca"),
-                })
-            } else {
-                let sort_column = query.measures.iter()
-                    .position(|m| m == &s.measure)
-                    .ok_or_else(|| format_err!("sort {:?} not found in measures", &s.measure))?;
-
-
-                Some(SortSql {
-                    direction: s.direction.clone(),
-                    column: format!("final_m{}", sort_column),
-                })
-            }
+            let sort_column = mea_or_calc!(&s.measure, query)?;
+            Some(SortSql {
+                direction: s.direction.clone(),
+                column: sort_column,
+            })
         } else {
             None
         };
@@ -1282,7 +1226,8 @@ pub enum CubeHasUniqueLevelsAndProperties {
 #[cfg(test)]
 mod test {
     use super::*;
-    use serde_json;
+    // use serde_json;
+    use crate::query::*;
 
     const SCHEMA_STR_MULTIPLE_HIER_NO_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
     const SCHEMA_STR_MULTIPLE_HIER_DEFAULT: &str = r#"{ "name": "test", "cubes": [ { "name": "sales", "table": { "name": "sales", "primary_key": "product_id" }, "dimensions": [{ "name": "Geography", "foreign_key": "customer_id", "default_hierarchy": "Tract", "hierarchies": [ { "name": "Tract", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "State", "key_column": "state_id", "name_column": "state_name", "key_type": "text" }, { "name": "County", "key_column": "county_id", "name_column": "county_name", "key_type": "text" }, { "name": "Tract", "key_column": "tract_id", "name_column": "tract_name", "key_type": "text" } ] }, { "name": "Place", "table": { "name": "customer_geo" }, "primary_key": "customer_id", "levels": [ { "name": "Place", "key_column": "place_id", "name_column": "place_name", "key_type": "text" } ] } ] } ], "measures": [ { "name": "Quantity", "column": "quantity", "aggregator": "sum" } ] } ] }"#;
@@ -1398,5 +1343,331 @@ mod test {
         println!("{:#?}", schema);
         let dm = schema.cubes[0].dimensions[0].hierarchies[0].default_member.clone();
         assert_eq!(dm.unwrap(), "Race.Race.Race.Total".to_owned());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sort_rca() {
+        let s = r##"
+        <Schema name="Webshop">
+            <SharedDimension name="Geography" type="geo">
+                <Hierarchy name="Geography">
+                    <Table name="tesseract_webshop_geographies" />
+
+
+                    <Level name="Continent" key_column="continent_id" name_column="continent_name"
+                            key_type="text">
+                        <Property name="Continent PT" column="continent_name_pt" caption_set="pt" />
+                        <Property name="Continent ES" column="continent_name_es" caption_set="es" />
+                    </Level>
+                    <Level name="Country" key_column="country_id" name_column="country_name"
+                            key_type="nontext">
+                        <Property name="Country PT" column="country_name_pt" caption_set="pt" />
+                        <Property name="Country ES" column="country_name_es" caption_set="es" />
+                    </Level>
+                </Hierarchy>
+            </SharedDimension>
+
+            <Cube name="Sales">
+                <Table name="tesseract_webshop_sales" />
+
+                <DimensionUsage foreign_key="country_id" name="Geography" source="Geography" />
+
+                <Dimension name="Year" foreign_key="year">
+                    <Hierarchy name="Year">
+                        <Level name="Year" key_column="year" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Month" foreign_key="month_id">
+                    <Hierarchy name="Month">
+                        <Table name="tesseract_webshop_time" />
+
+                        <Level name="Month" key_column="month_id" name_column="month_name">
+                            <Property name="Month PT" column="month_name_pt" caption_set="pt" />
+                        </Level>
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Category" foreign_key="category_id">
+                    <Hierarchy name="Category">
+                        <InlineTable alias="tesseract_webshop_categories">
+                            <ColumnDef name="category_name" key_type="text" />
+                            <ColumnDef name="category_name_pt" key_type="text" caption_set="pt" />
+                            <ColumnDef name="category_name_es" key_type="text" caption_set="es" />
+                            <ColumnDef name="category_idx" key_type="nontext" key_column_type="Int32" />
+
+                            <Row>
+                                <Value column="category_name">Books</Value>
+                                <Value column="category_name_pt">Livros</Value>
+                                <Value column="category_name_es">Libros</Value>
+                                <Value column="category_idx">1</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Sports</Value>
+                                <Value column="category_name_pt">Esportes</Value>
+                                <Value column="category_name_es">Deportes</Value>
+                                <Value column="category_idx">2</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Various</Value>
+                                <Value column="category_name_pt">Vários</Value>
+                                <Value column="category_name_es">Varios</Value>
+                                <Value column="category_idx">3</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Videos</Value>
+                                <Value column="category_name_pt">Vídeos</Value>
+                                <Value column="category_name_es">Videos</Value>
+                                <Value column="category_idx">4</Value>
+                            </Row>
+                        </InlineTable>
+
+                        <!-- <Level name="Category" key_column="category_id" name_column="category_name" key_type="nontext" /> -->
+
+                        <Level name="Category" key_column="category_idx" name_column="category_name" key_type="nontext" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Measure name="Price Total" column="price_total" aggregator="sum" />
+                <Measure name="Quantity" column="quantity" aggregator="sum" />
+            </Cube>
+        </Schema>
+        "##;
+        let query = Query {
+            drilldowns: [Drilldown(LevelName{
+                dimension: "Year".to_string(),
+                hierarchy: "Year".to_string(),
+                level: "Year".to_string(),
+            })].to_vec(),
+            cuts: vec![],
+            measures: [Measure("Price Total".to_string())].to_vec(),
+            properties: vec![],
+            filters: vec![],
+            captions: vec![],
+            parents: false,
+            top: None,
+            top_where: None,
+            sort: Some(SortQuery{
+                direction: SortDirection::Asc,
+                measure: MeaOrCalc::Mea(Measure("Price Total".to_string()))
+            }),
+            limit: None,
+            rca: Some(RcaQuery{
+                drill_1: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                drill_2: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                mea: Measure("Price Total".to_string())
+            }),
+            growth: None,
+            rate: None,
+            debug: false,
+            sparse: false,
+            exclude_default_members: false,
+        };
+        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
+        let (query_ir, _headers) = query_ir_headers.unwrap();
+        assert_eq!(query_ir.sort, Some(SortSql{direction: SortDirection::Asc, column: "final_m0".to_string()}))
+    }
+
+    #[test]
+    fn test_filter_query() {
+        let s = r##"
+        <Schema name="Webshop">
+            <SharedDimension name="Geography" type="geo">
+                <Hierarchy name="Geography">
+                    <Table name="tesseract_webshop_geographies" />
+
+
+                    <Level name="Continent" key_column="continent_id" name_column="continent_name"
+                            key_type="text">
+                        <Property name="Continent PT" column="continent_name_pt" caption_set="pt" />
+                        <Property name="Continent ES" column="continent_name_es" caption_set="es" />
+                    </Level>
+                    <Level name="Country" key_column="country_id" name_column="country_name"
+                            key_type="nontext">
+                        <Property name="Country PT" column="country_name_pt" caption_set="pt" />
+                        <Property name="Country ES" column="country_name_es" caption_set="es" />
+                    </Level>
+                </Hierarchy>
+            </SharedDimension>
+
+            <Cube name="Sales">
+                <Table name="tesseract_webshop_sales" />
+
+                <DimensionUsage foreign_key="country_id" name="Geography" source="Geography" />
+
+                <Dimension name="Year" foreign_key="year">
+                    <Hierarchy name="Year">
+                        <Level name="Year" key_column="year" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Month" foreign_key="month_id">
+                    <Hierarchy name="Month">
+                        <Table name="tesseract_webshop_time" />
+
+                        <Level name="Month" key_column="month_id" name_column="month_name">
+                            <Property name="Month PT" column="month_name_pt" caption_set="pt" />
+                        </Level>
+                    </Hierarchy>
+                </Dimension>
+
+                <Dimension name="Category" foreign_key="category_id">
+                    <Hierarchy name="Category">
+                        <InlineTable alias="tesseract_webshop_categories">
+                            <ColumnDef name="category_name" key_type="text" />
+                            <ColumnDef name="category_name_pt" key_type="text" caption_set="pt" />
+                            <ColumnDef name="category_name_es" key_type="text" caption_set="es" />
+                            <ColumnDef name="category_idx" key_type="nontext" key_column_type="Int32" />
+
+                            <Row>
+                                <Value column="category_name">Books</Value>
+                                <Value column="category_name_pt">Livros</Value>
+                                <Value column="category_name_es">Libros</Value>
+                                <Value column="category_idx">1</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Sports</Value>
+                                <Value column="category_name_pt">Esportes</Value>
+                                <Value column="category_name_es">Deportes</Value>
+                                <Value column="category_idx">2</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Various</Value>
+                                <Value column="category_name_pt">Vários</Value>
+                                <Value column="category_name_es">Varios</Value>
+                                <Value column="category_idx">3</Value>
+                            </Row>
+                            <Row>
+                                <Value column="category_name">Videos</Value>
+                                <Value column="category_name_pt">Vídeos</Value>
+                                <Value column="category_name_es">Videos</Value>
+                                <Value column="category_idx">4</Value>
+                            </Row>
+                        </InlineTable>
+
+                        <!-- <Level name="Category" key_column="category_id" name_column="category_name" key_type="nontext" /> -->
+
+                        <Level name="Category" key_column="category_idx" name_column="category_name" key_type="nontext" />
+                    </Hierarchy>
+                </Dimension>
+
+                <Measure name="Price Total" column="price_total" aggregator="sum" />
+                <Measure name="Quantity" column="quantity" aggregator="sum" />
+            </Cube>
+        </Schema>
+        "##;
+        let query = Query {
+            drilldowns: [Drilldown(LevelName{
+                dimension: "Year".to_string(),
+                hierarchy: "Year".to_string(),
+                level: "Year".to_string(),
+            })].to_vec(),
+            cuts: vec![],
+            measures: [Measure("Price Total".to_string()), Measure("Quantity".to_string())].to_vec(),
+            properties: vec![],
+            filters: [FilterQuery{
+                by_mea_or_calc: MeaOrCalc::Mea(Measure("Price Total".to_string())),
+                constraint: Constraint{
+                    comparison: Comparison::LessThan,
+                    n: 100.0
+                },
+                operator: Some(Operator::Or),
+                constraint2: Some(Constraint{
+                    comparison: Comparison::GreaterThan,
+                    n: 200.0
+                }),
+            },
+            FilterQuery{
+                by_mea_or_calc: MeaOrCalc::Mea(Measure("Quantity".to_string())),
+                constraint: Constraint{
+                    comparison: Comparison::GreaterThan,
+                    n: 40.0
+                },
+                operator: None,
+                constraint2: None,
+            },
+            FilterQuery{
+                by_mea_or_calc: MeaOrCalc::Calc(Calculation::Rca),
+                constraint: Constraint{
+                    comparison: Comparison::GreaterThan,
+                    n: 1.0
+                },
+                operator: None,
+                constraint2: None,
+            }
+            ].to_vec(),
+            captions: vec![],
+            parents: false,
+            top: None,
+            top_where: None,
+            sort: Some(SortQuery{
+                direction: SortDirection::Asc,
+                measure: MeaOrCalc::Mea(Measure("Price Total".to_string()))
+            }),
+            limit: None,
+            rca: Some(RcaQuery{
+                drill_1: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                drill_2: Drilldown(LevelName{
+                    dimension: "Year".to_string(),
+                    hierarchy: "Year".to_string(),
+                    level: "Year".to_string(),
+                }),
+                mea: Measure("Price Total".to_string())
+            }),
+            growth: None,
+            rate: None,
+            debug: false,
+            sparse: false,
+            exclude_default_members: false,
+        };
+        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
+        let (query_ir, _headers) = query_ir_headers.unwrap();
+        assert_eq!(query_ir.filters, [FilterSql {
+            by_column: "final_m1".to_string(),
+            constraint: Constraint {
+                comparison: Comparison::LessThan,
+                n: 100.0,
+            },
+            operator: Some(
+                Operator::Or,
+            ),
+            constraint2: Some(
+                Constraint {
+                    comparison: Comparison::GreaterThan,
+                    n: 200.0,
+                },
+            ),
+        },
+        FilterSql {
+            by_column: "final_m2".to_string(),
+            constraint: Constraint {
+                comparison: Comparison::GreaterThan,
+                n: 40.0,
+            },
+            operator: None,
+            constraint2: None,
+        },
+        FilterSql {
+            by_column: "rca".to_string(),
+            constraint: Constraint {
+                comparison: Comparison::GreaterThan,
+                n: 1.0,
+            },
+            operator: None,
+            constraint2: None,
+        }].to_vec())
     }
 }

@@ -95,6 +95,7 @@ pub fn create_app(
                 has_unique_levels_properties: has_unique_levels_properties.clone(),
         })
         .middleware(middleware::Logger::default())
+        .middleware(middleware::DefaultHeaders::new().header("Vary", "Accept-Encoding"))
 
         // Metadata
         .resource("/", |r| {

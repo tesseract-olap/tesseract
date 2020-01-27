@@ -2,7 +2,7 @@ use itertools::join;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::names::Mask;
-use crate::query::{LimitQuery, SortDirection, Constraint};
+use crate::query::{LimitQuery, SortDirection, Constraint, Operator};
 use crate::schema::{Table, InlineTable};
 use crate::schema::aggregator::Aggregator;
 
@@ -89,7 +89,7 @@ impl DrilldownSql {
     }
 
     pub fn col_alias_only_vec(&self) -> Vec<String> {
-        let mut cols = vec![]; 
+        let mut cols = vec![];
 
         // can't just map the cols, because some levels
         // produce two and some produce one
@@ -270,10 +270,13 @@ pub struct TopWhereSql {
     pub constraint: Constraint,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FilterSql {
     pub by_column: String,
     pub constraint: Constraint,
+    pub operator: Option<Operator>,
+    pub constraint2: Option<Constraint>
+
 }
 
 
@@ -292,7 +295,7 @@ impl From<LimitQuery> for LimitSql {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SortSql {
     pub direction: SortDirection,
     pub column: String,
@@ -397,4 +400,3 @@ pub fn dim_subquery(drill: Option<&DrilldownSql>, cut: Option<&CutSql>) -> DimSu
         dim_cols: None,
     }
 }
-
