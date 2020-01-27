@@ -1,6 +1,6 @@
 use failure::Error;
-use futures::{Future, Stream};
-
+use futures::{future::ok, Future, Stream};
+use log::warn;
 use crate::dataframe::DataFrame;
 use crate::query_ir::QueryIr;
 use crate::sql;
@@ -40,7 +40,8 @@ pub trait Backend {
     }
 
     fn check_user(&self) -> Box<dyn Future<Item=(), Error= Error>> {
-        unimplemented!()
+        warn!("Backend does not support read/write status checks");
+        Box::new(ok(()))
     }
 }
 
