@@ -16,6 +16,7 @@ use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
+use crate::handlers::util::validate_members;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
@@ -80,6 +81,16 @@ pub fn do_aggregate(
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = ok_or_404!(ts_query);
+
+    // sql injection mitigation on query:
+    // - Check that cut members exist in members cache
+    // this is in braces to explicitly the scope in which
+    // req is borrowed, since req is moved later in the `map_err`
+    {
+        let cache = req.state().cache.read().unwrap();
+        let cube_cache = some_or_404!(cache.find_cube_info(&cube), format!("Cube {} not found", cube));
+        ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
+    }
 
     let query_ir_headers = schema.sql_query(&cube, &ts_query);
     let (query_ir, headers) = ok_or_404!(query_ir_headers);
@@ -240,3 +251,4 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
         })
     }
 }
+

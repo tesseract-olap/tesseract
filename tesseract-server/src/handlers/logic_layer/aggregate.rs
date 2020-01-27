@@ -28,7 +28,8 @@ use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
-    verify_api_key, format_to_content_type, generate_source_data
+    verify_api_key, format_to_content_type, generate_source_data,
+    validate_members
 };
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
@@ -223,6 +224,9 @@ pub fn logic_layer_aggregation(
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
     for ts_query in &ts_queries {
+        // SQL injection mitigation
+        ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
+
         debug!("Tesseract query: {:?}", ts_query);
 
         let query_ir_headers = req
