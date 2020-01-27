@@ -14,7 +14,6 @@ impl Middleware<AppState> for ValidateAccess {
         let app_state: &AppState = req.state();
         let jwt_secret = &app_state.env_vars.jwt_secret;
 
-        // TODO grab from HTTP request
         let qry = req.query();
 
         let token = {
