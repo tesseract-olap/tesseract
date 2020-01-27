@@ -8,3 +8,5 @@ members = [
     "tests",
 ]
 
+[replace]
+"cookie:0.11.0" = { git = 'https://github.com/alexcrichton/cookie-rs.git', rev = "c59d94e1492f2aa8ce0949335d494322ca25366e" }

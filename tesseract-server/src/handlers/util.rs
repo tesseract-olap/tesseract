@@ -67,6 +67,7 @@ pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
 }
 
 
+
 pub fn verify_api_key(req: &HttpRequest<AppState>, cube: &Cube) -> Result<(), HttpResponse> {
     if cube.public == false {
         match &req.state().env_vars.api_key {

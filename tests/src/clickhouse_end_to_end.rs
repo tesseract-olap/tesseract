@@ -149,6 +149,7 @@ mod tests {
             geoservice_url: None,
             schema_source,
             api_key: None,
+            jwt_secret: None,
             flush_secret: None,
         };
 

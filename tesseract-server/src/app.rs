@@ -5,7 +5,7 @@ use actix_web::{
     http::NormalizePath,
 };
 use tesseract_core::{Backend, Schema, CubeHasUniqueLevelsAndProperties};
-
+use crate::auth::ValidateAccess;
 use crate::db_config::Database;
 use crate::handlers::{
     aggregate_handler,
@@ -50,6 +50,7 @@ pub struct EnvVars {
     pub geoservice_url: Option<Url>,
     pub schema_source: SchemaSource,
     pub api_key: Option<String>,
+    pub jwt_secret: Option<String>,
     pub flush_secret: Option<String>,
 }
 
@@ -94,6 +95,7 @@ pub fn create_app(
                 logic_layer_config,
                 has_unique_levels_properties: has_unique_levels_properties.clone(),
         })
+        .middleware(ValidateAccess)
         .middleware(middleware::Logger::default())
         .middleware(middleware::DefaultHeaders::new().header("Vary", "Accept-Encoding"))
 
