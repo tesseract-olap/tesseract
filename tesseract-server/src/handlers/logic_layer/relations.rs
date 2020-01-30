@@ -155,7 +155,7 @@ pub fn logic_layer_relations(
 
     let content_type = format_to_content_type(&format);
 
-    match format_records(&final_headers, final_df, format) {
+    match format_records(&final_headers, final_df, format, None) {
         Ok(res) => {
             Ok(HttpResponse::Ok()
                 .set(content_type)
@@ -171,7 +171,7 @@ pub fn get_relations(
     cube: &Cube,
     cube_cache: &CubeCache,
     level_map: &HashMap<String, LevelName>,
-    property_map: &HashMap<String, Property>,
+    _property_map: &HashMap<String, Property>,
     geoservice_url: &Option<Url>
 ) -> Result<Vec<Vec<String>>, Error> {
 
@@ -230,7 +230,7 @@ pub fn get_relations(
                         None => continue  // This level has no child
                     };
 
-                    let child_level_name = LevelName {
+                    let _child_level_name = LevelName {
                         dimension: level_name.dimension.clone(),
                         hierarchy: level_name.hierarchy.clone(),
                         level: child_level.name.clone()

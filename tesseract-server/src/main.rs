@@ -23,6 +23,7 @@ extern crate tokio;
 mod app;
 mod db_config;
 mod errors;
+mod auth;
 pub mod handlers;
 mod logic_layer;
 mod schema_config;
@@ -92,6 +93,9 @@ fn main() -> Result<(), Error> {
     // API key
     let api_key = env::var("TESSERACT_API_KEY").ok();
 
+    // JSONWebToken Secret
+    let jwt_secret = env::var("TESSERACT_JWT_SECRET").ok();
+
     // flush
     let flush_secret = env::var("TESSERACT_FLUSH_SECRET").ok();
 
@@ -152,6 +156,7 @@ fn main() -> Result<(), Error> {
         geoservice_url,
         schema_source,
         api_key,
+        jwt_secret,
         flush_secret,
     };
 

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use actix_web::{
     FutureResponse,
     HttpRequest,
@@ -9,8 +10,13 @@ use mime;
 
 use tesseract_core::format::FormatType;
 use tesseract_core::schema::Cube;
+use tesseract_core::schema::metadata::SourceMetadata;
 
 use crate::app::AppState;
+
+use failure::{bail, format_err, Error};
+use tesseract_core::names::Cut;
+use crate::logic_layer::CubeCache;
 
 
 pub(crate) fn format_to_content_type(format_type: &FormatType) -> ContentType {
@@ -38,6 +44,32 @@ pub fn boxed_error_http_response(response: HttpResponse) -> FutureResponse<HttpR
 
 
 pub const X_TESSERACT_API_KEY: &str = "x-tesseract-api-key";
+
+
+// Genrates the source data/ annotaion of the cube for which the query is executed
+pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
+    let cube_name = &cube.name;
+    let mut measures = Vec::new();
+    for measure in cube.measures.iter() {
+        measures.push(measure.name.clone());
+    }
+    let annotations = match cube.annotations.clone(){
+        Some(annotations) => {
+            let mut anotate_hashmap = HashMap::new();
+            for annotation in annotations.iter(){
+                anotate_hashmap.insert(annotation.name.to_string(), annotation.text.to_string());
+            }
+            Some(anotate_hashmap)
+        },
+        None => None
+    };
+    SourceMetadata {
+        name: cube_name.clone(),
+        measures: measures.clone(),
+        annotations: annotations.clone(),
+    }
+}
+
 
 
 pub fn verify_api_key(req: &HttpRequest<AppState>, cube: &Cube) -> Result<(), HttpResponse> {
@@ -108,6 +140,7 @@ macro_rules! ok_or_404 {
     };
 }
 
+#[macro_export]
 macro_rules! auth_denied {
     ($x:expr) => {
         return Box::new(
@@ -115,4 +148,36 @@ macro_rules! auth_denied {
             Ok(HttpResponse::Unauthorized().json($x))
         ));
     }
+
+
+#[macro_export]
+macro_rules! some_or_404 {
+    ($expr:expr, $note:expr) => {
+        match $expr {
+            Some(val) => val,
+            None => {
+                return Box::new(
+                    future::result(
+                        Ok(HttpResponse::NotFound().json($note.to_string()))
+                    )
+                );
+            }
+        }
+    };
+}
+
+
+pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Error> {
+    for cut in cuts {
+        // get level cache
+        let member_cache = cube_cache.members_for_level(&cut.level_name)
+            .ok_or_else(|| format_err!("Level not found in cache"))?;
+        for member in &cut.members {
+            if !member_cache.contains(member) {
+                bail!("Cut member not found");
+            }
+        }
+    }
+    Ok(())
+
 }

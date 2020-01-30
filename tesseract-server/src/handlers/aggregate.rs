@@ -5,6 +5,7 @@ use actix_web::{
     HttpResponse,
     Path,
 };
+
 use failure::Error;
 use futures::future::{self, Future};
 use lazy_static::lazy_static;
@@ -15,9 +16,11 @@ use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
+use crate::handlers::util::validate_members;
+
 use crate::app::AppState;
 use crate::errors::ServerError;
-use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type};
+use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type, generate_source_data};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -71,9 +74,23 @@ pub fn do_aggregate(
 
     info!("query opts:{:?}", agg_query);
 
+    // Gets the Source Data
+    let source_data = Some(generate_source_data(&cube_obj));
+
+
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
     let ts_query = ok_or_404!(ts_query);
+
+    // sql injection mitigation on query:
+    // - Check that cut members exist in members cache
+    // this is in braces to explicitly the scope in which
+    // req is borrowed, since req is moved later in the `map_err`
+    {
+        let cache = req.state().cache.read().unwrap();
+        let cube_cache = some_or_404!(cache.find_cube_info(&cube), format!("Cube {} not found", cube));
+        ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
+    }
 
     let query_ir_headers = schema.sql_query(&cube, &ts_query);
     let (query_ir, headers) = ok_or_404!(query_ir_headers);
@@ -91,7 +108,7 @@ pub fn do_aggregate(
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
 
-            match format_records(&headers, df, format) {
+            match format_records(&headers, df, format, source_data) {
                 Ok(res) => {
                     Ok(HttpResponse::Ok()
                         .set(content_type)
@@ -234,3 +251,4 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
         })
     }
 }
+

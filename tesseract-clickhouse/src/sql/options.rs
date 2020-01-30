@@ -1,14 +1,6 @@
 use itertools::join;
-use tesseract_core::query::{Comparison, Constraint};
 use tesseract_core::{QueryIr};
 
-use super::{
-    LimitSql,
-    SortSql,
-    TopSql,
-    TopWhereSql,
-    FilterSql,
-};
 
 pub fn wrap_options(
     final_sql: String,
@@ -76,7 +68,14 @@ pub fn wrap_options(
 
     let mut filters_sql = if !filters.is_empty() {
         let filter_clauses = filters.iter()
-            .map(|f| format!("{} {}", f.by_column, f.constraint.sql_string()));
+            .map(|filter| {
+                if let Some(operator) = &filter.operator {
+                    let constraint2 = filter.constraint2.as_ref().unwrap();
+                    format!("({} {} {} {} {})", filter.by_column, filter.constraint.sql_string(), operator.sql_string(), filter.by_column, constraint2.sql_string())
+                } else {
+                    format!("{} {}", filter.by_column, filter.constraint.sql_string())
+                }
+            });
         format!("where {}", join(filter_clauses, " and "))
     }
     else {
@@ -104,4 +103,3 @@ pub fn wrap_options(
 
     final_sql
 }
-

@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use actix::SystemRunner;
 use failure::{Error, format_err};
-use log::info;
+use log::{info, debug};
+use std::time::Instant;
 
 use serde_derive::Deserialize;
 
@@ -225,6 +226,19 @@ impl CubeCache {
             None => None
         }
     }
+
+    // TODO note that this is being used in core tesseract, but that the cache is created using
+    // logic layer rules. This means that at the moment of this implementation, this will work in
+    // core tesseract but only if the core tesseract schema can also be a logic layer schema (and
+    // satisfying all the rules about level, property uniqueness, etc.)
+    //
+    // The next step is to figure out how to architecture this cache so that it can be used even in
+    // non-logic layer setups, but also be used for members endpoint (which requires label also)
+    pub fn members_for_level(&self, level_name: &LevelName) -> Option<&HashSet<String>> {
+        debug!("Level Caches: {:?}", self.level_caches);
+        self.level_caches.get(&level_name.level)
+            .map(|level_cache| &level_cache.members)
+    }
 }
 
 
@@ -233,6 +247,9 @@ pub struct LevelCache {
     pub parent_map: Option<HashMap<String, String>>,
     pub children_map: Option<HashMap<String, Vec<String>>>,
     pub neighbors_map: HashMap<String, Vec<String>>,
+    // TODO to be able to use for /members endpoint, this will
+    // need both ID and member label. Right now it's just ID
+    pub members: HashSet<String>,
 }
 
 
@@ -250,6 +267,7 @@ pub fn populate_cache(
         sys: &mut SystemRunner
 ) -> Result<Cache, Error> {
     info!("Populating cache...");
+    let time_start = Instant::now();
 
     let time_column_names = vec![
         "Year".to_string(),
@@ -396,7 +414,11 @@ pub fn populate_cache(
                         map_entry.push(level_name.clone());
                     }
 
-                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map, neighbors_map });
+                    // neighbors are not optional, iterate over the keys of neighbors to get all
+                    // members.
+                    let members = neighbors_map.keys().cloned().collect();
+
+                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map, neighbors_map, members });
                 }
             }
 
@@ -425,8 +447,8 @@ pub fn populate_cache(
         })
     }
 
-    info!("Cache ready!");
-
+    let timing = time_start.elapsed();
+    info!("Cache ready! (Time elapsed: {}.{:03})", timing.as_secs(), timing.subsec_millis());
     Ok(Cache { cubes })
 }
 
