@@ -18,6 +18,7 @@ pub struct SchemaConfigJson {
 pub struct CubeConfigJson {
     pub name: String,
     pub public: Option<String>,
+    pub min_auth_level: Option<i32>,
     pub table: TableConfigJson,
     pub dimensions: Option<Vec<DimensionConfigJson>>,
     pub dimension_usages: Option<Vec<DimensionUsageJson>>,

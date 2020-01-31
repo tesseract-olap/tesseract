@@ -17,7 +17,7 @@ use crate::app::AppState;
 use failure::{bail, format_err, Error};
 use tesseract_core::names::Cut;
 use crate::logic_layer::CubeCache;
-
+use crate::auth::{validate_web_token, extract_token};
 
 pub(crate) fn format_to_content_type(format_type: &FormatType) -> ContentType {
     match format_type {
@@ -101,6 +101,12 @@ pub fn verify_api_key(req: &HttpRequest<AppState>, cube: &Cube) -> Result<(), Ht
                 return Err(HttpResponse::InternalServerError().json("Internal Server Error 700".to_string()));
             }
         }
+    }
+
+    let jwt_secret = &req.state().env_vars.jwt_secret;
+    let user_token = extract_token(req);
+    if !validate_web_token(jwt_secret, &user_token, cube.min_auth_level) {
+        return Err(HttpResponse::Unauthorized().json("This cube is not public".to_string()));
     }
 
     Ok(())

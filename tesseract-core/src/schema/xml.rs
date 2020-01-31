@@ -33,6 +33,8 @@ pub struct SchemaConfigXML {
 pub struct CubeConfigXML {
     pub name: String,
     pub public: Option<String>,
+    #[serde(rename(deserialize="minAuthLevel"))]
+    pub min_auth_level: Option<i32>,
     #[serde(rename(deserialize="Table"))]
     pub table: TableConfigXML,
     #[serde(rename(deserialize="Dimension"))]
