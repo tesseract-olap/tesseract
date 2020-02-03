@@ -236,14 +236,21 @@ impl CubeCache {
     // non-logic layer setups, but also be used for members endpoint (which requires label also)
     pub fn members_for_level(&self, level_name: &LevelName) -> Option<&HashSet<String>> {
         debug!("Level Caches: {:?}", self.level_caches);
-        self.level_caches.get(&level_name.level)
-            .map(|level_cache| &level_cache.members)
+
+        for (_key, value) in self.level_caches.iter() {
+            if value.level_name == level_name.clone() {
+                return Some(&value.members);
+            }
+        }
+
+        None
     }
 }
 
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LevelCache {
+    pub level_name: LevelName,
     pub parent_map: Option<HashMap<String, String>>,
     pub children_map: Option<HashMap<String, Vec<String>>>,
     pub neighbors_map: HashMap<String, Vec<String>>,
@@ -327,17 +334,17 @@ pub fn populate_cache(
                         }
                     }
 
-                    // Get unique name for this level
-                    let unique_name = match get_unique_level_name(&cube, ll_config, &level)? {
-                        Some(name) => name,
-                        None => return Err(format_err!("Couldn't find unique name for {}", level.name.clone()))
-                    };
-
                     let level_name = LevelName::new(
                         dimension.name.clone(),
                         hierarchy.name.clone(),
                         level.name.clone()
                     );
+
+                    // Get unique name for this level
+                    let unique_name = match get_unique_level_name(&cube, ll_config, &level_name)? {
+                        Some(name) => name,
+                        None => return Err(format_err!("Couldn't find unique name for {}", level.name.clone()))
+                    };
 
                     let mut parent_map: Option<HashMap<String, String>> = None;
                     let mut children_map: Option<HashMap<String, Vec<String>>> = None;
@@ -418,7 +425,7 @@ pub fn populate_cache(
                     // members.
                     let members = neighbors_map.keys().cloned().collect();
 
-                    level_caches.insert(unique_name.clone(), LevelCache { parent_map, children_map, neighbors_map, members });
+                    level_caches.insert(unique_name.clone(), LevelCache { level_name, parent_map, children_map, neighbors_map, members });
                 }
             }
 
@@ -453,17 +460,17 @@ pub fn populate_cache(
 }
 
 
-pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, level: &Level) -> Result<Option<String>, Error> {
+pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, level_name: &LevelName) -> Result<Option<String>, Error> {
     for dimension in &cube.dimensions {
         for hierarchy in &dimension.hierarchies {
-            for curr_level in &hierarchy.levels {
-                if curr_level == level {
-                    let level_name = LevelName::new(
-                        dimension.name.clone(),
-                        hierarchy.name.clone(),
-                        curr_level.name.clone()
-                    );
+            for level in &hierarchy.levels {
+                let curr_level_name = LevelName::new(
+                    dimension.name.clone(),
+                    hierarchy.name.clone(),
+                    level.name.clone()
+                );
 
+                if curr_level_name == level_name.clone() {
                     let unique_level_name = match ll_config {
                         Some(ll_config) => {
                             let unique_level_name_opt = if dimension.is_shared {
@@ -478,10 +485,10 @@ pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, 
 
                             match unique_level_name_opt {
                                 Some(unique_level_name) => unique_level_name,
-                                None => curr_level.name.clone()
+                                None => level.name.clone()
                             }
                         },
-                        None => curr_level.name.clone()
+                        None => level.name.clone()
                     };
 
                     return Ok(Some(unique_level_name))
