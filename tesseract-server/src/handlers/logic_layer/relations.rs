@@ -238,7 +238,7 @@ pub fn get_relations(
 
 
                     // Get children IDs from the cache
-                    let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                    let level_cache = match cube_cache.level_caches.get(&level_name) {
                         Some(level_cache) => level_cache,
                         None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
                     };
@@ -278,7 +278,7 @@ pub fn get_relations(
                         };
 
                         // Get parent IDs from the cache
-                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                        let level_cache = match cube_cache.level_caches.get(&level_name) {
                             Some(level_cache) => level_cache,
                             None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
                         };
@@ -336,7 +336,7 @@ pub fn get_relations(
                             };
                         },
                         _ => {
-                            let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                            let level_cache = match cube_cache.level_caches.get(&level_name) {
                                 Some(level_cache) => level_cache,
                                 None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
                             };
