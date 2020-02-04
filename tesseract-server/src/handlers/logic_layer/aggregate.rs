@@ -997,7 +997,7 @@ pub fn resolve_cuts(
                     header_map.entry(child_level_name.level.clone()).or_insert(child_level_name.dimension.clone());
 
                     // Get children IDs from the cache
-                    let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                    let level_cache = match cube_cache.level_caches.get(&level_name) {
                         Some(level_cache) => level_cache,
                         None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
                     };
@@ -1036,7 +1036,7 @@ pub fn resolve_cuts(
                         header_map.entry(parent_level_name.level.clone()).or_insert(parent_level_name.dimension.clone());
 
                         // Get parent IDs from the cache
-                        let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                        let level_cache = match cube_cache.level_caches.get(&level_name) {
                             Some(level_cache) => level_cache,
                             None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
                         };
@@ -1088,7 +1088,7 @@ pub fn resolve_cuts(
                             };
                         },
                         _ => {
-                            let level_cache = match cube_cache.level_caches.get(&level_name.level) {
+                            let level_cache = match cube_cache.level_caches.get(&level_name) {
                                 Some(level_cache) => level_cache,
                                 None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
                             };

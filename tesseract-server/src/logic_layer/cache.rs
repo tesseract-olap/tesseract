@@ -147,7 +147,7 @@ pub struct CubeCache {
     pub property_map: HashMap<String, Property>,
 
     // Maps a level name to a `LevelCache` object
-    pub level_caches: HashMap<String, LevelCache>,
+    pub level_caches: HashMap<LevelName, LevelCache>,
 
     // Maps a dimension name to a `DimensionCache` object
     pub dimension_caches: HashMap<String, DimensionCache>,
@@ -236,21 +236,15 @@ impl CubeCache {
     // non-logic layer setups, but also be used for members endpoint (which requires label also)
     pub fn members_for_level(&self, level_name: &LevelName) -> Option<&HashSet<String>> {
         debug!("Level Caches: {:?}", self.level_caches);
-
-        for (_key, value) in self.level_caches.iter() {
-            if value.level_name == level_name.clone() {
-                return Some(&value.members);
-            }
-        }
-
-        None
+        self.level_caches.get(level_name)
+            .map(|level_cache| &level_cache.members)
     }
 }
 
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LevelCache {
-    pub level_name: LevelName,
+    pub unique_name: String,
     pub parent_map: Option<HashMap<String, String>>,
     pub children_map: Option<HashMap<String, Vec<String>>>,
     pub neighbors_map: HashMap<String, Vec<String>>,
@@ -298,7 +292,7 @@ pub fn populate_cache(
         let mut day_level: Option<Level> = None;
         let mut day_values: Option<Vec<String>> = None;
 
-        let mut level_caches: HashMap<String, LevelCache> = HashMap::new();
+        let mut level_caches: HashMap<LevelName, LevelCache> = HashMap::new();
         let mut dimension_caches: HashMap<String, DimensionCache> = HashMap::new();
 
         for dimension in &cube.dimensions {
@@ -425,7 +419,16 @@ pub fn populate_cache(
                     // members.
                     let members = neighbors_map.keys().cloned().collect();
 
-                    level_caches.insert(unique_name.clone(), LevelCache { level_name, parent_map, children_map, neighbors_map, members });
+                    level_caches.insert(
+                        level_name,
+                        LevelCache {
+                            unique_name: unique_name.clone(),
+                            parent_map,
+                            children_map,
+                            neighbors_map,
+                            members
+                        }
+                    );
                 }
             }
 
