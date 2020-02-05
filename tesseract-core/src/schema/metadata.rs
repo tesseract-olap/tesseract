@@ -41,7 +41,8 @@ pub struct CubeMetadata {
     pub dimensions: Vec<DimensionMetadata>,
     pub measures: Vec<MeasureMetadata>,
     pub annotations: AnnotationMetadata,
-    pub alias: Option<Vec<String>>
+    pub alias: Option<Vec<String>>,
+    pub min_auth_level: i32,
 }
 
 impl From<&Cube> for CubeMetadata {
@@ -54,6 +55,7 @@ impl From<&Cube> for CubeMetadata {
             measures: cube.measures.iter().map(|m| m.into()).collect(),
             annotations,
             alias: None,
+            min_auth_level: cube.min_auth_level,
         }
     }
 }
