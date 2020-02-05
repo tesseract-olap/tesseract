@@ -154,8 +154,16 @@ impl Schema {
         self.cubes.iter().find(|c| c.name == cube_name).map(|c| c.into())
     }
 
-    pub fn metadata(&self) -> SchemaMetadata {
-        self.into()
+    pub fn metadata(&self, user_auth_level: Option<i32>) -> SchemaMetadata {
+        let mut schema_metadata: SchemaMetadata = self.into();
+        match user_auth_level {
+            Some(val) => {
+                schema_metadata.cubes = schema_metadata.cubes.drain(..).filter(|c| val >= c.min_auth_level && val >= 0).collect();
+            },
+            _ => {} // no auth
+
+        }
+        schema_metadata
     }
 
     pub fn has_unique_levels_properties(&self) -> CubeHasUniqueLevelsAndProperties {
