@@ -1,6 +1,6 @@
 use jsonwebtoken::{decode, Validation};
 use serde_derive::{Serialize, Deserialize};
-
+use log;
 use actix_web::middleware::{Middleware, Started};
 use actix_web::{HttpRequest, HttpResponse, Result};
 pub const X_TESSERACT_JWT_TOKEN: &str = "x-tesseract-jwt-token";
@@ -62,6 +62,28 @@ pub fn extract_token(req: &HttpRequest<AppState>) -> String {
         }
     };
     token.to_string()
+}
+
+// None = auth not set on server, -1 = bad auth level
+pub fn user_auth_level(jwt_secret: &Option<String>, raw_token: &str) -> Option<i32> {
+    match jwt_secret {
+        Some(key) => {
+            let validation = Validation::default();
+            match decode::<Claims>(&raw_token, key.as_ref(), &validation) {
+                Ok(c) => {
+                    let claims: Claims = c.claims;
+                    let part1 = claims.status == "valid";
+                    if part1 {
+                        Some(claims.auth_level.unwrap_or(0)) // default auth level 0
+                    } else {
+                        Some(0)
+                    }
+                },
+                Err(_err) => Some(-1), // If any error occurs, do not validate
+            }
+        },
+        None => None
+    }
 }
 
 pub fn validate_web_token(jwt_secret: &Option<String>, raw_token: &str, min_auth_level: i32) -> bool {
