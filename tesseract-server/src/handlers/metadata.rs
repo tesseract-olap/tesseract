@@ -15,6 +15,7 @@ use serde_qs as qs;
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::metadata::{CubeMetadata, PropertyMetadata};
+use tesseract_core::DEFAULT_ALLOWED_ACCESS;
 
 use crate::app::AppState;
 use crate::logic_layer::LogicLayerConfig;
@@ -57,7 +58,7 @@ pub fn metadata_all_handler(
         // Filter out cube that user isn't authorized to see
         match user_auth_level {
             Some(auth_level) => { // Authorization is set
-                if (auth_level >= cube.min_auth_level && auth_level >= 0) {
+                if (auth_level >= cube.min_auth_level && auth_level >= DEFAULT_ALLOWED_ACCESS) {
                     cubes.push(get_cube_metadata(cube.clone(), &ll_config));
                 }
             },

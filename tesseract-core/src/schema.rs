@@ -34,7 +34,7 @@ pub use crate::schema::{
 use crate::names::{LevelName, Measure as MeasureName, Property as TsProperty};
 use crate::query_ir::MemberType;
 pub use self::aggregator::Aggregator;
-
+use crate::DEFAULT_ALLOWED_ACCESS;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Schema {
@@ -131,7 +131,7 @@ impl From<SchemaConfigJson> for Schema {
                 None => true
             };
 
-            let min_auth_level = cube_config.min_auth_level.unwrap_or(0);
+            let min_auth_level = cube_config.min_auth_level.unwrap_or(DEFAULT_ALLOWED_ACCESS);
 
             cubes.push(Cube {
                 name: cube_config.name,
