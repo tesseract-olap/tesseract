@@ -347,6 +347,10 @@ pub fn populate_cache(
                         // Identify what time of level this is based on the annotation name
                         let mut found_time = false;
 
+                        // This is a hack for now. It handles the case where you
+                        // have a level called Time that is actually at a more
+                        // specific depth. It allows to cut on that depth using the
+                        // .latest/.oldest feature.
                         match &level.annotations {
                             Some(annotations) => {
                                 for annotation in annotations {
