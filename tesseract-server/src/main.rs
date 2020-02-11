@@ -190,6 +190,12 @@ fn main() -> Result<(), Error> {
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
 
+    if jwt_secret.is_some() {
+        println!("Tesseract JWT token protection: ON");
+    } else {
+        println!("Tesseract JWT token protection: OFF");
+    }
+
     if debug {
         println!("Tesseract debug mode: ON");
     }
