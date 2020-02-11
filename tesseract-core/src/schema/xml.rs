@@ -33,6 +33,8 @@ pub struct SchemaConfigXML {
 pub struct CubeConfigXML {
     pub name: String,
     pub public: Option<String>,
+    #[serde(rename(deserialize="min_auth_level"))]
+    pub min_auth_level: Option<i32>,
     #[serde(rename(deserialize="Table"))]
     pub table: TableConfigXML,
     #[serde(rename(deserialize="Dimension"))]
@@ -184,7 +186,7 @@ mod test {
                         <Level name="Tract" key_column="geoid" />
                     </Hierarchy>
                 </SharedDimension>
-                <Cube name="my_cube">
+                <Cube name="my_cube" min_auth_level="1">
                     <Table name="my_table" />
                     <Dimension name="my_dim">
                         <Hierarchy name="my_hier">
@@ -196,5 +198,7 @@ mod test {
             </Schema>
         "##;
         let xml_schema_config: SchemaConfigXML = from_reader(s.as_bytes()).unwrap();
+        let cube = &xml_schema_config.cubes[0];
+        assert_eq!(cube.min_auth_level.unwrap(), 1)
     }
 }

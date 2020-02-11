@@ -15,10 +15,11 @@ use serde_qs as qs;
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::metadata::{CubeMetadata, PropertyMetadata};
+use tesseract_core::DEFAULT_ALLOWED_ACCESS;
 
 use crate::app::AppState;
 use crate::logic_layer::LogicLayerConfig;
-use super::util::{boxed_error_http_response, verify_api_key};
+use super::util::{boxed_error_http_response, verify_api_key, get_user_auth_level};
 
 
 pub fn metadata_handler(
@@ -44,14 +45,26 @@ pub fn metadata_all_handler(
     ) -> ActixResult<HttpResponse>
 {
     info!("Metadata for all");
-    let mut schema_details = req.state().schema.read().unwrap().metadata();
+    let user_auth_level = get_user_auth_level(&req);
+    let mut schema_details = req.state().schema.read().unwrap().metadata(user_auth_level);
     let ll_config = match &req.state().logic_layer_config {
         Some(llc) => llc.read().unwrap().clone(),
-        None => return  Ok(HttpResponse::Ok().json(schema_details))
+        None => {
+            return  Ok(HttpResponse::Ok().json(schema_details))
+        }
     };
     let mut cubes: Vec<CubeMetadata> = Vec::new();
     for cube in schema_details.cubes.iter(){
-        cubes.push(get_cube_metadata(cube.clone(), &ll_config));
+        // Filter out cube that user isn't authorized to see
+        match user_auth_level {
+            Some(auth_level) => { // Authorization is set
+                if (auth_level >= cube.min_auth_level && auth_level >= DEFAULT_ALLOWED_ACCESS) {
+                    cubes.push(get_cube_metadata(cube.clone(), &ll_config));
+                }
+            },
+            // No authorization set. Show all cubes
+            None => cubes.push(get_cube_metadata(cube.clone(), &ll_config))
+        }
     }
     schema_details.cubes = cubes;
     Ok(HttpResponse::Ok().json(schema_details))

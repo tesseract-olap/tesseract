@@ -18,6 +18,10 @@ use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
+
+pub static DEFAULT_ALLOWED_ACCESS: i32 = 0;
+pub static INVALID_ACCESS: i32 = -1;
+
 use self::names::{
     Cut,
     Drilldown,
@@ -154,8 +158,12 @@ impl Schema {
         self.cubes.iter().find(|c| c.name == cube_name).map(|c| c.into())
     }
 
-    pub fn metadata(&self) -> SchemaMetadata {
-        self.into()
+    pub fn metadata(&self, user_auth_level: Option<i32>) -> SchemaMetadata {
+        let mut schema_metadata: SchemaMetadata = self.into();
+        if let Some(val) = user_auth_level {
+            schema_metadata.cubes = schema_metadata.cubes.drain(..).filter(|c| val >= c.min_auth_level && val >= DEFAULT_ALLOWED_ACCESS).collect();
+        }
+        schema_metadata
     }
 
     pub fn has_unique_levels_properties(&self) -> CubeHasUniqueLevelsAndProperties {
