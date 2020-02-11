@@ -127,7 +127,11 @@ fn main() -> Result<(), Error> {
     schema.validate()?;
     let mut has_unique_levels_properties = schema.has_unique_levels_properties();
     let schema_arc = Arc::new(RwLock::new(schema.clone()));
-
+    let jwt_status = if jwt_secret.is_some() {
+        "ON"
+    } else {
+        "OFF"
+    };
     // Env
     let env_vars = EnvVars {
         database_url: db_url.clone(),
@@ -190,11 +194,7 @@ fn main() -> Result<(), Error> {
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
 
-    if jwt_secret.is_some() {
-        println!("Tesseract JWT token protection: ON");
-    } else {
-        println!("Tesseract JWT token protection: OFF");
-    }
+    println!("Tesseract JWT token protection: {}", jwt_status);
 
     if debug {
         println!("Tesseract debug mode: ON");
