@@ -200,7 +200,9 @@ pub fn logic_layer_aggregation(
         Err(err) => return boxed_error_http_response(err)
     }
 
-    let cube_cache = match req.state().cache.read().unwrap().find_cube_info(&cube_name) {
+    let cache = req.state().cache.read().unwrap();
+
+    let cube_cache = match cache.find_cube_info(&cube_name) {
         Some(cube_cache) => cube_cache,
         None => return boxed_error_string("Unable to access cube cache".to_string())
     };
