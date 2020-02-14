@@ -103,7 +103,9 @@ pub fn logic_layer_relations(
         Err(err) => return Ok(err)
     }
 
-    let cube_cache = match req.state().cache.read().unwrap().find_cube_info(&cube_name) {
+    let cache = req.state().cache.read().unwrap();
+
+    let cube_cache = match cache.find_cube_info(&cube_name) {
         Some(cube_cache) => cube_cache,
         None => return Ok(HttpResponse::NotFound().json("Unable to access cube cache".to_string()))
     };

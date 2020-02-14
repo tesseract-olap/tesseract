@@ -119,10 +119,10 @@ pub struct Cache {
 
 impl Cache {
     /// Finds the `CubeCache` object for a cube with a given name.
-    pub fn find_cube_info(&self, cube: &String) -> Option<CubeCache> {
+    pub fn find_cube_info(&self, cube: &String) -> Option<&CubeCache> {
         for cube_cache in &self.cubes {
             if cube_cache.name == *cube {
-                return Some(cube_cache.clone());
+                return Some(cube_cache);
             }
         }
         None
