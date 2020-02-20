@@ -392,6 +392,7 @@ impl Schema {
         &self,
         cube: &str,
         query: &Query,
+        unique_header_map: Option<&HashMap<String, String>>
         ) -> Result<(QueryIr, Vec<String>), Error>
     {
         // TODO check that cuts have members:
@@ -706,7 +707,7 @@ impl Schema {
         };
 
         // getting headers, not for sql but needed for formatting
-        let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents)
+        let mut drill_headers = self.cube_drill_headers(&cube, &query.drilldowns, &query.properties, query.parents, unique_header_map)
             .map_err(|err| format_err!("Error getting drill headers: {}", err))?;
 
         let mut mea_headers = self.cube_mea_headers(&cube, &query.measures)
@@ -715,7 +716,7 @@ impl Schema {
         // rca mea will always be first, so just put
         // in `Mea RCA` second
         if let Some(ref rca) = query.rca {
-            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &query.properties, query.parents)
+            let rca_drill_headers = self.cube_drill_headers(&cube, &[rca.drill_1.clone(), rca.drill_2.clone()], &query.properties, query.parents, unique_header_map)
                 .map_err(|err| format_err!("Error getting rca drill headers: {}", err))?;
 
             drill_headers.extend_from_slice(&rca_drill_headers);
@@ -741,7 +742,7 @@ impl Schema {
             mea_headers.push(format!("{} Growth Value", growth.mea.0));
 
             // swapping around drilldown headers. Move time to back
-            let time_headers = self.cube_drill_headers(&cube, &[growth.time_drill.clone()], &[], query.parents)
+            let time_headers = self.cube_drill_headers(&cube, &[growth.time_drill.clone()], &[], query.parents, unique_header_map)
                 .map_err(|err| format_err!("Error getting time drill headers for Growth: {}", err))?;
 
             let time_header_idxs: Result<Vec<_>,_> = time_headers.iter()
@@ -1049,6 +1050,7 @@ impl Schema {
         drills: &[Drilldown],
         properties: &[Property],
         parents: bool,
+        unique_header_map: Option<&HashMap<String, String>>,
         ) -> Result<Vec<String>, Error>
     {
         let cube = self.cubes.iter()
@@ -1056,6 +1058,7 @@ impl Schema {
             .ok_or(format_err!("Could not find cube"))?;
 
         let mut level_headers = vec![];
+        let mut unique_level_headers = vec![];
 
         for drill in drills {
             let dim = cube.dimensions.iter()
@@ -1078,16 +1081,70 @@ impl Schema {
             // key column and a name column and add ID to the first if necessary
             if parents {
                 for i in 0..=level_idx {
+                    let level_str = format!("{}.{}.{}", dim.name, hier.name, levels[i].name).to_string();
+
                     if levels[i].name_column.is_some() {
-                        level_headers.push(levels[i].name.clone() + " ID");
+                        let default_header_name = levels[i].name.clone() + " ID";
+
+                        level_headers.push(default_header_name.clone());
+
+                        match unique_header_map {
+                            Some(unique_header_map) => {
+                                match unique_header_map.get(&level_str) {
+                                    Some(unique_header) => unique_level_headers.push(unique_header.clone() + " ID"),
+                                    None => unique_level_headers.push(default_header_name.clone())
+                                }
+                            },
+                            None => unique_level_headers.push(default_header_name.clone())
+                        }
                     }
-                    level_headers.push(levels[i].name.clone());
+
+                    let default_header_name = &levels[i].name;
+
+                    level_headers.push(default_header_name.clone());
+
+                    match unique_header_map {
+                        Some(unique_header_map) => {
+                            match unique_header_map.get(&level_str) {
+                                Some(unique_header) => unique_level_headers.push(unique_header.clone()),
+                                None => unique_level_headers.push(default_header_name.clone())
+                            }
+                        },
+                        None => unique_level_headers.push(default_header_name.clone())
+                    }
                 }
             } else {
+                let level_str = format!("{}.{}.{}", dim.name, hier.name, levels[level_idx].name).to_string();
+
                 if levels[level_idx].name_column.is_some() {
-                    level_headers.push(levels[level_idx].name.clone() + " ID");
+                    let default_header_name = levels[level_idx].name.clone() + " ID";
+
+                    level_headers.push(default_header_name.clone());
+
+                    match unique_header_map {
+                        Some(unique_header_map) => {
+                            match unique_header_map.get(&level_str) {
+                                Some(unique_header) => unique_level_headers.push(unique_header.clone() + " ID"),
+                                None => unique_level_headers.push(default_header_name.clone())
+                            }
+                        },
+                        None => unique_level_headers.push(default_header_name.clone())
+                    }
                 }
-                level_headers.push(levels[level_idx].name.clone());
+
+                let default_header_name = &levels[level_idx].name;
+
+                level_headers.push(default_header_name.clone());
+
+                match unique_header_map {
+                    Some(unique_header_map) => {
+                        match unique_header_map.get(&level_str) {
+                            Some(unique_header) => unique_level_headers.push(unique_header.clone()),
+                            None => unique_level_headers.push(default_header_name.clone())
+                        }
+                    },
+                    None => unique_level_headers.push(default_header_name.clone())
+                }
             }
 
             // for this drill, get related properties.
@@ -1107,13 +1164,21 @@ impl Schema {
                                 None
                             }
                         })
-                        .map(|p| p.name.clone())
+                        .map(|p| {
+                            p.name.clone()
+                        })
                         .ok_or(format_err!("cannot find property for {}", p))
                 })
                 .collect();
             let property_columns = property_columns?;
 
             level_headers.extend(property_columns);
+        }
+
+        let hash_set: HashSet<String> = level_headers.clone().into_iter().collect();
+
+        if hash_set.len() != level_headers.len() {
+            level_headers = unique_level_headers;
         }
 
         Ok(level_headers)

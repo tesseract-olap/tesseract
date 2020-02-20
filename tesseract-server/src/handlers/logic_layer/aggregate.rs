@@ -223,8 +223,40 @@ pub fn logic_layer_aggregation(
         return boxed_error_string("Unable to generate queries".to_string())
     }
 
+    // Need to create a map here to help create unique header names in the next step
+    let mut unique_header_map: HashMap<String, String> = HashMap::new();
+
+    if let Some(ref llc) = logic_layer_config {
+        if let Some(ref llc_aliases) = llc.aliases {
+            if let Some(ref llc_cubes) = llc_aliases.cubes {
+                for llc_cube in llc_cubes {
+                    if cube_name == llc_cube.name {
+                        if let Some(ref llc_cube_levels) = llc_cube.levels {
+                            for llc_cube_level in llc_cube_levels {
+                                unique_header_map.insert(
+                                    llc_cube_level.current_name.clone(),
+                                    llc_cube_level.unique_name.clone()
+                                );
+                            }
+                        }
+
+                        if let Some(ref llc_cube_properties) = llc_cube.properties {
+                            for llc_cube_property in llc_cube_properties {
+                                unique_header_map.insert(
+                                    llc_cube_property.current_name.clone(),
+                                    llc_cube_property.unique_name.clone()
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
+
     for ts_query in &ts_queries {
         // SQL injection mitigation
         ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
@@ -234,7 +266,7 @@ pub fn logic_layer_aggregation(
         let query_ir_headers = req
             .state()
             .schema.read().unwrap()
-            .sql_query(&cube_name, &ts_query);
+            .sql_query(&cube_name, &ts_query, Some(&unique_header_map));
 
         let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
