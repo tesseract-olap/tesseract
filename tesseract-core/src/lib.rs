@@ -1545,7 +1545,7 @@ mod test {
             sparse: false,
             exclude_default_members: false,
         };
-        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
+        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query, None);
         let (query_ir, _headers) = query_ir_headers.unwrap();
         assert_eq!(query_ir.sort, Some(SortSql{direction: SortDirection::Asc, column: "final_m0".to_string()}))
     }
@@ -1706,7 +1706,7 @@ mod test {
             sparse: false,
             exclude_default_members: false,
         };
-        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query);
+        let query_ir_headers = Schema::from_xml(s).unwrap().sql_query("Sales", &query, None);
         let (query_ir, _headers) = query_ir_headers.unwrap();
         assert_eq!(query_ir.filters, [FilterSql {
             by_column: "final_m1".to_string(),
