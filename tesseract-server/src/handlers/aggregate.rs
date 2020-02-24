@@ -108,7 +108,7 @@ pub fn do_aggregate(
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
 
-            match format_records(&headers, df, format, source_data) {
+            match format_records(&headers, df, format, source_data, false) {
                 Ok(res) => {
                     Ok(HttpResponse::Ok()
                         .set(content_type)

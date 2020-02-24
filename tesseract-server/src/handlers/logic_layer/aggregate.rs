@@ -406,7 +406,7 @@ pub fn logic_layer_aggregation(
 
             let content_type = format_to_content_type(&format);
 
-            match format_records(&final_headers, final_df, format, source_data) {
+            match format_records(&final_headers, final_df, format, source_data, false) {
                 Ok(res) => {
                     Ok(HttpResponse::Ok()
                         .set(content_type)

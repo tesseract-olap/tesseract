@@ -159,10 +159,10 @@ pub fn perform_diagnosis(
             }
         ] };
 
-        let headers = vec!["Error Type".to_string(), "Error Message".to_string()];
+        let headers = vec!["type".to_string(), "message".to_string()];
         let content_type = format_to_content_type(&format);
 
-        match format_records(&headers, df, format, None) {
+        match format_records(&headers, df, format, None, true) {
             Ok(res) => {
                 Ok(HttpResponse::ExpectationFailed()
                     .set(content_type)

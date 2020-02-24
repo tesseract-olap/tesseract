@@ -172,7 +172,7 @@ pub fn get_members(
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
 
-            match format_records(&header, df, format, None) {
+            match format_records(&header, df, format, None, false) {
                 Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }
