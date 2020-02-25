@@ -1,5 +1,5 @@
 use failure::{Error, format_err};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde_derive::Deserialize;
 use serde_json;
@@ -158,6 +158,40 @@ pub fn read_config(config_path: &String) -> Result<LogicLayerConfig, Error> {
 }
 
 impl LogicLayerConfig {
+    /// Returns a HashMap of current level signatures to unique level signatures
+    /// for a given cube name.
+    pub fn get_unique_names_map(&self, cube_name: String) -> HashMap<String, String> {
+        let mut unique_header_map: HashMap<String, String> = HashMap::new();
+
+        if let Some(ref aliases) = self.aliases {
+            if let Some(ref llc_cubes) = aliases.cubes {
+                for llc_cube in llc_cubes {
+                    if cube_name == llc_cube.name {
+                        if let Some(ref llc_cube_levels) = llc_cube.levels {
+                            for llc_cube_level in llc_cube_levels {
+                                unique_header_map.insert(
+                                    llc_cube_level.current_name.clone(),
+                                    llc_cube_level.unique_name.clone()
+                                );
+                            }
+                        }
+
+                        if let Some(ref llc_cube_properties) = llc_cube.properties {
+                            for llc_cube_property in llc_cube_properties {
+                                unique_header_map.insert(
+                                    llc_cube_property.current_name.clone(),
+                                    llc_cube_property.unique_name.clone()
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        unique_header_map
+    }
+
     /// Given a cube name, loops over the LogicLayerConfig and returns the
     /// actual cube name if an alias was provided.
     pub fn substitute_cube_name(self, name: String) -> Result<String, Error> {

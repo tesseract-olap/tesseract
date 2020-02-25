@@ -224,35 +224,11 @@ pub fn logic_layer_aggregation(
     }
 
     // Need to create a map here to help create unique header names in the next step
-    let mut unique_header_map: HashMap<String, String> = HashMap::new();
-
-    if let Some(ref llc) = logic_layer_config {
-        if let Some(ref llc_aliases) = llc.aliases {
-            if let Some(ref llc_cubes) = llc_aliases.cubes {
-                for llc_cube in llc_cubes {
-                    if cube_name == llc_cube.name {
-                        if let Some(ref llc_cube_levels) = llc_cube.levels {
-                            for llc_cube_level in llc_cube_levels {
-                                unique_header_map.insert(
-                                    llc_cube_level.current_name.clone(),
-                                    llc_cube_level.unique_name.clone()
-                                );
-                            }
-                        }
-
-                        if let Some(ref llc_cube_properties) = llc_cube.properties {
-                            for llc_cube_property in llc_cube_properties {
-                                unique_header_map.insert(
-                                    llc_cube_property.current_name.clone(),
-                                    llc_cube_property.unique_name.clone()
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let unique_header_map: HashMap<String, String> = if let Some(ref llc) = logic_layer_config {
+        llc.get_unique_names_map(cube_name.clone())
+    } else {
+        HashMap::new()
+    };
 
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
