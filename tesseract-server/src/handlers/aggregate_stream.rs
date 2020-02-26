@@ -75,7 +75,7 @@ pub fn do_aggregate(
     let query_ir_headers = req
         .state()
         .schema.read().unwrap()
-        .sql_query(&cube, &ts_query);
+        .sql_query(&cube, &ts_query, None);
 
     let (query_ir, headers) = ok_or_404!(query_ir_headers);
 

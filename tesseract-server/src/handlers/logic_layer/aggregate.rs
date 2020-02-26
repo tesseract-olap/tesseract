@@ -223,8 +223,16 @@ pub fn logic_layer_aggregation(
         return boxed_error_string("Unable to generate queries".to_string())
     }
 
+    // Need to create a map here to help create unique header names in the next step
+    let unique_header_map: HashMap<String, String> = if let Some(ref llc) = logic_layer_config {
+        llc.get_unique_names_map(cube_name.clone())
+    } else {
+        HashMap::new()
+    };
+
     let mut sql_strings: Vec<String> = vec![];
     let mut final_headers: Vec<String> = vec![];
+
     for ts_query in &ts_queries {
         // SQL injection mitigation
         ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
@@ -234,7 +242,7 @@ pub fn logic_layer_aggregation(
         let query_ir_headers = req
             .state()
             .schema.read().unwrap()
-            .sql_query(&cube_name, &ts_query);
+            .sql_query(&cube_name, &ts_query, Some(&unique_header_map));
 
         let (query_ir, headers) = ok_or_404!(query_ir_headers);
 

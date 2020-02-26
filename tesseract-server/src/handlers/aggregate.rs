@@ -92,7 +92,7 @@ pub fn do_aggregate(
         ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
     }
 
-    let query_ir_headers = schema.sql_query(&cube, &ts_query);
+    let query_ir_headers = schema.sql_query(&cube, &ts_query, None);
     let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
     let sql = req.state()
