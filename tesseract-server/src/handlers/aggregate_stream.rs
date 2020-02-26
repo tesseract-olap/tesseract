@@ -96,7 +96,7 @@ pub fn do_aggregate(
         futures::future::ok(
             HttpResponse::Ok()
             .set(content_type)
-            .streaming(format_records_stream(headers, df_stream, format))
+            .streaming(format_records_stream(headers, df_stream, format, false))
         )
     )
     //    .and_then(move |df_stream_res| {
