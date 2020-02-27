@@ -8,16 +8,16 @@ More documentation is coming soon!
 
 ### Getting started
 
-Tesseract serves an api which allows the user to drill-down, cut, filter, and otherwise examine a [cube](https://en.wikipedia.org/wiki/OLAP_cube) of data.
+Tesseract serves an API which allows users to drilldown, cut, filter, and otherwise examine a [cube](https://en.wikipedia.org/wiki/OLAP_cube) of data.
 
 The logical construct of the "cube" allows for powerful, flexible, and fast data analysis while keeping the data in the most efficient physical format (in-db).
 
 1) Get `tesseract`: See installation instructions below.
-2) Get data into "cube" format: [star schema](https://en.wikipedia.org/wiki/Star_schema)-like is simplest.
+2) Get data into "cube" format: [star schema](https://en.wikipedia.org/wiki/Star_schema)-like is optimal.
 3) Write a schema, which shows how the logical representation of the cube maps to the data in the database.
-4) Set options as environment variables and/or cli flags. See instructions below.
+4) Set options as environment variables and/or CLI flags. See instructions below.
 5) (Optional) Set up a process monitor like systemd.
-6) Run tesseract! For some examples of cli invocations, see the [justfile](https://github.com/hwchen/tesseract/blob/master/justfile). 
+6) Run tesseract! For some examples of CLI invocations, see the [justfile](https://github.com/hwchen/tesseract/blob/master/justfile). 
 
 If you installed using Homebrew on macOS, the binary is automatically moved to your `usr/local/bin` folder and is called `tesseract-olap`.
 
@@ -78,11 +78,11 @@ For more details on the logic layer api, check [here](https://github.com/hwchen/
 
 ### Dev Environment
 
-To make life easier for developers, I've set up a simple dev environment using:
+To make life easier, the development environment uses:
 - [just](https://github.com/casey/just) (a command runner)
 - [watchexec](https://github.com/watchexec/watchexec) (executes command on file changes)
 
-You can install them via `cargo` or check their webpage:
+You can install them via `cargo` (or see their respectively webpages):
 ```
 cargo install just
 cargo install watchexec
@@ -90,10 +90,10 @@ cargo install watchexec
 
 Make sure your `~/.cargo/bin` is in your `PATH`.
 
-I also highly recommended using something like [direnv](https://github.com/direnv/direnv) to manage environment variables.
+We also recommended using something like [direnv](https://github.com/direnv/direnv) to manage environment variables.
 
 ### Dev commands
-From the repo root:
+From the root of the repository folder:
 - `just serve`: serves from debug build, using env vars for options
 - `just deploy {{target}}`: builds `--release` and will scp to target of your choice
 - `just check`: an alias for `watchexec cargo check`
