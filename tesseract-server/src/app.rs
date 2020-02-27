@@ -12,6 +12,8 @@ use crate::handlers::{
     aggregate_default_handler,
     aggregate_stream_handler,
     aggregate_stream_default_handler,
+    diagnosis_handler,
+    diagnosis_default_handler,
     logic_layer_default_handler,
     logic_layer_handler,
     logic_layer_non_unique_levels_handler,
@@ -116,6 +118,14 @@ pub fn create_app(
         })
         .resource("/cubes/{cube}/members.{format}", |r| {
             r.method(Method::GET).with(members_handler)
+        })
+
+        // Data Quality Assurance
+        .resource("/diagnosis", |r| {
+            r.method(Method::GET).with(diagnosis_default_handler)
+        })
+        .resource("/diagnosis.{format}", |r| {
+            r.method(Method::GET).with(diagnosis_handler)
         })
 
         .resource("/flush", |r| {

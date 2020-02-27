@@ -11,11 +11,11 @@ use crate::dataframe::{DataFrame, ColumnData};
 use super::format::FormatType;
 
 /// Wrapper to format `DataFrame` to the desired output format.
-pub fn format_records_stream<S>(headers: Vec<String>, df_stream: S, format_type: FormatType) -> RecordBlockStream<S>
+pub fn format_records_stream<S>(headers: Vec<String>, df_stream: S, format_type: FormatType, error: bool) -> RecordBlockStream<S>
     where
     S: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
 {
-    RecordBlockStream::new(df_stream, headers, format_type)
+    RecordBlockStream::new(df_stream, headers, format_type, error)
 }
 
 pub struct RecordBlockStream<S>
@@ -27,12 +27,13 @@ pub struct RecordBlockStream<S>
     sent_first_chunk: bool, // for not setting a leading comma
     format_type: FormatType,
     headers: Vec<String>,
+    error: bool
 }
 
 impl<S> RecordBlockStream<S>
     where S: Stream<Item=Result<DataFrame, Error>, Error=Error> + 'static
 {
-    pub fn new(stream: S, headers: Vec<String>, format_type: FormatType) -> Self {
+    pub fn new(stream: S, headers: Vec<String>, format_type: FormatType, error: bool) -> Self {
         RecordBlockStream {
             inner: stream,
             sent_header: false,
@@ -40,6 +41,7 @@ impl<S> RecordBlockStream<S>
             sent_first_chunk: false,
             format_type,
             headers,
+            error
         }
     }
 }
@@ -52,7 +54,7 @@ impl<S> Stream for RecordBlockStream<S>
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         // first check eof
-        // this is separate from matchin on Asyn::Ready(None),
+        // this is separate from matching on Asyn::Ready(None),
         // because the json formats need to have a trailing `]}`
         // after all the blocks for the body have been sent
         if self.eof {
@@ -82,7 +84,11 @@ impl<S> Stream for RecordBlockStream<S>
                     return Ok(Async::Ready(Some(bytes)));
                 },
                 FormatType::JsonRecords => {
-                    let buf = b"{\"data\":[".to_vec();
+                    let buf = if self.error {
+                        b"{\"error\":[".to_vec()
+                    } else {
+                        b"{\"data\":[".to_vec()
+                    };
                     let bytes: Bytes = buf.into();
 
                     self.sent_header = true;
@@ -101,7 +107,11 @@ impl<S> Stream for RecordBlockStream<S>
 
                     // now data prefix
                     let mut buf = ser.into_inner();
-                    buf.extend(b",\"data\":[");
+                    if self.error {
+                        buf.extend(b",\"error\":[");
+                    } else {
+                        buf.extend(b",\"data\":[");
+                    }
 
                     let bytes: Bytes = buf.into();
 

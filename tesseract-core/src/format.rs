@@ -29,11 +29,17 @@ impl std::str::FromStr for FormatType {
 }
 
 /// Wrapper to format `DataFrame` to the desired output format.
-pub fn format_records(headers: &[String], df: DataFrame, format_type: FormatType, source_data: Option<SourceMetadata>) -> Result<String, Error> {
+pub fn format_records(
+    headers: &[String],
+    df: DataFrame,
+    format_type: FormatType,
+    source_data: Option<SourceMetadata>,
+    error: bool
+) -> Result<String, Error> {
     match format_type {
         FormatType::Csv => Ok(format_csv(headers, df)?),
-        FormatType::JsonRecords => Ok(format_jsonrecords(headers, df, source_data)?),
-        FormatType::JsonArrays => Ok(format_jsonarrays(headers, df)?),
+        FormatType::JsonRecords => Ok(format_jsonrecords(headers, df, source_data, error)?),
+        FormatType::JsonArrays => Ok(format_jsonarrays(headers, df, error)?),
     }
 }
 
@@ -88,7 +94,7 @@ fn format_csv(headers: &[String], df: DataFrame) -> Result<String, Error> {
 }
 
 /// Formats response `DataFrame` to JSON records.
-fn format_jsonrecords(headers: &[String], df: DataFrame, source_data: Option<SourceMetadata>) -> Result<String, Error> {
+fn format_jsonrecords(headers: &[String], df: DataFrame, source_data: Option<SourceMetadata>, error: bool) -> Result<String, Error> {
     // use streaming serializer
     // Necessary because this way we don't create a huge vec of rows containing Value
     // (very expensive)
@@ -102,9 +108,15 @@ fn format_jsonrecords(headers: &[String], df: DataFrame, source_data: Option<Sou
     // I had a hard time figuring out how to serialize the struct before the data.
     // So I just wrote the bytes in and put a '}' at the end, and serialized
     // the values in between.
-    let mut ser = serde_json::Serializer::new(
-        b"{\"data\":".to_vec()
-    );
+    let mut ser = if error {
+        serde_json::Serializer::new(
+            b"{\"error\":".to_vec()
+        )
+    } else {
+        serde_json::Serializer::new(
+            b"{\"data\":".to_vec()
+        )
+    };
 
     let mut seq = ser.serialize_seq(Some(df.len()))?;
     // write data
@@ -160,7 +172,7 @@ fn format_jsonrecords(headers: &[String], df: DataFrame, source_data: Option<Sou
 }
 
 /// Formats response `DataFrame` to JSON arrays.
-fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error> {
+fn format_jsonarrays(headers: &[String], df: DataFrame, error: bool) -> Result<String, Error> {
     // use streaming serializer
     // Necessary because this way we don't create a huge vec of rows containing Value
     // (very expensive)
@@ -185,7 +197,11 @@ fn format_jsonarrays(headers: &[String], df: DataFrame) -> Result<String, Error>
 
     // now the data
     let mut intermediate = ser.into_inner();
-    intermediate.extend(b",\"data\":");
+    if error {
+        intermediate.extend(b",\"error\":");
+    } else {
+        intermediate.extend(b",\"data\":");
+    }
 
 
     let mut ser = serde_json::Serializer::new(intermediate);

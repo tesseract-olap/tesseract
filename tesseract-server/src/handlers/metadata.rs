@@ -185,7 +185,7 @@ pub fn do_members(
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
-            match format_records(&header, df, format, None) {
+            match format_records(&header, df, format, None, false) {
                 Ok(res) => Ok(HttpResponse::Ok().body(res)),
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
             }
