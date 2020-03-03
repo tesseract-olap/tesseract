@@ -50,7 +50,6 @@ pub struct EnvVars {
     pub database_url: String,
     pub geoservice_url: Option<Url>,
     pub schema_source: SchemaSource,
-    pub api_key: Option<String>,
     pub jwt_secret: Option<String>,
     pub flush_secret: Option<String>,
 }
