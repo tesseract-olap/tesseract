@@ -15,7 +15,7 @@ use tesseract_core::Query as TsQuery;
 
 use crate::app::AppState;
 use super::aggregate::AggregateQueryOpt;
-use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type};
+use super::util::{boxed_error_http_response, verify_authorization, format_to_content_type};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -50,9 +50,8 @@ pub fn do_aggregate(
     let schema = &req.state().schema.read().unwrap().clone();
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
 
-    match verify_api_key(&req, &cube_obj) {
-        Ok(_) => (),
-        Err(err) => return boxed_error_http_response(err)
+    if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
+        return boxed_error_http_response(err);
     }
 
     let format = ok_or_404!(format.parse::<FormatType>());

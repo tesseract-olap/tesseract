@@ -28,7 +28,7 @@ use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
-    verify_api_key, format_to_content_type, generate_source_data,
+    verify_authorization, format_to_content_type, generate_source_data,
     validate_members
 };
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
@@ -195,9 +195,8 @@ pub fn logic_layer_aggregation(
 
     let cube = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
-    match verify_api_key(&req, &cube) {
-        Ok(_) => (),
-        Err(err) => return boxed_error_http_response(err)
+    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
+        return boxed_error_http_response(err);
     }
 
     let cache = req.state().cache.read().unwrap();

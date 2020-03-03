@@ -20,7 +20,7 @@ use tesseract_core::names::LevelName;
 
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
-    verify_api_key, format_to_content_type
+    verify_authorization, format_to_content_type
 };
 
 
@@ -75,9 +75,8 @@ pub fn get_members(
     // Get cube object to check for API key
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
-    match verify_api_key(&req, &cube_obj) {
-        Ok(_) => (),
-        Err(err) => return boxed_error_http_response(err)
+    if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
+        return boxed_error_http_response(err);
     }
 
     if let Some(logic_layer_config) = &logic_layer_config {

@@ -2,29 +2,11 @@ use jsonwebtoken::{decode, Validation};
 use serde_derive::{Serialize, Deserialize};
 use log;
 use actix_web::middleware::{Middleware, Started};
-use actix_web::{HttpRequest, HttpResponse, Result};
+use actix_web::{HttpRequest, HttpResponse, Result, FutureResponse};
 pub const X_TESSERACT_JWT_TOKEN: &str = "x-tesseract-jwt-token";
 use crate::app::AppState;
-use tesseract_core::{DEFAULT_ALLOWED_ACCESS, INVALID_ACCESS};
-pub struct ValidateAccess;
+use tesseract_core::{DEFAULT_ALLOWED_ACCESS};
 
-impl Middleware<AppState> for ValidateAccess {
-    // We only need to hook into the `start` for this middleware.
-    fn start(&self, req: &HttpRequest<AppState>) -> Result<Started> {
-        let app_state: &AppState = req.state();
-        let jwt_secret = &app_state.env_vars.jwt_secret;
-
-        let token = extract_token(&req);
-        if validate_web_token(jwt_secret, &token, DEFAULT_ALLOWED_ACCESS) {
-            Ok(Started::Done)
-        } else {
-            Ok(Started::Response(
-                        HttpResponse::Unauthorized()
-                            .json("Unauthorized")
-                    ))
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -75,10 +57,10 @@ pub fn user_auth_level(jwt_secret: &Option<String>, raw_token: &str) -> Option<i
                     if claims.auth_level.is_some() && claims.status == "valid" {
                         claims.auth_level
                     } else {
-                        Some(INVALID_ACCESS)
+                        Some(DEFAULT_ALLOWED_ACCESS)
                     }
                 },
-                Err(_err) => Some(INVALID_ACCESS), // If any error occurs, do not validate
+                Err(_err) => Some(DEFAULT_ALLOWED_ACCESS), // If any error occurs, validate to default access level
             }
         },
         None => None
@@ -86,6 +68,10 @@ pub fn user_auth_level(jwt_secret: &Option<String>, raw_token: &str) -> Option<i
 }
 
 pub fn validate_web_token(jwt_secret: &Option<String>, raw_token: &str, min_auth_level: i32) -> bool {
+    // if no token is provided, allowed access where min auth is 0
+    if raw_token == "" && min_auth_level == DEFAULT_ALLOWED_ACCESS {
+        return true;
+    }
     match jwt_secret {
         Some(key) => {
             let validation = Validation::default();
@@ -125,9 +111,16 @@ mod test {
     }
 
     #[test]
-    fn test_jwt_auth_bad2() {
+    fn test_jwt_auth_allow_by_default() {
         let jwt_secret = Some("hello-secret-123".to_string());
         let result = validate_web_token(&jwt_secret, "", DEFAULT_ALLOWED_ACCESS);
+        assert_eq!(result, true);
+    }
+
+    #[test]
+    fn test_jwt_auth_do_not_allow_high_by_default() {
+        let jwt_secret = Some("hello-secret-123".to_string());
+        let result = validate_web_token(&jwt_secret, "", 100);
         assert_eq!(result, false);
     }
 
