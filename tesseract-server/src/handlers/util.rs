@@ -42,10 +42,6 @@ pub fn boxed_error_http_response(response: HttpResponse) -> FutureResponse<HttpR
     Box::new(future::result(Ok(response)))
 }
 
-
-pub const X_TESSERACT_API_KEY: &str = "x-tesseract-api-key";
-
-
 // Genrates the source data/ annotaion of the cube for which the query is executed
 pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
     let cube_name = &cube.name;
@@ -76,40 +72,10 @@ pub fn get_user_auth_level(req: &HttpRequest<AppState>) -> Option<i32> {
     user_auth_level(jwt_secret, &user_token)
 }
 
-pub fn verify_api_key(req: &HttpRequest<AppState>, cube: &Cube) -> Result<(), HttpResponse> {
-    if cube.public == false {
-        match &req.state().env_vars.api_key {
-            Some(tesseract_api_key) => {
-                // Check query parameters
-                let qp_secret_is_valid = {
-                    let qry = req.query();
-                    let qp_secret = qry.get(X_TESSERACT_API_KEY);
-                    qp_secret.map(|val| val == tesseract_api_key)
-                        .unwrap_or(false)
-                };
-
-                // Check headers
-                let header_api_key = req.headers().get(X_TESSERACT_API_KEY);
-                let header_secret_is_valid = header_api_key.map(|result_val| {
-                    result_val.to_str().map(|val| val == tesseract_api_key).unwrap_or(false)
-                }).unwrap_or(false);
-
-                if qp_secret_is_valid || header_secret_is_valid {
-                    return Ok(())
-                } else {
-                    return Err(HttpResponse::Unauthorized().json("This cube is not public".to_string()));
-                }
-            },
-            None => {
-                // TODO: Move somewhere else
-                return Err(HttpResponse::InternalServerError().json("Internal Server Error 700".to_string()));
-            }
-        }
-    }
-
+pub fn verify_authorization(req: &HttpRequest<AppState>, min_auth_level: i32) -> Result<(), HttpResponse> {
     let jwt_secret = &req.state().env_vars.jwt_secret;
     let user_token = extract_token(req);
-    if !validate_web_token(jwt_secret, &user_token, cube.min_auth_level) {
+    if !validate_web_token(jwt_secret, &user_token, min_auth_level) {
         return Err(HttpResponse::Unauthorized().json("This cube is not public".to_string()));
     }
 

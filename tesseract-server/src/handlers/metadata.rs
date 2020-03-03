@@ -19,7 +19,7 @@ use tesseract_core::DEFAULT_ALLOWED_ACCESS;
 
 use crate::app::AppState;
 use crate::logic_layer::LogicLayerConfig;
-use super::util::{boxed_error_http_response, verify_api_key, get_user_auth_level};
+use super::util::{boxed_error_http_response, verify_authorization, get_user_auth_level};
 
 
 pub fn metadata_handler(
@@ -31,6 +31,11 @@ pub fn metadata_handler(
         Some(c) => c,
         None => return Ok(HttpResponse::NotFound().finish()),
     };
+
+    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
+        return Ok(err);
+    }
+
     let ll_config = match &req.state().logic_layer_config {
         Some(llc) => llc.read().unwrap().clone(),
         None => return  Ok(HttpResponse::Ok().json(cube))
@@ -58,7 +63,7 @@ pub fn metadata_all_handler(
         // Filter out cube that user isn't authorized to see
         match user_auth_level {
             Some(auth_level) => { // Authorization is set
-                if (auth_level >= cube.min_auth_level && auth_level >= DEFAULT_ALLOWED_ACCESS) {
+                if auth_level >= cube.min_auth_level && auth_level >= DEFAULT_ALLOWED_ACCESS {
                     cubes.push(get_cube_metadata(cube.clone(), &ll_config));
                 }
             },
@@ -155,9 +160,8 @@ pub fn do_members(
     let schema = &req.state().schema.read().unwrap().clone();
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
 
-    match verify_api_key(&req, &cube_obj) {
-        Ok(_) => (),
-        Err(err) => return boxed_error_http_response(err)
+    if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
+        return boxed_error_http_response(err);
     }
 
     let format = ok_or_404!(format.parse::<FormatType>());

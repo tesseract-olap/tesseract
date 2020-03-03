@@ -20,7 +20,6 @@ pub use self::backend::Backend;
 pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
 
 pub static DEFAULT_ALLOWED_ACCESS: i32 = 0;
-pub static INVALID_ACCESS: i32 = -1;
 
 use self::names::{
     Cut,

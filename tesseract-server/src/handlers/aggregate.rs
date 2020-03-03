@@ -20,7 +20,7 @@ use crate::handlers::util::validate_members;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
-use super::util::{boxed_error_http_response, verify_api_key, format_to_content_type, generate_source_data};
+use super::util::{boxed_error_http_response, verify_authorization, format_to_content_type, generate_source_data};
 
 
 /// Handles default aggregation when a format is not specified.
@@ -55,9 +55,8 @@ pub fn do_aggregate(
     let schema = &req.state().schema.read().unwrap().clone();
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
 
-    match verify_api_key(&req, &cube_obj) {
-        Ok(_) => (),
-        Err(err) => return boxed_error_http_response(err)
+    if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
+        return boxed_error_http_response(err);
     }
 
     let format = format.parse::<FormatType>();

@@ -20,7 +20,7 @@ use tesseract_core::{DataFrame, Column, ColumnData};
 use tesseract_core::schema::{Cube, DimensionType};
 use crate::app::AppState;
 use crate::logic_layer::{LogicLayerConfig, CubeCache};
-use super::super::util::{verify_api_key, format_to_content_type};
+use super::super::util::{verify_authorization, format_to_content_type};
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
@@ -98,9 +98,8 @@ pub fn logic_layer_relations(
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
     };
 
-    match verify_api_key(&req, &cube) {
-        Ok(_) => (),
-        Err(err) => return Ok(err)
+    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
+        return Ok(err);
     }
 
     let cache = req.state().cache.read().unwrap();

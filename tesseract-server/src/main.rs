@@ -88,9 +88,6 @@ fn main() -> Result<(), Error> {
     // address
     let server_addr = opt.address.unwrap_or("127.0.0.1:7777".to_owned());
 
-    // API key
-    let api_key = env::var("TESSERACT_API_KEY").ok();
-
     // JSONWebToken Secret
     let jwt_secret = env::var("TESSERACT_JWT_SECRET").ok();
 
@@ -137,7 +134,6 @@ fn main() -> Result<(), Error> {
         database_url: db_url.clone(),
         geoservice_url,
         schema_source,
-        api_key,
         jwt_secret,
         flush_secret,
     };
