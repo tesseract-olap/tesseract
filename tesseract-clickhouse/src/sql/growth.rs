@@ -109,7 +109,7 @@ pub fn calculate(
                 {grouparray_other_meas} \
                 groupArray({growth_mea}) as all_m_in_group, \
                 arrayEnumerate(all_m_in_group) as all_m_in_group_ids, \
-                arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: 0, all_m_in_group_ids) as m_diff \
+                arrayMap( i -> i > 1 ? all_m_in_group[i] - all_m_in_group[i-1]: NULL, all_m_in_group_ids) as m_diff \
             select \
                 {all_drill_cols_except_growth}{comma_for_all_drill_cols_except_growth} \
                 {other_meas} \
