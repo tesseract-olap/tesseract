@@ -88,14 +88,14 @@ pub fn perform_diagnosis(
     let mut error_types: Vec<String> = vec![];
     let mut error_messages: Vec<String> = vec![];
 
-    // Check for `MissingDimensionIDs`
-    // TODO: Deal with the case where there is an inline table.
     for dimension in &cube.dimensions {
         for hierarchy in &dimension.hierarchies {
             let last_level: &Level = &hierarchy.levels[hierarchy.levels.len() - 1];
 
             if let Some(ref foreign_key) = dimension.foreign_key {
                 if let Some(ref dimension_table) = hierarchy.table {
+                    // Check for `MissingDimensionIDs`
+                    // TODO: Deal with the case where there is an inline table.
                     let sql_str: String = format!(
                         "SELECT DISTINCT {} FROM {} WHERE {} NOT IN (SELECT {} FROM {})",
                         foreign_key,
@@ -105,14 +105,7 @@ pub fn perform_diagnosis(
                         dimension_table.name,
                     );
 
-                    let res_df = req.state().backend
-                        .exec_sql(sql_str)
-                        .wait()
-                        .and_then(move |df| {
-                            Ok(df)
-                        });
-
-                    match res_df {
+                    match get_res_df(&req, sql_str) {
                         Ok(res_df) => {
                             match res_df.columns.get(0) {
                                 Some(column) => {
@@ -129,6 +122,39 @@ pub fn perform_diagnosis(
                                                 dimension.name,
                                                 hierarchy.name,
                                                 last_level.name,
+                                                column_data.join(", ")
+                                            )
+                                        );
+                                    }
+                                },
+                                None => ()
+                            }
+                        },
+                        Err(err) => ()
+                    }
+
+                    // Check for `NonUniqueDimensionIDs`
+                    // TODO: Deal with the case where there is an inline table.
+                    let sql_str: String = format!(
+                        "SELECT {} FROM (select {}, count(*) as unique_count FROM {} GROUP BY {}) where unique_count > 1",
+                        last_level.key_column,
+                        last_level.key_column,
+                        dimension_table.name,
+                        last_level.key_column,
+                    );
+
+                    match get_res_df(&req, sql_str) {
+                        Ok(res_df) => {
+                            match res_df.columns.get(0) {
+                                Some(column) => {
+                                    let column_data = column.stringify_column_data();
+
+                                    if column_data.len() > 0 {
+                                        error_types.push("NonUniqueDimensionIDs".to_string());
+                                        error_messages.push(
+                                            format!(
+                                                "There are duplicate entries for the following IDs in the {} dimension table: {}.",
+                                                dimension_table.name,
                                                 column_data.join(", ")
                                             )
                                         );
@@ -170,4 +196,13 @@ pub fn perform_diagnosis(
             Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
         }
     }
+}
+
+fn get_res_df(req: &HttpRequest<AppState>, sql_str: String) -> Result<DataFrame, Error> {
+    req.state().backend
+        .exec_sql(sql_str)
+        .wait()
+        .and_then(move |df| {
+            Ok(df)
+        })
 }
