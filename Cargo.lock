@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "clickhouse-rs"
-version = "0.1.19"
+version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2094,7 +2094,7 @@ dependencies = [
 name = "tesseract-clickhouse"
 version = "0.1.0"
 dependencies = [
- "clickhouse-rs 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clickhouse-rs 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2775,7 +2775,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "31850b4a4d6bae316f7a09e691c944c28299298837edc0a03f755618c23cbc01"
 "checksum chrono-tz 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e0e430fad0384e4defc3dc6b1223d1b886087a8bf9b7080e5ae027f73851ea15"
 "checksum clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5067f5bb2d80ef5d68b4c87db81601f0b75bca627bc2ef76b141d7b846a3c6d9"
-"checksum clickhouse-rs 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)" = "93aafd1a645dd1eb1b42865280bdb197795628d02b5fa31ac6077f7f0d32019c"
+"checksum clickhouse-rs 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)" = "bbfa5c155f260585f210db259028c5a4dabcebff63454728b82b7a89329c27a5"
 "checksum clickhouse-rs-cityhash-sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "551a67cb2913d82f0fd5fd3973c6a6a8dc7b66986f8e1a060af3ffe0c587d8f7"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 "checksum cookie 0.11.0 (git+https://github.com/alexcrichton/cookie-rs.git?rev=c59d94e1492f2aa8ce0949335d494322ca25366e)" = "<none>"
