@@ -337,6 +337,18 @@ pub fn logic_layer_aggregation(
             let mut exclude_row_indexes: HashSet<i32> = HashSet::new();
             let mut col_data_map: HashMap<usize, Vec<String>> = HashMap::new();
 
+            let mut unique_to_general_name_map: HashMap<String, String> = HashMap::new();
+
+            for (k, v) in unique_header_map.iter() {
+                let name: Vec<String> = k.split(".").map(|s| s.to_string()).collect();
+                let name_len = name.len();
+                let name = &name[name_len - 1];
+
+                unique_to_general_name_map.insert(
+                    format!("{} ID", v), format!("{} ID", name)
+                );
+            }
+
             // This first pass will combine the data from the different dataframes.
             // We also find the rows that will be ignored in the next pass.
             for col_i in 0..num_cols {
@@ -350,7 +362,11 @@ pub fn logic_layer_aggregation(
 
                 // Find rows that need to be excluded
                 if let Some(header) = final_headers.get(col_i) {
+                    let mut has_match = false;
+
+                    // First try to match on a unique name
                     if let Some(ids) = exclude_map.get(header) {
+                        has_match = true;
                         let mut i = 0;
 
                         for entry in &col_data {
@@ -359,6 +375,34 @@ pub fn logic_layer_aggregation(
                             }
 
                             i += 1;
+                        }
+                    }
+
+                    // If that doesn't work, try to match this header to a general
+                    // name. Because of the way that the header name selection works
+                    // this is guaranteed to only match a single general name, since
+                    // if the query required the use of unique names those would be
+                    // used for the headers. If they are not being used, it's because
+                    // only one of the levels with this general name is present.
+                    if !has_match {
+                        for (k, v) in exclude_map.iter() {
+                            let opt = unique_to_general_name_map.get(k);
+
+                            if let Some(general_name) = opt {
+                                if header == general_name {
+                                   let ids = v;
+
+                                   let mut i = 0;
+
+                                   for entry in &col_data {
+                                       if ids.contains(entry) {
+                                           exclude_row_indexes.insert(i);
+                                       }
+
+                                       i += 1;
+                                   }
+                                }
+                            }
                         }
                     }
                 }
