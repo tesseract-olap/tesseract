@@ -4,7 +4,7 @@ use failure::{Error, format_err};
 
 pub mod aggregator;
 pub mod metadata;
-mod json;
+pub mod json;
 mod xml;
 
 const DEFAULT_LOCALE_STR: &str = "en";

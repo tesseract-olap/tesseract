@@ -22,6 +22,7 @@ serde_qs = "0.4.1"
 structopt = "0.2.13"
 mime = "0.3.13"
 url = "2.1.0"
+tokio = "0.1"
 jsonwebtoken = "6"
 
 [dependencies.actix-web]

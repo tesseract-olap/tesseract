@@ -20,6 +20,10 @@ use crate::handlers::{
     logic_layer_members_handler,
     logic_layer_members_default_handler,
     flush_handler,
+    schema_update_handler,
+    schema_add_handler,
+    schema_delete_handler,
+    schema_info_handler,
     index_handler,
     metadata_handler,
     metadata_all_handler,
@@ -40,6 +44,7 @@ use url::Url;
 #[derive(Debug, Clone)]
 pub enum SchemaSource {
     LocalSchema { filepath: String },
+    DbSchema { tablepath: String, },
     #[allow(dead_code)]
     RemoteSchema { endpoint: String },
 }
@@ -127,6 +132,18 @@ pub fn create_app(
 
         .resource("/flush", |r| {
             r.method(Method::POST).with(flush_handler)
+        })
+        .resource("/schema/update", |r| {
+            r.method(Method::POST).with(schema_update_handler)
+        })
+        .resource("/schema/add", |r| {
+            r.method(Method::POST).with(schema_add_handler)
+        })
+        .resource("/schema/delete", |r| {
+            r.method(Method::POST).with(schema_delete_handler)
+        })
+        .resource("/schema/list", |r| {
+            r.method(Method::GET).with(schema_info_handler)
         })
         // Allow the API to accept /my-path or /my-path/ for all requests
         .default_resource(|r| r.h(NormalizePath::default()));

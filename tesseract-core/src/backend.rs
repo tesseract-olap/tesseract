@@ -4,9 +4,16 @@ use futures::{Future, Stream};
 use crate::dataframe::DataFrame;
 use crate::query_ir::QueryIr;
 use crate::sql;
-
+use crate::schema::metadata::SchemaPhysicalData;
 
 pub trait Backend {
+    /// Takes in a fully-qualfiied path to a table name
+    /// assumes table is in the structure of: id (integer), name (text), schema (json) 
+    /// desired query output format.
+    fn retrieve_schemas(&self, tablepath: &str, id: Option<&str>) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
+        unimplemented!()
+    }
+
     /// Takes in a SQL string, outputs a DataFrame, which will go on to be formatted into the
     /// desired query output format.
     fn exec_sql(&self, sql: String) -> Box<dyn Future<Item=DataFrame, Error=Error>>;
@@ -37,6 +44,19 @@ pub trait Backend {
             &query_ir.rca,
             &query_ir.growth,
         )
+    }
+
+    /// This function allows administrators to update the content of a given schema.
+    fn update_schema(&self, tablepath: &str, schema_name_id: &str, schema_content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        unimplemented!()
+    }
+
+    fn delete_schema(&self, tablepath: &str, schema_name_id: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        unimplemented!()
+    }
+
+    fn add_schema(&self, tablepath: &str,  schema_name_id: &str, schema_content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        unimplemented!()
     }
 }
 

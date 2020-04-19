@@ -1,11 +1,11 @@
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::query_ir::MemberType;
 use super::aggregator::Aggregator;
 use super::{DimensionType, MeasureType};
 
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SchemaConfigJson {
     pub name: String,
     pub shared_dimensions: Option<Vec<SharedDimensionConfigJson>>,
@@ -14,7 +14,7 @@ pub struct SchemaConfigJson {
     pub default_locale: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct CubeConfigJson {
     pub name: String,
     pub public: Option<String>,
@@ -26,7 +26,7 @@ pub struct CubeConfigJson {
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DimensionConfigJson {
     pub name: String,
     pub foreign_key: Option<String>, // does not exist for shared dims
@@ -37,7 +37,7 @@ pub struct DimensionConfigJson {
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SharedDimensionConfigJson {
     pub name: String,
     pub hierarchies: Vec<HierarchyConfigJson>,
@@ -47,7 +47,7 @@ pub struct SharedDimensionConfigJson {
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DimensionUsageJson {
     pub source: String,
     pub name: Option<String>,
@@ -55,7 +55,7 @@ pub struct DimensionUsageJson {
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct HierarchyConfigJson {
     pub name: String,
     pub table: Option<TableConfigJson>,
@@ -66,14 +66,14 @@ pub struct HierarchyConfigJson {
     pub default_member: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct InlineTableJson {
     pub alias: String,
     pub column_definitions: Vec<InlineTableColumnDefinitionJson>,
     pub rows: Vec<InlineTableRowJson>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct InlineTableColumnDefinitionJson {
     pub name: String,
     pub key_type: MemberType,
@@ -81,18 +81,18 @@ pub struct InlineTableColumnDefinitionJson {
     pub caption_set: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct InlineTableRowJson {
     pub row_values: Vec<InlineTableRowValueJson>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct InlineTableRowValueJson {
     pub column: String,
     pub value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct LevelConfigJson {
     pub name: String,
     pub key_column: String,
@@ -102,7 +102,7 @@ pub struct LevelConfigJson {
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct MeasureConfigJson {
     pub name: String,
     pub column: String,
@@ -112,14 +112,14 @@ pub struct MeasureConfigJson {
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct TableConfigJson {
     pub name: String,
     pub schema: Option<String>,
     pub primary_key: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct PropertyConfigJson {
     pub name: String,
     pub column: String,
@@ -127,7 +127,7 @@ pub struct PropertyConfigJson {
     pub annotations: Option<Vec<AnnotationConfigJson>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct AnnotationConfigJson {
     pub name: String,
     pub text: String,

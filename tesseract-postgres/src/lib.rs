@@ -1,5 +1,7 @@
 use failure::{Error, format_err};
+
 use tesseract_core::{Backend, DataFrame};
+use tesseract_core::schema::metadata::SchemaPhysicalData;
 use futures::{Future, Stream};
 use tokio_postgres::NoTls;
 extern crate futures;
@@ -8,7 +10,9 @@ extern crate bb8;
 extern crate bb8_postgres;
 extern crate futures_state_stream;
 extern crate tokio;
-
+use std::thread;
+use tokio_postgres::{Column , Row};
+use tokio::executor::current_thread;
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use futures::{
@@ -55,6 +59,35 @@ impl Postgres {
 // 2. dataframe creation
 
 impl Backend for Postgres {
+    fn retrieve_schemas(&self, tablepath: &str, id: Option<&str>) -> Box<dyn Future<Item=Vec<SchemaPhysicalData>, Error=Error>> {
+        let sql = match id {
+            None => format!("SELECT id, schema FROM {}", tablepath),
+            Some(id_val) => format!("SELECT id, schema FROM {} WHERE id = '{}", tablepath, id_val),
+        };
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(move |r| {
+                            let rows: Vec<Row> = r.expect("Failure in query of schema rows");
+                            let res = rows.into_iter().map(|row| {
+                                SchemaPhysicalData {
+                                    id: row.get::<usize, String>(0),
+                                    content: row.get::<usize, String>(1),
+                                    format: "json".to_string(),
+                                }
+                            }).collect();
+                            Ok((res, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        return Box::new(fut);
+    }
+
     fn exec_sql(&self, sql: String) -> Box<Future<Item=DataFrame, Error=Error>> {
         let fut = self.pool.run(move |mut connection| {
             connection.prepare(&sql).then( |r| match r {
@@ -75,6 +108,60 @@ impl Backend for Postgres {
 
     fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
         Box::new((*self).clone())
+    }
+
+    fn update_schema(&self, tablepath: &str, schema_name_id: &str, schema_content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("UPDATE {} SET schema = '{}' WHERE id = '{}'", tablepath, schema_content, schema_name_id);
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(|_r| {
+                            Ok((true, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        return Box::new(fut);
+    }
+
+    fn delete_schema(&self, tablepath: &str, schema_name_id: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("DELETE FROM {} WHERE id = '{}'", tablepath, schema_name_id);
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(|_r| {
+                            Ok((true, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        return Box::new(fut);
+    }
+
+    fn add_schema(&self, tablepath: &str, schema_name_id: &str, content: &str) -> Box<dyn Future<Item=bool, Error=Error>> {
+        let sql = format!("INSERT INTO {} (\"id\", \"schema\") VALUES ('{}', '{}') RETURNING \"id\"", tablepath, schema_name_id, content);
+        let fut = self.pool.run(move |mut connection| {
+            connection.prepare(&sql).then( |r| match r {
+                Ok(select) => {
+                    let f = connection.query(&select, &[])
+                        .collect()
+                        .then(|_r| {
+                            Ok((true, connection))
+                        });
+                    Either::A(f)
+                }
+                Err(e) => Either::B(err((e, connection))),
+            })
+        }).map_err(|err| format_err!("Postgres error {:?}", err));
+        return Box::new(fut);
     }
 }
 

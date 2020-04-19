@@ -1,6 +1,8 @@
 use serde_derive::Serialize;
 use std::collections::HashMap;
 use std::convert::From;
+use serde_json::value::Value;
+use serde::ser::{Serialize as CustomSerialize, SerializeStruct, Serializer};
 
 use super::{
     Schema,
@@ -15,6 +17,27 @@ use super::{
     Annotation,
     aggregator::Aggregator,
 };
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SchemaPhysicalData {
+    pub id: String,
+    pub content: String,
+    pub format: String,
+}
+
+impl CustomSerialize for SchemaPhysicalData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // this section allows the API to return the raw string as a formatted JSON object.
+        let mut s = serializer.serialize_struct("SchemaPhysicalData", 2)?;
+        s.serialize_field("id", &self.id)?;
+        let raw_json: HashMap<String, Value> = serde_json::from_str(&self.content).expect("failed to parse json");
+        s.serialize_field("content", &raw_json)?;
+        s.end()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SchemaMetadata {

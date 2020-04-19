@@ -116,6 +116,15 @@ macro_rules! ok_or_404 {
     };
 }
 
+#[macro_export]
+macro_rules! auth_denied {
+    ($x:expr) => {
+        return Box::new(
+        future::result(
+            Ok(HttpResponse::Unauthorized().json($x))
+        ));
+    }
+
 
 #[macro_export]
 macro_rules! some_or_404 {
@@ -146,4 +155,5 @@ pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Erro
         }
     }
     Ok(())
+
 }

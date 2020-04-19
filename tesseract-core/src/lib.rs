@@ -30,7 +30,7 @@ use self::names::{
     Mask,
 };
 pub use self::schema::{Schema, Cube, Dimension, Table, Aggregator};
-use self::schema::metadata::{SchemaMetadata, CubeMetadata};
+use self::schema::metadata::{SchemaMetadata, SchemaPhysicalData, CubeMetadata};
 use self::query_ir::{
     CutSql,
     DrilldownSql,
