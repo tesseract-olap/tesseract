@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str;
 
 use actix_web::{
@@ -90,6 +90,7 @@ pub struct LogicLayerQueryOpt {
     growth: Option<String>,
     rca: Option<String>,
     debug: Option<bool>,
+    exclude: Option<String>,
     exclude_default_members: Option<bool>,
     locale: Option<String>,
     //    distinct: Option<bool>,
@@ -129,6 +130,43 @@ impl LogicLayerQueryOpt {
         }
 
         arg_vec
+    }
+
+    pub fn deserialize_exclude(&self) -> HashMap<String, HashSet<String>> {
+        let mut excludes: HashMap<String, HashSet<String>> = HashMap::new();
+
+        match &self.exclude {
+            Some(arg) => {
+                let levels: Vec<&str> = arg.split(";").collect();
+
+                for level in levels {
+                    let parts: Vec<&str> = level.split(":").collect();
+
+                    let level_name = match parts.get(0) {
+                        Some(level_name) => level_name,
+                        None => continue
+                    };
+
+                    let level_ids = match parts.get(1) {
+                        Some(level_ids) => level_ids,
+                        None => continue
+                    };
+
+                    let level_ids: Vec<&str> = level_ids.split(",").collect();
+
+                    let level_ids_set: HashSet<String> = level_ids.into_iter().map(|s| s.to_string()).collect();
+
+                    // Since we are filtering on IDs, we need to add an `ID` suffix here.
+                    excludes.insert(
+                        format!("{} ID", level_name),
+                        level_ids_set
+                    );
+                }
+            },
+            None => ()
+        }
+
+        excludes
     }
 }
 
@@ -273,6 +311,8 @@ pub fn logic_layer_aggregation(
 
     debug!("Headers: {:?}", final_headers);
 
+    let exclude_map = agg_query.deserialize_exclude();
+
     // Joins all the futures for each TsQuery
     let futs: JoinAll<Vec<Box<dyn Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
             .iter()
@@ -294,6 +334,85 @@ pub fn logic_layer_aggregation(
                 None => return Err(format_err!("No dataframes were returned."))
             };
 
+            let mut exclude_row_indexes: HashSet<usize> = HashSet::new();
+            let mut col_data_map: HashMap<usize, Vec<String>> = HashMap::new();
+
+            let mut unique_to_general_name_map: HashMap<String, String> = HashMap::new();
+
+            for (k, v) in unique_header_map.iter() {
+                let name: Vec<String> = k.split(".").map(|s| s.to_string()).collect();
+                let name_len = name.len();
+                let name = &name[name_len - 1];
+
+                unique_to_general_name_map.insert(
+                    format!("{} ID", v), format!("{} ID", name)
+                );
+            }
+
+            // This first pass will combine the data from the different dataframes.
+            // We also find the rows that will be ignored in the next pass.
+            for col_i in 0..num_cols {
+                let mut col_data: Vec<String> = vec![];
+
+                for df in &dfs {
+                    let c: &Column = &df.columns[col_i];
+                    let rows = c.stringify_column_data();
+                    col_data = [&col_data[..], &rows[..]].concat()
+                }
+
+                // Find rows that need to be excluded
+                if let Some(header) = final_headers.get(col_i) {
+                    let mut has_match = false;
+
+                    // First try to match on a unique name
+                    if let Some(ids) = exclude_map.get(header) {
+                        has_match = true;
+                        let mut i = 0;
+
+                        for entry in &col_data {
+                            if ids.contains(entry) {
+                                exclude_row_indexes.insert(i);
+                            }
+
+                            i += 1;
+                        }
+                    }
+
+                    // If that doesn't work, try to match this header to a general
+                    // name. Because of the way that the header name selection works
+                    // this is guaranteed to only match a single general name, since
+                    // if the query required the use of unique names those would be
+                    // used for the headers. If they are not being used, it's because
+                    // only one of the levels with this general name is present.
+                    if !has_match {
+                        for (k, v) in exclude_map.iter() {
+                            let opt = unique_to_general_name_map.get(k);
+
+                            if let Some(general_name) = opt {
+                                if header == general_name {
+                                   let ids = v;
+
+                                   let mut i = 0;
+
+                                   for entry in &col_data {
+                                       if ids.contains(entry) {
+                                           exclude_row_indexes.insert(i);
+                                       }
+
+                                       i += 1;
+                                   }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Add this information for processing later
+                col_data_map.insert(col_i, col_data);
+            }
+
+            // Here we create the final dataframe by finding the correct data types
+            // and ignoring any rows that need to be excluded.
             for col_i in 0..num_cols {
                 let mut same_type = true;
 
@@ -309,93 +428,92 @@ pub fn logic_layer_aggregation(
                     }
                 }
 
-                let mut col_data: Vec<String> = vec![];
-
-                for df in &dfs {
-                    let c: &Column = &df.columns[col_i];
-                    let rows = c.stringify_column_data();
-                    col_data = [&col_data[..], &rows[..]].concat()
-                }
+                let col_data = &col_data_map[&col_i];
+                let col_data: Vec<String> = col_data.iter()
+                    .enumerate()
+                    .filter(|&(i, _)| !exclude_row_indexes.contains(&i) )
+                    .map(|(_, e) | e.to_string())
+                    .collect();
 
                 // When returning data from multiple levels from the same
                 // hierarchy, there is a chance that this column will have
                 // multiple data types. In those cases, we will convert the
                 // whole column to string values.
                 if same_type {
-                    let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
-
-                    match first_col.column_data {
+                    let column_data = match first_col.column_data {
                         ColumnData::Int8(_) => {
-                            column_data = ColumnData::Int8(consolidate_column_data!(&col_data, i8));
+                            ColumnData::Int8(consolidate_column_data!(&col_data, i8))
                         },
                         ColumnData::Int16(_) => {
-                            column_data = ColumnData::Int16(consolidate_column_data!(&col_data, i16));
+                            ColumnData::Int16(consolidate_column_data!(&col_data, i16))
                         },
                         ColumnData::Int32(_) => {
-                            column_data = ColumnData::Int32(consolidate_column_data!(&col_data, i32));
+                            ColumnData::Int32(consolidate_column_data!(&col_data, i32))
                         },
                         ColumnData::Int64(_) => {
-                            column_data = ColumnData::Int64(consolidate_column_data!(&col_data, i64));
+                            ColumnData::Int64(consolidate_column_data!(&col_data, i64))
                         },
                         ColumnData::UInt8(_) => {
-                            column_data = ColumnData::UInt8(consolidate_column_data!(&col_data, u8));
+                            ColumnData::UInt8(consolidate_column_data!(&col_data, u8))
                         },
                         ColumnData::UInt16(_) => {
-                            column_data = ColumnData::UInt16(consolidate_column_data!(&col_data, u16));
+                            ColumnData::UInt16(consolidate_column_data!(&col_data, u16))
                         },
                         ColumnData::UInt32(_) => {
-                            column_data = ColumnData::UInt32(consolidate_column_data!(&col_data, u32));
+                            ColumnData::UInt32(consolidate_column_data!(&col_data, u32))
                         },
                         ColumnData::UInt64(_) => {
-                            column_data = ColumnData::UInt64(consolidate_column_data!(&col_data, u64));
+                            ColumnData::UInt64(consolidate_column_data!(&col_data, u64))
                         },
                         ColumnData::Float32(_) => {
-                            column_data = ColumnData::Float32(consolidate_column_data!(&col_data, f32));
+                            ColumnData::Float32(consolidate_column_data!(&col_data, f32))
                         },
                         ColumnData::Float64(_) => {
-                            column_data = ColumnData::Float64(consolidate_column_data!(&col_data, f64));
+                            ColumnData::Float64(consolidate_column_data!(&col_data, f64))
                         },
                         ColumnData::NullableInt8(_) => {
-                            column_data = ColumnData::NullableInt8(consolidate_null_column_data!(&col_data, i8));
+                            ColumnData::NullableInt8(consolidate_null_column_data!(&col_data, i8))
                         },
                         ColumnData::NullableInt16(_) => {
-                            column_data = ColumnData::NullableInt16(consolidate_null_column_data!(&col_data, i16));
+                            ColumnData::NullableInt16(consolidate_null_column_data!(&col_data, i16))
                         },
                         ColumnData::NullableInt32(_) => {
-                            column_data = ColumnData::NullableInt32(consolidate_null_column_data!(&col_data, i32));
+                            ColumnData::NullableInt32(consolidate_null_column_data!(&col_data, i32))
                         },
                         ColumnData::NullableInt64(_) => {
-                            column_data = ColumnData::NullableInt64(consolidate_null_column_data!(&col_data, i64));
+                            ColumnData::NullableInt64(consolidate_null_column_data!(&col_data, i64))
                         },
                         ColumnData::NullableUInt8(_) => {
-                            column_data = ColumnData::NullableUInt8(consolidate_null_column_data!(&col_data, u8));
+                            ColumnData::NullableUInt8(consolidate_null_column_data!(&col_data, u8))
                         },
                         ColumnData::NullableUInt16(_) => {
-                            column_data = ColumnData::NullableUInt16(consolidate_null_column_data!(&col_data, u16));
+                            ColumnData::NullableUInt16(consolidate_null_column_data!(&col_data, u16))
                         },
                         ColumnData::NullableUInt32(_) => {
-                            column_data = ColumnData::NullableUInt32(consolidate_null_column_data!(&col_data, u32));
+                            ColumnData::NullableUInt32(consolidate_null_column_data!(&col_data, u32))
                         },
                         ColumnData::NullableUInt64(_) => {
-                            column_data = ColumnData::NullableUInt64(consolidate_null_column_data!(&col_data, u64));
+                            ColumnData::NullableUInt64(consolidate_null_column_data!(&col_data, u64))
                         },
                         ColumnData::NullableFloat32(_) => {
-                            column_data = ColumnData::NullableFloat32(consolidate_null_column_data!(&col_data, f32));
+                            ColumnData::NullableFloat32(consolidate_null_column_data!(&col_data, f32))
                         },
                         ColumnData::NullableFloat64(_) => {
-                            column_data = ColumnData::NullableFloat64(consolidate_null_column_data!(&col_data, f64));
+                            ColumnData::NullableFloat64(consolidate_null_column_data!(&col_data, f64))
                         },
                         ColumnData::NullableText(_) => {
-                            column_data = ColumnData::NullableText(col_data.iter().map(|x| {
+                            ColumnData::NullableText(col_data.iter().map(|x| {
                                 if x == "" {
                                     None
                                 } else {
                                     Some(x.clone())
                                 }
-                            }).collect());
+                            }).collect())
                         }
-                        _ => ()
-                    }
+                        _ => {
+                            ColumnData::Text(col_data.clone())
+                        }
+                    };
 
                     final_columns.push(Column {
                         name: "placeholder".to_string(),
@@ -404,7 +522,7 @@ pub fn logic_layer_aggregation(
                 } else {
                     final_columns.push(Column {
                         name: "placeholder".to_string(),
-                        column_data: ColumnData::Text(col_data)
+                        column_data: ColumnData::Text(col_data.clone())
                     });
                 }
             }
