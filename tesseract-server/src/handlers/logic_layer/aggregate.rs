@@ -440,7 +440,7 @@ pub fn logic_layer_aggregation(
                 // multiple data types. In those cases, we will convert the
                 // whole column to string values.
                 if same_type {
-                    let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
+                    let mut column_data: ColumnData = ColumnData::Text(vec![]);
 
                     match first_col.column_data {
                         ColumnData::Int8(_) => {
@@ -512,7 +512,9 @@ pub fn logic_layer_aggregation(
                                 }
                             }).collect());
                         }
-                        _ => ()
+                        _ => {
+                            column_data = ColumnData::Text(col_data.clone());
+                        }
                     }
 
                     final_columns.push(Column {
