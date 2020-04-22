@@ -137,10 +137,10 @@ impl LogicLayerQueryOpt {
 
         match &self.exclude {
             Some(arg) => {
-                let levels: Vec<String> = arg.split(";").map(|s| s.to_string()).collect();
+                let levels: Vec<&str> = arg.split(";").collect();
 
                 for level in levels {
-                    let parts: Vec<String> = level.split(":").map(|s| s.to_string()).collect();
+                    let parts: Vec<&str> = level.split(":").collect();
 
                     let level_name = match parts.get(0) {
                         Some(level_name) => level_name,
@@ -152,9 +152,9 @@ impl LogicLayerQueryOpt {
                         None => continue
                     };
 
-                    let level_ids: Vec<String> = level_ids.split(",").map(|s| s.to_string()).collect();
+                    let level_ids: Vec<&str> = level_ids.split(",").collect();
 
-                    let level_ids_set: HashSet<String> = level_ids.into_iter().collect();
+                    let level_ids_set: HashSet<String> = level_ids.into_iter().map(|s| s.to_string()).collect();
 
                     // Since we are filtering on IDs, we need to add an `ID` suffix here.
                     excludes.insert(
@@ -334,7 +334,7 @@ pub fn logic_layer_aggregation(
                 None => return Err(format_err!("No dataframes were returned."))
             };
 
-            let mut exclude_row_indexes: HashSet<i32> = HashSet::new();
+            let mut exclude_row_indexes: HashSet<usize> = HashSet::new();
             let mut col_data_map: HashMap<usize, Vec<String>> = HashMap::new();
 
             let mut unique_to_general_name_map: HashMap<String, String> = HashMap::new();
@@ -429,88 +429,82 @@ pub fn logic_layer_aggregation(
                 }
 
                 let col_data = &col_data_map[&col_i];
-
-                let mut final_col_data: Vec<String> = vec![];
-                let mut i = 0;
-
-                for entry in col_data {
-                    if !exclude_row_indexes.contains(&i) {
-                        final_col_data.push(entry.clone());
-                    }
-
-                    i += 1;
-                }
+                let col_data: Vec<String> = col_data.iter()
+                    .enumerate()
+                    .filter(|&(i, _)| !exclude_row_indexes.contains(&i) )
+                    .map(|(_, e) | e.to_string())
+                    .collect();
 
                 // When returning data from multiple levels from the same
                 // hierarchy, there is a chance that this column will have
                 // multiple data types. In those cases, we will convert the
                 // whole column to string values.
                 if same_type {
-                    let mut column_data: ColumnData = ColumnData::Text(final_col_data.clone());
+                    let mut column_data: ColumnData = ColumnData::Text(col_data.clone());
 
                     match first_col.column_data {
                         ColumnData::Int8(_) => {
-                            column_data = ColumnData::Int8(consolidate_column_data!(&final_col_data, i8));
+                            column_data = ColumnData::Int8(consolidate_column_data!(&col_data, i8));
                         },
                         ColumnData::Int16(_) => {
-                            column_data = ColumnData::Int16(consolidate_column_data!(&final_col_data, i16));
+                            column_data = ColumnData::Int16(consolidate_column_data!(&col_data, i16));
                         },
                         ColumnData::Int32(_) => {
-                            column_data = ColumnData::Int32(consolidate_column_data!(&final_col_data, i32));
+                            column_data = ColumnData::Int32(consolidate_column_data!(&col_data, i32));
                         },
                         ColumnData::Int64(_) => {
-                            column_data = ColumnData::Int64(consolidate_column_data!(&final_col_data, i64));
+                            column_data = ColumnData::Int64(consolidate_column_data!(&col_data, i64));
                         },
                         ColumnData::UInt8(_) => {
-                            column_data = ColumnData::UInt8(consolidate_column_data!(&final_col_data, u8));
+                            column_data = ColumnData::UInt8(consolidate_column_data!(&col_data, u8));
                         },
                         ColumnData::UInt16(_) => {
-                            column_data = ColumnData::UInt16(consolidate_column_data!(&final_col_data, u16));
+                            column_data = ColumnData::UInt16(consolidate_column_data!(&col_data, u16));
                         },
                         ColumnData::UInt32(_) => {
-                            column_data = ColumnData::UInt32(consolidate_column_data!(&final_col_data, u32));
+                            column_data = ColumnData::UInt32(consolidate_column_data!(&col_data, u32));
                         },
                         ColumnData::UInt64(_) => {
-                            column_data = ColumnData::UInt64(consolidate_column_data!(&final_col_data, u64));
+                            column_data = ColumnData::UInt64(consolidate_column_data!(&col_data, u64));
                         },
                         ColumnData::Float32(_) => {
-                            column_data = ColumnData::Float32(consolidate_column_data!(&final_col_data, f32));
+                            column_data = ColumnData::Float32(consolidate_column_data!(&col_data, f32));
                         },
                         ColumnData::Float64(_) => {
-                            column_data = ColumnData::Float64(consolidate_column_data!(&final_col_data, f64));
+                            column_data = ColumnData::Float64(consolidate_column_data!(&col_data, f64));
                         },
                         ColumnData::NullableInt8(_) => {
-                            column_data = ColumnData::NullableInt8(consolidate_null_column_data!(&final_col_data, i8));
+                            column_data = ColumnData::NullableInt8(consolidate_null_column_data!(&col_data, i8));
                         },
                         ColumnData::NullableInt16(_) => {
-                            column_data = ColumnData::NullableInt16(consolidate_null_column_data!(&final_col_data, i16));
+                            column_data = ColumnData::NullableInt16(consolidate_null_column_data!(&col_data, i16));
                         },
                         ColumnData::NullableInt32(_) => {
-                            column_data = ColumnData::NullableInt32(consolidate_null_column_data!(&final_col_data, i32));
+                            column_data = ColumnData::NullableInt32(consolidate_null_column_data!(&col_data, i32));
                         },
                         ColumnData::NullableInt64(_) => {
-                            column_data = ColumnData::NullableInt64(consolidate_null_column_data!(&final_col_data, i64));
+                            column_data = ColumnData::NullableInt64(consolidate_null_column_data!(&col_data, i64));
                         },
                         ColumnData::NullableUInt8(_) => {
-                            column_data = ColumnData::NullableUInt8(consolidate_null_column_data!(&final_col_data, u8));
+                            column_data = ColumnData::NullableUInt8(consolidate_null_column_data!(&col_data, u8));
                         },
                         ColumnData::NullableUInt16(_) => {
-                            column_data = ColumnData::NullableUInt16(consolidate_null_column_data!(&final_col_data, u16));
+                            column_data = ColumnData::NullableUInt16(consolidate_null_column_data!(&col_data, u16));
                         },
                         ColumnData::NullableUInt32(_) => {
-                            column_data = ColumnData::NullableUInt32(consolidate_null_column_data!(&final_col_data, u32));
+                            column_data = ColumnData::NullableUInt32(consolidate_null_column_data!(&col_data, u32));
                         },
                         ColumnData::NullableUInt64(_) => {
-                            column_data = ColumnData::NullableUInt64(consolidate_null_column_data!(&final_col_data, u64));
+                            column_data = ColumnData::NullableUInt64(consolidate_null_column_data!(&col_data, u64));
                         },
                         ColumnData::NullableFloat32(_) => {
-                            column_data = ColumnData::NullableFloat32(consolidate_null_column_data!(&final_col_data, f32));
+                            column_data = ColumnData::NullableFloat32(consolidate_null_column_data!(&col_data, f32));
                         },
                         ColumnData::NullableFloat64(_) => {
-                            column_data = ColumnData::NullableFloat64(consolidate_null_column_data!(&final_col_data, f64));
+                            column_data = ColumnData::NullableFloat64(consolidate_null_column_data!(&col_data, f64));
                         },
                         ColumnData::NullableText(_) => {
-                            column_data = ColumnData::NullableText(final_col_data.iter().map(|x| {
+                            column_data = ColumnData::NullableText(col_data.iter().map(|x| {
                                 if x == "" {
                                     None
                                 } else {
@@ -528,7 +522,7 @@ pub fn logic_layer_aggregation(
                 } else {
                     final_columns.push(Column {
                         name: "placeholder".to_string(),
-                        column_data: ColumnData::Text(final_col_data.clone())
+                        column_data: ColumnData::Text(col_data.clone())
                     });
                 }
             }
