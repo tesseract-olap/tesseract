@@ -184,7 +184,9 @@ pub fn primary_agg(
             agg_sql_string_select_mea(&m.aggregator, i)
         });
     let select_mea_cols = join(select_mea_cols, ", ");
-
+    // The alias counter is meant to track distinct subquery joins
+    // to allow a unique alias per query to avoid issues with joined_subquery_requires_alias
+    let mut alias_counter = 0;
     for dim_subquery in dim_subqueries {
         // This section needed to accumulate the dim cols that are being selected over
         // the recursive joins.
@@ -197,15 +199,17 @@ pub fn primary_agg(
         } else {
             "".to_owned()
         };
-
         // Now construct subquery
-        sub_queries = format!("SELECT {}{} FROM ({}) ALL INNER JOIN ({}) USING {}",
+        sub_queries = format!("SELECT {}{} FROM ({}) ALIAS{} ALL INNER JOIN ({}) ALIAS{} USING {}",
             sub_queries_dim_cols,
             select_mea_cols,
             dim_subquery.sql,
+            alias_counter,
             sub_queries,
+            alias_counter + 1,
             dim_subquery.foreign_key
         );
+        alias_counter += 1;
     }
 
     // Finally, wrap with final agg and result
