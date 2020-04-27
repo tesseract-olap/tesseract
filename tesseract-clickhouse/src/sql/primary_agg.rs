@@ -42,14 +42,10 @@ pub fn primary_agg(
     //
     // So just swap the primary key DimSubquery to the head
 
+    // Loop through all drilldowns. Collect any drilldown that either references an
+    // inline table OR a table that is not the fact table
     let mut ext_drills: Vec<_> = drills.iter()
-        .filter(|d| {
-            if d.inline_table.is_some() {
-                true
-            } else {
-                d.table.name != table.name
-            }
-        })
+        .filter(|d| d.inline_table.is_some() || (d.table.name != table.name))
         .collect();
 
     let ext_cuts: Vec<_> = cuts.iter()
@@ -57,46 +53,28 @@ pub fn primary_agg(
         .collect();
     let ext_cuts_for_inline = ext_cuts.clone();
 
+    // An inline drilldown is one that only relies on the fact table
     let inline_drills: Vec<_> = drills.iter()
-        .filter(|d| {
-            if d.inline_table.is_some() {
-                false
-            } else {
-                d.table.name == table.name
-            }
-        })
+        .filter(|d| d.table.name == table.name && d.inline_table.is_none())
         .collect();
 
     let inline_cuts: Vec<_> = cuts.iter()
-        .filter(|c| c.table.name == table.name && !c.inline_table.is_some())
+        .filter(|c| c.table.name == table.name && c.inline_table.is_none())
         .collect();
 
     let mut dim_subqueries = vec![];
 
-    // external drill and cuts section
-
+    // For each of the external drilldowns, we will need to add a subquery
     while let Some(drill) = ext_drills.pop() {
-        // TODO can this be removed?
-//        if let Some(idx) = ext_cuts.iter().position(|c| c.table == drill.table) { // TODO bug here, can't just match on table
-//            let cut = ext_cuts.swap_remove(idx);
-//
-//            dim_subqueries.push(
-//                dim_subquery(Some(drill),Some(cut))
-//            );
-//        } else {
-            dim_subqueries.push(
-                dim_subquery(Some(drill), None)
-            );
-//        }
+        dim_subqueries.push(
+            dim_subquery(Some(drill), None)
+        );
     }
-    // TODO can this be removed entirely?
-//
-//    for cut in &ext_cuts {
-//        dim_subqueries.push(
-//            dim_subquery(None, Some(cut))
-//        );
-//    }
 
+    // If the table has a primary key set, check all the subqueries and find if any of them
+    // have a foreign key that equals the table's primary key.
+    // If this is the case, make that subquery first in the list.
+    // TODO: Could be better to explicitly allow schema writer to send a value for JOIN priority
     if let Some(ref primary_key) = table.primary_key {
         if let Some(idx) = dim_subqueries.iter().position(|d| d.foreign_key == *primary_key) {
             dim_subqueries.swap(0, idx);
@@ -118,8 +96,7 @@ pub fn primary_agg(
         .map(|(i, m)| {
             // should return "m.aggregator({m.col}) as m{i}" for simple cases
             agg_sql_string_pass_1(&m.column, &m.aggregator, i)
-        }
-        );
+        });
     let mea_cols = join(mea_cols, ", ");
 
     let inline_dim_cols = inline_drills.iter().map(|d| d.col_alias_string());
@@ -134,14 +111,14 @@ pub fn primary_agg(
     let hidden_drills = hidden_drills.map(|ds| ds.to_vec()).unwrap_or(vec![]);
     let hidden_dim_cols = join(hidden_drills.iter().map(|d| d.drilldown_sql.col_alias_string()), ", ");
 
-    let mut fact_sql = format!("select {}", all_fact_dim_cols);
+    let mut fact_sql = format!("SELECT {}", all_fact_dim_cols);
 
     // done separately so that it isn't projected up the subqueries
     if !hidden_drills.is_empty() {
         fact_sql.push_str(&format!(", {}", hidden_dim_cols));
     }
 
-    fact_sql.push_str(&format!(", {} from {}", mea_cols, table.name));
+    fact_sql.push_str(&format!(", {} FROM {}", mea_cols, table.name));
 
     if (inline_cuts.len() > 0) || (ext_cuts_for_inline.len() > 0) {
         let inline_cut_clause = inline_cuts
@@ -162,13 +139,13 @@ pub fn primary_agg(
                 if c.members.is_empty() {
                     // this case is for default hierarchy
                     // in multiple hierarchies
-                    format!("{} in (select {} from {})",
+                    format!("{} in (SELECT {} FROM {})",
                         c.foreign_key,
                         c.primary_key,
                         cut_table,
                     )
                 } else {
-                    format!("{} in (select {} from {} where {})",
+                    format!("{} IN (SELECT {} FROM {} WHERE {})",
                         c.foreign_key,
                         c.primary_key,
                         cut_table,
@@ -177,12 +154,12 @@ pub fn primary_agg(
                 }
             });
 
-        let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "and ");
+        let cut_clause = join(inline_cut_clause.chain(ext_cut_clause), "AND ");
 
-        fact_sql.push_str(&format!(" where {}", cut_clause));
+        fact_sql.push_str(&format!(" WHERE {}", cut_clause));
     }
 
-    fact_sql.push_str(&format!(" group by {}", all_fact_dim_aliass));
+    fact_sql.push_str(&format!(" GROUP BY {}", all_fact_dim_aliass));
 
     // done separately so that it isn't projected up the subqueries
     if !hidden_drills.is_empty() {
@@ -207,7 +184,9 @@ pub fn primary_agg(
             agg_sql_string_select_mea(&m.aggregator, i)
         });
     let select_mea_cols = join(select_mea_cols, ", ");
-
+    // The alias counter is meant to track distinct subquery joins
+    // to allow a unique alias per query to avoid issues with joined_subquery_requires_alias
+    let mut alias_counter = 0;
     for dim_subquery in dim_subqueries {
         // This section needed to accumulate the dim cols that are being selected over
         // the recursive joins.
@@ -220,15 +199,17 @@ pub fn primary_agg(
         } else {
             "".to_owned()
         };
-
         // Now construct subquery
-        sub_queries = format!("select {}{} from ({}) all inner join ({}) using {}",
+        sub_queries = format!("SELECT {}{} FROM ({}) ALIAS{} ALL INNER JOIN ({}) ALIAS{} USING {}",
             sub_queries_dim_cols,
             select_mea_cols,
             dim_subquery.sql,
+            alias_counter,
             sub_queries,
+            alias_counter + 1,
             dim_subquery.foreign_key
         );
+        alias_counter += 1;
     }
 
     // Finally, wrap with final agg and result
@@ -242,7 +223,7 @@ pub fn primary_agg(
     let final_mea_cols = join(final_mea_cols, ", ");
 
     // This is the final result of the groupings.
-    let final_sql = format!("select {}, {} from ({}) group by {}",
+    let final_sql = format!("SELECT {}, {} FROM ({}) GROUP BY {}",
         final_drill_cols,
         final_mea_cols,
         sub_queries,
