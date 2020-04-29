@@ -21,7 +21,7 @@ use crate::handlers::util::validate_members;
 use crate::app::AppState;
 use crate::errors::ServerError;
 use super::util::{boxed_error_http_response, verify_authorization, format_to_content_type, generate_source_data};
-
+use r2d2_redis::{redis};
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
@@ -100,6 +100,28 @@ pub fn do_aggregate(
 
     info!("Sql query: {}", sql);
     info!("Headers: {:?}", headers);
+    
+    let redis_pool = req.state().redis_pool.clone();
+    let cache_key = format!("{}-{:?}", &sql, &format);
+    // Check if SQL is in Redis
+    if let Some(rpool) =  &redis_pool {
+        let conn_result = rpool.get();
+        // Check cache...
+        if let Ok(mut conn) = conn_result {
+            let redis_cache_result = redis::cmd("GET").arg(&cache_key).query(&mut *conn);
+            if let Ok(result_str) = redis_cache_result {
+                let result_str: &String = &result_str;
+                let content_type = format_to_content_type(&format);
+                let response = HttpResponse::Ok()
+                .set(content_type)
+                    .body(result_str);
+                return Box::new(future::result(Ok(response)));
+            }
+        } else {
+            debug!("Failed to get redis pool handle!");
+        }
+        // cache miss!
+    }
 
     req.state()
         .backend
@@ -109,6 +131,14 @@ pub fn do_aggregate(
 
             match format_records(&headers, df, format, source_data, false) {
                 Ok(res) => {
+                    if let Some(rpool) = &redis_pool { // if user set redis 
+                        if let Ok(mut conn) = rpool.get() { // if able to get pool handle
+                            let rs: redis::RedisResult<String> = redis::cmd("SET").arg(&cache_key).arg(&res).query(&mut *conn);
+                            if rs.is_err() {
+                                debug!("Error occured when trying to save key: {}", &cache_key);
+                            }
+                        }
+                    }
                     Ok(HttpResponse::Ok()
                         .set(content_type)
                         .body(res))
