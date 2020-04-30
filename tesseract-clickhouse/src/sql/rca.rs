@@ -251,7 +251,7 @@ pub fn calculate(
 
     // now do the final join
 
-    let mut final_sql = format!("select * from ({}) all inner join ({}) using {}",
+    let mut final_sql = format!("select * from ({}) RCAALIAS1 all inner join ({}) RCAALIAS2 using {}",
         ac,
         bd,
         b_final_drills,
