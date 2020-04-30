@@ -1,8 +1,6 @@
 use jsonwebtoken::{decode, Validation};
 use serde_derive::{Serialize, Deserialize};
-use log;
-use actix_web::middleware::{Middleware, Started};
-use actix_web::{HttpRequest, HttpResponse, Result, FutureResponse};
+use actix_web::{HttpRequest};
 pub const X_TESSERACT_JWT_TOKEN: &str = "x-tesseract-jwt-token";
 use crate::app::AppState;
 use tesseract_core::{DEFAULT_ALLOWED_ACCESS};

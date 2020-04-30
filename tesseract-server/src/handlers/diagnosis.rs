@@ -46,7 +46,7 @@ pub fn diagnosis_handler(
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DiagnosisQueryOpt {
-    pub cube: String,
+    pub cube: Option<String>,
 }
 
 
@@ -76,15 +76,56 @@ pub fn perform_diagnosis(
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
     };
 
-    let cube = match schema.get_cube_by_name(&query_opt.cube) {
-        Ok(c) => c,
-        Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
-    };
+    // If a cube name was provided, we try to match that,
+    // otherwise we will diagnose all cubes this user has access to
+    match query_opt.cube {
+        Some(cube_name) => {
+            match schema.get_cube_by_name(&cube_name) {
+                Ok(cube) => {
+                    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
+                        return Ok(err);
+                    }
 
-    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
-        return Ok(err);
+                    let (error_types, error_messages) = diagnose_cube(&req, cube);
+
+                    format_diagnosis_response(error_types, error_messages, format, None)
+                },
+                Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
+            }
+        },
+        None => {
+            let mut error_cubes: Vec<String> = vec![];
+            let mut error_types: Vec<String> = vec![];
+            let mut error_messages: Vec<String> = vec![];
+
+            for cube in &schema.cubes {
+                if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
+                    continue;
+                }
+
+                let (new_error_types, new_error_messages) = diagnose_cube(&req, &cube);
+
+                // Add these to the overall list
+                if new_error_types.len() != 0 {
+                    let mut new_error_cubes: Vec<String> = vec![];
+
+                    for i in 0..new_error_types.len() {
+                        new_error_cubes.push(cube.name.clone());
+                    }
+
+                    error_cubes.extend(new_error_cubes);
+                    error_types.extend(new_error_types);
+                    error_messages.extend(new_error_messages);
+                }
+            }
+
+            format_diagnosis_response(error_types, error_messages, format, Some(error_cubes))
+        }
     }
+}
 
+
+fn diagnose_cube(req: &HttpRequest<AppState>, cube: &Cube) -> (Vec<String>, Vec<String>) {
     let mut error_types: Vec<String> = vec![];
     let mut error_messages: Vec<String> = vec![];
 
@@ -170,21 +211,56 @@ pub fn perform_diagnosis(
         }
     }
 
+    (error_types, error_messages)
+}
+
+
+fn format_diagnosis_response(
+        error_types: Vec<String>,
+        error_messages: Vec<String>,
+        format: FormatType,
+        error_cubes: Option<Vec<String>>
+) -> ActixResult<HttpResponse> {
     if error_messages.len() == 0 {
         Ok(HttpResponse::Ok().json("Success.".to_string()))
     } else {
-        let df = DataFrame { columns: vec![
-            Column {
-                name: "type".to_string(),
-                column_data: ColumnData::Text(error_types)
-            },
-            Column {
-                name: "message".to_string(),
-                column_data: ColumnData::Text(error_messages)
-            }
-        ] };
+        let headers = if error_cubes.is_some() {
+            vec!["cube".to_string(), "type".to_string(), "message".to_string()]
+        } else {
+            vec!["type".to_string(), "message".to_string()]
+        };
 
-        let headers = vec!["type".to_string(), "message".to_string()];
+        let df = match error_cubes {
+            Some(error_cubes) => {
+                DataFrame { columns: vec![
+                    Column {
+                        name: "cube".to_string(),
+                        column_data: ColumnData::Text(error_cubes)
+                    },
+                    Column {
+                        name: "type".to_string(),
+                        column_data: ColumnData::Text(error_types)
+                    },
+                    Column {
+                        name: "message".to_string(),
+                        column_data: ColumnData::Text(error_messages)
+                    }
+                ] }
+            },
+            None => {
+                DataFrame { columns: vec![
+                    Column {
+                        name: "type".to_string(),
+                        column_data: ColumnData::Text(error_types)
+                    },
+                    Column {
+                        name: "message".to_string(),
+                        column_data: ColumnData::Text(error_messages)
+                    }
+                ] }
+            }
+        };
+
         let content_type = format_to_content_type(&format);
 
         match format_records(&headers, df, format, None, true) {
@@ -197,6 +273,7 @@ pub fn perform_diagnosis(
         }
     }
 }
+
 
 fn get_res_df(req: &HttpRequest<AppState>, sql_str: String) -> Result<DataFrame, Error> {
     req.state().backend
