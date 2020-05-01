@@ -179,12 +179,12 @@ fn main() -> Result<(), Error> {
             let manager = RedisConnectionManager::new(conn_str).expect("Failed to connect to redis");
             let pool: r2d2::Pool<RedisConnectionManager> = r2d2::Pool::builder()
                 .connection_timeout(if let Some(val) = redis_connection_timeout{
-                    std::time::Duration::from_secs(val.parse::<u64>().unwrap())
+                    std::time::Duration::from_secs(val.parse::<u64>().expect("Invalid value for TESSERACT_REDIS_TIMEOUT"))
                 } else {
                     std::time::Duration::from_secs(20) // default connection time out 10 seconds
                 })
                 .max_size(if let Some(rms_val) = redis_max_size{
-                    rms_val.parse::<u32>().unwrap()
+                    rms_val.parse::<u32>().expect("Invalid value for TESSERACT_REDIS_MAX_SIZE")
                 } else {
                     25 // default max size 25
                 })
