@@ -6,6 +6,8 @@ use log::*;
 use std::time::{Duration, Instant};
 use tesseract_core::{Backend, DataFrame, QueryIr};
 
+use regex::Regex;
+
 mod df;
 mod sql;
 
@@ -22,6 +24,15 @@ pub struct Clickhouse {
 
 impl Clickhouse {
     pub fn from_url(url: &str) -> Result<Self, Error> {
+        let rg = Regex::new(r"(?:readonly=)[0-2]").unwrap();
+
+        let mut read_only = "";
+        if rg.captures(url).is_none() {
+            read_only = "?readonly=1";
+        }
+
+        let url = format!("{}{}", url, read_only);
+
         let options = format!("tcp://{}", url).parse::<Options>()?;
 
         let options = options
