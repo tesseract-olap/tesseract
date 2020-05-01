@@ -135,7 +135,7 @@ pub fn do_aggregate(
                         if let Ok(mut conn) = rpool.get() { // if able to get pool handle
                             let rs: redis::RedisResult<String> = redis::cmd("SET").arg(&cache_key).arg(&res).query(&mut *conn);
                             if rs.is_err() {
-                                debug!("Error occured when trying to save key: {}", &cache_key);
+                                debug!("Error occurred when trying to save key: {}", &cache_key);
                             }
                         }
                     }

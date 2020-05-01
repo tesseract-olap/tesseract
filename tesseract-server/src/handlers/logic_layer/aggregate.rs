@@ -1,18 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::str;
 
-use actix_web::{
-    AsyncResponder,
-    FutureResponse,
-    HttpRequest,
-    HttpResponse,
-    Path,
-};
+use actix_web::{AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path, Request};
 use failure::{Error, format_err, bail};
 use futures::future;
 use futures::future::*;
 use lazy_static::lazy_static;
 use log::*;
+use r2d2_redis::{redis};
 use serde_qs as qs;
 use serde_derive::Deserialize;
 use url::Url;
@@ -235,6 +230,31 @@ pub fn logic_layer_aggregation(
 
     if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
         return boxed_error_http_response(err);
+    }
+
+    // First, check if this query is cached
+    let redis_pool = req.state().redis_pool.clone();
+    let cache_key = get_cache_key(&req, &format);
+
+    if let Some(rpool) = &redis_pool {
+        let conn_result = rpool.get();
+
+        if let Ok(mut conn) = conn_result {
+            let redis_cache_result = redis::cmd("GET").arg(&cache_key).query(&mut *conn);
+
+            if let Ok(result_str) = redis_cache_result {
+                let result_str: &String = &result_str;
+                let content_type = format_to_content_type(&format);
+                let response = HttpResponse::Ok()
+                    .set(content_type)
+                    .body(result_str);
+
+                return Box::new(future::result(Ok(response)));
+            }
+        } else {
+            debug!("Failed to get redis pool handle!");
+        }
+        // Cache miss!
     }
 
     let cache = req.state().cache.read().unwrap();
@@ -533,6 +553,15 @@ pub fn logic_layer_aggregation(
 
             match format_records(&final_headers, final_df, format, source_data, false) {
                 Ok(res) => {
+                    if let Some(rpool) = &redis_pool {
+                        if let Ok(mut conn) = rpool.get() {
+                            let rs: redis::RedisResult<String> = redis::cmd("SET").arg(&cache_key).arg(&res).query(&mut *conn);
+                            if rs.is_err() {
+                                debug!("Error occurred when trying to save key: {}", &cache_key);
+                            }
+                        }
+                    }
+
                     Ok(HttpResponse::Ok()
                         .set(content_type)
                         .body(res))
@@ -548,6 +577,31 @@ pub fn logic_layer_aggregation(
             }
         })
         .responder()
+}
+
+
+/// Gets the Redis cache key for a given query.
+/// The sorting of query param keys is an attempt to increase cache hits.
+fn get_cache_key(req: &HttpRequest<AppState>, format: &FormatType) -> String {
+    let mut qry = req.query().clone();
+    qry.remove("x-tesseract-jwt-token");
+
+    let mut qry_keys: Vec<(String, String)> = qry.into_iter().collect();
+    qry_keys.sort_by(|x, y| {x.0.cmp(&y.0)});
+
+    let mut qry_strings: Vec<String> = qry_keys.iter()
+        .map(|x| {
+            format!("{}={}", x.0, x.1)
+        })
+        .collect();
+
+    let format_str = match format {
+        FormatType::Csv => "csv",
+        FormatType::JsonArrays => "jsonarrays",
+        FormatType::JsonRecords => "jsonrecords",
+    };
+
+    format!("{}/{}", format_str, qry_strings.join("&"))
 }
 
 
