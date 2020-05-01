@@ -26,19 +26,6 @@ impl Clickhouse {
     pub fn from_url(url: &str) -> Result<Self, Error> {
         let rg = Regex::new(r"(?:readonly=)[0-2]").unwrap();
 
-        let mut read_only = "";
-        if rg.captures(url).is_none() {
-            if url.contains("default?") {
-                read_only = "&readonly=1";
-                info!("Default: 'only read data queries are allowed'");
-            } else {
-                read_only = "?readonly=1";
-                info!("Default: 'only read data queries are allowed'");
-            }
-        }
-
-        let url = format!("{}{}", url, read_only);
-
         let options = format!("tcp://{}", url).parse::<Options>()?;
 
         let options = options
@@ -46,11 +33,25 @@ impl Clickhouse {
             // simultaneously, each one taking 5s ordinarily) the client will timeout.
             .ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
-        let pool = Pool::new(options);
+        if rg.captures(url).is_none() {
+            let options = options
+            // Default readonly=1 if param is not set
+            .readonly(Some(1));
+            info!("Default: 'only read data queries are allowed");
 
-        Ok(Clickhouse {
-            pool,
-        })
+            let pool = Pool::new(options);
+
+            Ok(Clickhouse {
+                pool,
+            })
+        } else {
+
+            let pool = Pool::new(options);
+
+            Ok(Clickhouse {
+                pool,
+            })
+        }
     }
 }
 
