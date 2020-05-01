@@ -130,7 +130,7 @@ pub fn perform_diagnosis(
                                 None => ()
                             }
                         },
-                        Err(err) => ()
+                        Err(_) => ()
                     }
 
                     // Check for `NonUniqueDimensionIDs`
@@ -163,7 +163,7 @@ pub fn perform_diagnosis(
                                 None => ()
                             }
                         },
-                        Err(err) => ()
+                        Err(_) => ()
                     }
                 }
             }

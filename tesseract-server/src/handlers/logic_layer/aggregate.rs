@@ -24,7 +24,8 @@ use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
     verify_authorization, format_to_content_type, generate_source_data,
-    validate_members
+    validate_members,
+    get_redis_cache_key, check_redis_cache, insert_into_redis_cache
 };
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
@@ -232,29 +233,12 @@ pub fn logic_layer_aggregation(
         return boxed_error_http_response(err);
     }
 
-    // First, check if this query is cached
+    // Check if this query is already cached
     let redis_pool = req.state().redis_pool.clone();
-    let cache_key = get_cache_key(&req, &format);
+    let redis_cache_key = get_redis_cache_key(&req, &format);
 
-    if let Some(rpool) = &redis_pool {
-        let conn_result = rpool.get();
-
-        if let Ok(mut conn) = conn_result {
-            let redis_cache_result = redis::cmd("GET").arg(&cache_key).query(&mut *conn);
-
-            if let Ok(result_str) = redis_cache_result {
-                let result_str: &String = &result_str;
-                let content_type = format_to_content_type(&format);
-                let response = HttpResponse::Ok()
-                    .set(content_type)
-                    .body(result_str);
-
-                return Box::new(future::result(Ok(response)));
-            }
-        } else {
-            debug!("Failed to get redis pool handle!");
-        }
-        // Cache miss!
+    if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
+        return res;
     }
 
     let cache = req.state().cache.read().unwrap();
@@ -553,14 +537,8 @@ pub fn logic_layer_aggregation(
 
             match format_records(&final_headers, final_df, format, source_data, false) {
                 Ok(res) => {
-                    if let Some(rpool) = &redis_pool {
-                        if let Ok(mut conn) = rpool.get() {
-                            let rs: redis::RedisResult<String> = redis::cmd("SET").arg(&cache_key).arg(&res).query(&mut *conn);
-                            if rs.is_err() {
-                                debug!("Error occurred when trying to save key: {}", &cache_key);
-                            }
-                        }
-                    }
+                    // Try to insert this result in the Redis cache, if available
+                    insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
 
                     Ok(HttpResponse::Ok()
                         .set(content_type)
@@ -577,31 +555,6 @@ pub fn logic_layer_aggregation(
             }
         })
         .responder()
-}
-
-
-/// Gets the Redis cache key for a given query.
-/// The sorting of query param keys is an attempt to increase cache hits.
-fn get_cache_key(req: &HttpRequest<AppState>, format: &FormatType) -> String {
-    let mut qry = req.query().clone();
-    qry.remove("x-tesseract-jwt-token");
-
-    let mut qry_keys: Vec<(String, String)> = qry.into_iter().collect();
-    qry_keys.sort_by(|x, y| {x.0.cmp(&y.0)});
-
-    let mut qry_strings: Vec<String> = qry_keys.iter()
-        .map(|x| {
-            format!("{}={}", x.0, x.1)
-        })
-        .collect();
-
-    let format_str = match format {
-        FormatType::Csv => "csv",
-        FormatType::JsonArrays => "jsonarrays",
-        FormatType::JsonRecords => "jsonrecords",
-    };
-
-    format!("{}/{}", format_str, qry_strings.join("&"))
 }
 
 
