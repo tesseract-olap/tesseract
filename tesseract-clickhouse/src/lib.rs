@@ -28,7 +28,13 @@ impl Clickhouse {
 
         let mut read_only = "";
         if rg.captures(url).is_none() {
-            read_only = "?readonly=1";
+            if url.contains("default?") {
+                read_only = "&readonly=1";
+                info!("Default: 'only read data queries are allowed'");
+            } else {
+                read_only = "?readonly=1";
+                info!("Default: 'only read data queries are allowed'");
+            }
         }
 
         let url = format!("{}{}", url, read_only);
