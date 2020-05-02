@@ -36,7 +36,7 @@ impl Clickhouse {
         if rg.captures(url).is_none() {
             let options = options
             // Default readonly=1 if param is not set
-            .readonly(Some(1));
+            .readonly(std::option::Option::Some(1));
             info!("Default: 'only read data queries are allowed");
 
             let pool = Pool::new(options);
