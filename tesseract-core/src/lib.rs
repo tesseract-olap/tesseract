@@ -1257,7 +1257,7 @@ impl Schema {
         Ok(column)
     }
 
-    fn get_mea_col(&self, cube_name: &str, measure: &Measure) -> Result<String, Error> {
+    /* fn get_mea_col(&self, cube_name: &str, measure: &Measure) -> Result<String, Error> {
         let cube = self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
             .ok_or(format_err!("Could not find cube"))?;
@@ -1269,7 +1269,7 @@ impl Schema {
         let column = mea.column.clone();
 
         Ok(column)
-    }
+    } */
 
     pub fn get_cube_by_name(&self, cube_name: &str) -> Result<&Cube, Error> {
         self.cubes.iter()
