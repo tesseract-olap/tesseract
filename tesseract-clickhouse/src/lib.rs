@@ -24,34 +24,23 @@ pub struct Clickhouse {
 
 impl Clickhouse {
     pub fn from_url(url: &str) -> Result<Self, Error> {
-        let rg = Regex::new(r"(?:readonly=)[0-2]").unwrap();
+        let rg = Regex::new(r"(?:readonly=)(?P<id>[0-2])").unwrap();
 
         let options = format!("tcp://{}", url).parse::<Options>()?;
 
         let options = options
-            // Ping timeout is necessary, because under heavy load (100 requests
-            // simultaneously, each one taking 5s ordinarily) the client will timeout.
+            .readonly(match rg.captures(url) { 
+                Some(_) =>  Some(rg.captures(url).unwrap().name("id")
+                                .unwrap().as_str().parse::<u8>().unwrap()),
+                None => Some(1)
+            })
             .ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
-        if rg.captures(url).is_none() {
-            let options = options
-            // Default readonly=1 if param is not set
-            .readonly(std::option::Option::Some(1));
-            info!("Default: 'only read data queries are allowed");
+        let pool = Pool::new(options);
 
-            let pool = Pool::new(options);
-
-            Ok(Clickhouse {
-                pool,
-            })
-        } else {
-
-            let pool = Pool::new(options);
-
-            Ok(Clickhouse {
-                pool,
-            })
-        }
+        Ok(Clickhouse {
+            pool,
+        })
     }
 }
 
