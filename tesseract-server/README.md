@@ -24,6 +24,12 @@ export TESSERACT_FLUSH_SECRET=12345
 export TESSERACT_SCHEMA_FILEPATH=test-schema/schema.json
 ```
 
+## Optional Environment Variables
+|Name|Description|Valid values|
+|----|-----------|------------|
+|TESSERACT_REDIS_MAX_SIZE|Sets the maximum number of simultaneous connections for the Redis cache|Integer|
+|TESSERACT_REDIS_TIMEOUT|Sets the timeout in seconds for Redis connections|Integer|
+
 # API
 
 ## Metadata
