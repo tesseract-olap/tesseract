@@ -20,8 +20,12 @@ use crate::handlers::util::validate_members;
 
 use crate::app::AppState;
 use crate::errors::ServerError;
-use super::util::{boxed_error_http_response, verify_authorization, format_to_content_type, generate_source_data};
-
+use super::util::{
+    boxed_error_http_response, verify_authorization,
+    format_to_content_type, generate_source_data,
+    get_redis_cache_key, check_redis_cache, insert_into_redis_cache
+};
+use r2d2_redis::{redis};
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
@@ -73,9 +77,16 @@ pub fn do_aggregate(
 
     info!("query opts:{:?}", agg_query);
 
+    // Check if this query is already cached
+    let redis_pool = req.state().redis_pool.clone();
+    let redis_cache_key = get_redis_cache_key(&req, &format);
+
+    if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
+        return res;
+    }
+
     // Gets the Source Data
     let source_data = Some(generate_source_data(&cube_obj));
-
 
     // Turn AggregateQueryOpt into Query
     let ts_query: Result<TsQuery, _> = agg_query.try_into();
@@ -100,7 +111,7 @@ pub fn do_aggregate(
 
     info!("Sql query: {}", sql);
     info!("Headers: {:?}", headers);
-
+    
     req.state()
         .backend
         .exec_sql(sql)
@@ -109,6 +120,9 @@ pub fn do_aggregate(
 
             match format_records(&headers, df, format, source_data, false) {
                 Ok(res) => {
+                    // Try to insert this result in the Redis cache, if available
+                    insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
+
                     Ok(HttpResponse::Ok()
                         .set(content_type)
                         .body(res))

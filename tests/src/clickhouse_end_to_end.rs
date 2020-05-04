@@ -180,6 +180,7 @@ mod tests {
                 move|| create_app(
                     false,
                     db.clone(),
+                    None,
                     db_type.clone(),
                     env_vars.clone(),
                     schema_arc.clone(),

@@ -34,6 +34,7 @@ use crate::logic_layer::{Cache, LogicLayerConfig};
 
 use std::sync::{Arc, RwLock};
 use url::Url;
+use r2d2_redis::{r2d2, RedisConnectionManager};
 
 
 /// Holds data about the source of a schema file.
@@ -58,6 +59,7 @@ pub struct EnvVars {
 pub struct AppState {
     pub debug: bool,
     pub backend: Box<dyn Backend + Sync + Send>,
+    pub redis_pool: Option<r2d2::Pool<RedisConnectionManager>>,
     // TODO this is a hack, until a better interface is set up with the Backend Trait
     // to generate its own sql.
     pub db_type: Database,
@@ -75,6 +77,7 @@ pub struct AppState {
 pub fn create_app(
         debug: bool,
         backend: Box<dyn Backend + Sync + Send>,
+        redis_pool: Option<r2d2::Pool<RedisConnectionManager>>,
         db_type: Database,
         env_vars: EnvVars,
         schema: Arc<RwLock<Schema>>,
@@ -88,6 +91,7 @@ pub fn create_app(
             AppState {
                 debug,
                 backend,
+                redis_pool,
                 db_type,
                 env_vars,
                 schema,

@@ -38,7 +38,7 @@ use url::Url;
 use std::sync::{Arc, RwLock};
 
 use crate::app::{EnvVars, SchemaSource, create_app};
-
+use r2d2_redis::{r2d2, RedisConnectionManager};
 
 fn main() -> Result<(), Error> {
     // Configuration
@@ -168,11 +168,42 @@ fn main() -> Result<(), Error> {
         None => None
     };
 
+    let redis_url = env::var("TESSERACT_REDIS_URL").ok();
+
+    // Setup redis pool and settings if enabled by user
+    let redis_pool = match redis_url {
+        Some(conn_str) => {
+            let redis_connection_timeout = env::var("TESSERACT_REDIS_TIMEOUT").ok();
+            let redis_max_size = env::var("TESSERACT_REDIS_MAX_SIZE").ok();
+
+            let manager = RedisConnectionManager::new(conn_str).expect("Failed to connect to redis");
+            let pool: r2d2::Pool<RedisConnectionManager> = r2d2::Pool::builder()
+                .connection_timeout(if let Some(val) = redis_connection_timeout{
+                    std::time::Duration::from_secs(val.parse::<u64>().expect("Invalid value for TESSERACT_REDIS_TIMEOUT"))
+                } else {
+                    std::time::Duration::from_secs(20) // default connection time out 10 seconds
+                })
+                .max_size(if let Some(rms_val) = redis_max_size{
+                    rms_val.parse::<u32>().expect("Invalid value for TESSERACT_REDIS_MAX_SIZE")
+                } else {
+                    25 // default max size 25
+                })
+                .build(manager)
+            .expect("Failed to connect to redis server. Is it running?");
+            Some(pool)
+        },
+        None => None,
+    };
+
     // Initialize Server
     server::new(
         move|| create_app(
                 debug,
                 db.clone(),
+                match &redis_pool {
+                    Some(pool) => Some(pool.clone()),
+                    None => None
+                },
                 db_type.clone(),
                 env_vars.clone(),
                 schema_arc.clone(),

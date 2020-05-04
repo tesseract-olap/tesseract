@@ -1,18 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::str;
 
-use actix_web::{
-    AsyncResponder,
-    FutureResponse,
-    HttpRequest,
-    HttpResponse,
-    Path,
-};
+use actix_web::{AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path, Request};
 use failure::{Error, format_err, bail};
 use futures::future;
 use futures::future::*;
 use lazy_static::lazy_static;
 use log::*;
+use r2d2_redis::{redis};
 use serde_qs as qs;
 use serde_derive::Deserialize;
 use url::Url;
@@ -29,7 +24,8 @@ use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
     verify_authorization, format_to_content_type, generate_source_data,
-    validate_members
+    validate_members,
+    get_redis_cache_key, check_redis_cache, insert_into_redis_cache
 };
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
@@ -235,6 +231,14 @@ pub fn logic_layer_aggregation(
 
     if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
         return boxed_error_http_response(err);
+    }
+
+    // Check if this query is already cached
+    let redis_pool = req.state().redis_pool.clone();
+    let redis_cache_key = get_redis_cache_key(&req, &format);
+
+    if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
+        return res;
     }
 
     let cache = req.state().cache.read().unwrap();
@@ -533,6 +537,9 @@ pub fn logic_layer_aggregation(
 
             match format_records(&final_headers, final_df, format, source_data, false) {
                 Ok(res) => {
+                    // Try to insert this result in the Redis cache, if available
+                    insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
+
                     Ok(HttpResponse::Ok()
                         .set(content_type)
                         .body(res))
