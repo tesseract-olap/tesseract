@@ -296,8 +296,6 @@ pub fn logic_layer_aggregation(
 
         let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
-        info!("LL {:?}", headers);
-
         debug!("Query IR: {:?}", query_ir);
 
         let sql = req.state()
