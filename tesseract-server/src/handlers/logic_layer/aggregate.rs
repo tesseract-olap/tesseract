@@ -192,6 +192,17 @@ macro_rules! consolidate_null_column_data {
     }};
 }
 
+/// Deduplicate drilldown in header
+pub fn deduplicate_vec(string: String) -> String {
+    let mut dedup_vec = vec![];
+    let vec: Vec<&str> = string.split(',').collect();
+    for ele in vec {
+        if !dedup_vec.contains(&ele) {
+            dedup_vec.push(ele);
+            }
+    }
+    dedup_vec.join(",")
+}
 
 /// Performs data aggregation.
 pub fn logic_layer_aggregation(
@@ -217,7 +228,9 @@ pub fn logic_layer_aggregation(
     }
 
     let agg_query_res = QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query);
-    let agg_query = ok_or_404!(agg_query_res);
+    let mut agg_query = ok_or_404!(agg_query_res);
+
+    agg_query.drilldowns = Some(deduplicate_vec(agg_query.drilldowns.expect("Could not convert to string")));
 
     // Check to see if the logic layer config has a alias with the
     // provided cube name
@@ -282,6 +295,8 @@ pub fn logic_layer_aggregation(
             .sql_query(&cube_name, &ts_query, Some(&unique_header_map));
 
         let (query_ir, headers) = ok_or_404!(query_ir_headers);
+
+        info!("LL {:?}", headers);
 
         debug!("Query IR: {:?}", query_ir);
 

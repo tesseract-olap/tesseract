@@ -42,6 +42,18 @@ pub fn aggregate_handler(
     do_aggregate(req, cube_format.into_inner())
 }
 
+/// Deduplicate drilldown in header
+pub fn deduplicate_vec(vec: &[String]) -> Vec<String> {
+    let mut dedup_vec = vec![];
+    let vec = vec.to_vec();
+    for ele in vec {
+        if !dedup_vec.contains(&ele) {
+            dedup_vec.push(ele);
+            }
+    }
+    dedup_vec
+}
+
 
 /// Performs data aggregation.
 pub fn do_aggregate(
@@ -69,7 +81,9 @@ pub fn do_aggregate(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
-    let agg_query = ok_or_404!(agg_query_res);
+    let mut agg_query = ok_or_404!(agg_query_res);
+
+    agg_query.drilldowns = Some(deduplicate_vec(&agg_query.drilldowns.expect("Could not convert to vector")));
 
     info!("query opts:{:?}", agg_query);
 
