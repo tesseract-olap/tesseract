@@ -4,6 +4,23 @@
 
 More documentation is coming soon!
 
+## Setup
+
+### Caching
+
+When using JWT authentication for requests, it is recommended to use Redis as the request cache instead of Nginx. The reason is that Tesseract is able to exclude the JWT token from the URL, which helps increase cache hits. To set up Redis, follow [this](https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-redis-on-ubuntu-18-04) guide.
+
+Once Redis is installed, set the `TESSERACT_REDIS_URL` environment variable to the address and port where Redis is running and restart Tesseract.
+
+**IMPORTANT:** You can customize the cache by setting its max memory limit and eviction policy. Add the following lines to `/etc/redis/redis.conf`:
+
+```
+maxmemory 10gb
+maxmemory-policy allkeys-lru
+```
+
+For more information, refer to [this](https://redis.io/topics/lru-cache) guide.
+
 ## For Users
 
 ### Getting started

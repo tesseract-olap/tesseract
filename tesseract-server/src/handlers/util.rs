@@ -6,7 +6,9 @@ use actix_web::{
 };
 use futures::future::{self};
 use actix_web::http::header::ContentType;
+use log::*;
 use mime;
+use r2d2_redis::{r2d2, redis, RedisConnectionManager};
 
 use tesseract_core::format::FormatType;
 use tesseract_core::schema::Cube;
@@ -42,7 +44,7 @@ pub fn boxed_error_http_response(response: HttpResponse) -> FutureResponse<HttpR
     Box::new(future::result(Ok(response)))
 }
 
-// Genrates the source data/ annotaion of the cube for which the query is executed
+// Generates the source data/annotation of the cube for which the query is executed
 pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
     let cube_name = &cube.name;
     let mut measures = Vec::new();
@@ -146,4 +148,77 @@ pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Erro
         }
     }
     Ok(())
+}
+
+
+/// Gets the Redis cache key for a given query.
+/// The sorting of query param keys is an attempt to increase cache hits.
+pub fn get_redis_cache_key(req: &HttpRequest<AppState>, format: &FormatType) -> String {
+    let mut qry = req.query().clone();
+    qry.remove("x-tesseract-jwt-token");
+
+    let mut qry_keys: Vec<(String, String)> = qry.into_iter().collect();
+    qry_keys.sort_by(|x, y| {x.0.cmp(&y.0)});
+
+    let qry_strings: Vec<String> = qry_keys.iter()
+        .map(|x| {
+            format!("{}={}", x.0, x.1)
+        })
+        .collect();
+
+    let format_str = match format {
+        FormatType::Csv => "csv",
+        FormatType::JsonArrays => "jsonarrays",
+        FormatType::JsonRecords => "jsonrecords",
+    };
+
+    format!("{}/{}", format_str, qry_strings.join("&"))
+}
+
+
+/// Checks if the current query is already cached in Redis.
+pub fn check_redis_cache(
+        format: &FormatType,
+        redis_pool: &Option<r2d2::Pool<RedisConnectionManager>>,
+        redis_cache_key: &str
+) -> Option<FutureResponse<HttpResponse>> {
+    if let Some(rpool) = redis_pool {
+        let conn_result = rpool.get();
+
+        if let Ok(mut conn) = conn_result {
+            let redis_cache_result = redis::cmd("GET").arg(redis_cache_key).query(&mut *conn);
+
+            if let Ok(result_str) = redis_cache_result {
+                let result_str: &String = &result_str;
+                let content_type = format_to_content_type(&format);
+                let response = HttpResponse::Ok()
+                    .set(content_type)
+                    .body(result_str);
+
+                return Some(Box::new(future::result(Ok(response))));
+            }
+        } else {
+            debug!("Failed to get redis pool handle!");
+        }
+        // Cache miss!
+    }
+
+    None
+}
+
+
+/// Inserts a new entry into the Redis cache.
+pub fn insert_into_redis_cache(
+    res: &str,
+    redis_pool: &Option<r2d2::Pool<RedisConnectionManager>>,
+    redis_cache_key: &str
+) {
+    if let Some(rpool) = redis_pool {
+        if let Ok(mut conn) = rpool.get() {
+            let rs: redis::RedisResult<String> = redis::cmd("SET").arg(redis_cache_key).arg(res).query(&mut *conn);
+            if rs.is_err() {
+                debug!("Error occurred when trying to save key: {}", redis_cache_key);
+            }
+        }
+    }
 }
