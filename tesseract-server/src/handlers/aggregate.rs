@@ -16,6 +16,8 @@ use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
+use itertools::Itertools;
+
 use crate::handlers::util::validate_members;
 
 use crate::app::AppState;
@@ -41,19 +43,6 @@ pub fn aggregate_handler(
 {
     do_aggregate(req, cube_format.into_inner())
 }
-
-/// Deduplicate drilldown in header
-pub fn deduplicate_vec(vec: &[String]) -> Vec<String> {
-    let mut dedup_vec = vec![];
-    let vec = vec.to_vec();
-    for ele in vec {
-        if !dedup_vec.contains(&ele) {
-            dedup_vec.push(ele);
-            }
-    }
-    dedup_vec
-}
-
 
 /// Performs data aggregation.
 pub fn do_aggregate(
@@ -81,9 +70,7 @@ pub fn do_aggregate(
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
     }
     let agg_query_res = QS_NON_STRICT.deserialize_str::<AggregateQueryOpt>(&query);
-    let mut agg_query = ok_or_404!(agg_query_res);
-
-    agg_query.drilldowns = Some(deduplicate_vec(&agg_query.drilldowns.expect("Could not convert to vector")));
+    let agg_query = ok_or_404!(agg_query_res);
 
     info!("query opts:{:?}", agg_query);
 
@@ -170,7 +157,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
     fn try_from(agg_query_opt: AggregateQueryOpt) -> Result<Self, Self::Error> {
         let drilldowns: Result<Vec<_>, _> = agg_query_opt.drilldowns
             .map(|ds| {
-                ds.iter().map(|d| d.parse()).collect()
+                ds.iter().unique().map(|d| d.parse()).collect()
             })
             .unwrap_or(Ok(vec![]));
 
