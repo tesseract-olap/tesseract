@@ -23,6 +23,7 @@ structopt = "0.2.13"
 mime = "0.3.13"
 url = "2.1.0"
 jsonwebtoken = "6"
+itertools = "0.9.0"
 
 [dependencies.actix-web]
 version = "0.7.18"
