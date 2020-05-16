@@ -16,6 +16,7 @@ use log::*;
 use serde_qs as qs;
 use serde_derive::Deserialize;
 use url::Url;
+use itertools::Itertools;
 
 use tesseract_core::names::{Cut, Drilldown, Property, Measure, LevelName, Mask};
 use tesseract_core::format::{format_records, FormatType};
@@ -192,18 +193,6 @@ macro_rules! consolidate_null_column_data {
     }};
 }
 
-/// Deduplicate drilldown in header
-pub fn deduplicate_vec(string: String) -> String {
-    let mut dedup_vec = vec![];
-    let vec: Vec<&str> = string.split(',').collect();
-    for ele in vec {
-        if !dedup_vec.contains(&ele) {
-            dedup_vec.push(ele);
-            }
-    }
-    dedup_vec.join(",")
-}
-
 /// Performs data aggregation.
 pub fn logic_layer_aggregation(
     req: HttpRequest<AppState>,
@@ -230,7 +219,8 @@ pub fn logic_layer_aggregation(
     let agg_query_res = QS_NON_STRICT.deserialize_str::<LogicLayerQueryOpt>(query);
     let mut agg_query = ok_or_404!(agg_query_res);
 
-    agg_query.drilldowns = Some(deduplicate_vec(agg_query.drilldowns.expect("Could not convert to string")));
+    agg_query.drilldowns = Some(agg_query.drilldowns.expect("Could not convert to string")
+        .split(',').into_iter().unique().join(","));
 
     // Check to see if the logic layer config has a alias with the
     // provided cube name
