@@ -79,7 +79,7 @@ pub fn do_aggregate(
 
     // Check if this query is already cached
     let redis_pool = req.state().redis_pool.clone();
-    let redis_cache_key = get_redis_cache_key(&req, &format);
+    let redis_cache_key = get_redis_cache_key("core", &req, &cube, &format);
 
     if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
         return res;

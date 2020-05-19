@@ -153,7 +153,7 @@ pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Erro
 
 /// Gets the Redis cache key for a given query.
 /// The sorting of query param keys is an attempt to increase cache hits.
-pub fn get_redis_cache_key(req: &HttpRequest<AppState>, format: &FormatType) -> String {
+pub fn get_redis_cache_key(prefix: &str, req: &HttpRequest<AppState>, cube: &str, format: &FormatType) -> String {
     let mut qry = req.query().clone();
     qry.remove("x-tesseract-jwt-token");
 
@@ -172,7 +172,7 @@ pub fn get_redis_cache_key(req: &HttpRequest<AppState>, format: &FormatType) -> 
         FormatType::JsonRecords => "jsonrecords",
     };
 
-    format!("{}/{}", format_str, qry_strings.join("&"))
+    format!("{}/{}/{}/{}", prefix, cube, format_str, qry_strings.join("&"))
 }
 
 
