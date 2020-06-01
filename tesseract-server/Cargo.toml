@@ -5,7 +5,7 @@ license = "MIT"
 readme = "README.md"
 edition = "2018"
 name = "tesseract-olap"
-version = "0.14.12"
+version = "0.14.13"
 
 [dependencies]
 actix = "0.7.7"

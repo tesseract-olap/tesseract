@@ -1028,7 +1028,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "tesseract-clickhouse 0.1.0",
  "tesseract-core 0.1.0",
- "tesseract-olap 0.14.12",
+ "tesseract-olap 0.14.13",
 ]
 
 [[package]]
@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "tesseract-olap"
-version = "0.14.12"
+version = "0.14.13"
 dependencies = [
  "actix 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 0.7.19 (registry+https://github.com/rust-lang/crates.io-index)",
