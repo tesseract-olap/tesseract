@@ -166,7 +166,7 @@ fn diagnose_cube(req: &HttpRequest<AppState>, cube: &Cube) -> (Vec<String>, Vec<
                                 None => ()
                             }
                         },
-                        Err(_err) => ()
+                        Err(_) => ()
                     }
 
                     // Check for `NonUniqueDimensionIDs`
@@ -199,7 +199,7 @@ fn diagnose_cube(req: &HttpRequest<AppState>, cube: &Cube) -> (Vec<String>, Vec<
                                 None => ()
                             }
                         },
-                        Err(_err) => ()
+                        Err(_) => ()
                     }
                 }
             }
