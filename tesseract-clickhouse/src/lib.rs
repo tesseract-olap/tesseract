@@ -28,16 +28,16 @@ impl Clickhouse {
 
         let options = format!("tcp://{}", url).parse::<Options>()?;
 
-        let options = options
-            .readonly(match rg.captures(url) {
+        let options = options.readonly(
+            match rg.captures(url) {
                 Some(readonly_option) => {
                     let rg_match = readonly_option.name("id").expect("Could not parse a value for readonly").as_str();
                     let num_match = rg_match.parse::<u8>().expect(&format!("Failed to parse {} into a numeric value", rg_match));
                     Some(num_match)
-                            }
+                },
                 None => Some(1)
-            })
-            .ping_timeout(Duration::from_millis(PING_TIMEOUT));
+            }
+        ).ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
         let pool = Pool::new(options);
 
