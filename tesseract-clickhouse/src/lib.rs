@@ -6,6 +6,8 @@ use log::*;
 use std::time::{Duration, Instant};
 use tesseract_core::{Backend, DataFrame, QueryIr};
 
+use regex::Regex;
+
 mod df;
 mod sql;
 
@@ -22,12 +24,20 @@ pub struct Clickhouse {
 
 impl Clickhouse {
     pub fn from_url(url: &str) -> Result<Self, Error> {
+        let rg = Regex::new(r"(?:readonly=)(?P<id>[0-2])").unwrap();
+
         let options = format!("tcp://{}", url).parse::<Options>()?;
 
-        let options = options
-            // Ping timeout is necessary, because under heavy load (100 requests
-            // simultaneously, each one taking 5s ordinarily) the client will timeout.
-            .ping_timeout(Duration::from_millis(PING_TIMEOUT));
+        let options = options.readonly(
+            match rg.captures(url) {
+                Some(readonly_option) => {
+                    let rg_match = readonly_option.name("id").expect("Could not parse a value for readonly").as_str();
+                    let num_match = rg_match.parse::<u8>().expect(&format!("Failed to parse {} into a numeric value", rg_match));
+                    Some(num_match)
+                },
+                None => Some(1)
+            }
+        ).ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
         let pool = Pool::new(options);
 
