@@ -1,9 +1,10 @@
 version: '3'
 services:
   clickhouse:
-    image: yandex/clickhouse-server
+    image: yandex/clickhouse-server:19.3
     ports:
       - 8123:8123
       - 9000:9000
     volumes:
       - ./docker/scripts:/docker-entrypoint-initdb.d
+
