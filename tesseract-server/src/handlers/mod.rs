@@ -2,6 +2,7 @@
 mod util;
 mod aggregate;
 mod aggregate_stream;
+mod cache;
 mod diagnosis;
 mod flush;
 mod index;
@@ -12,6 +13,7 @@ pub use self::aggregate::aggregate_handler;
 pub use self::aggregate::aggregate_default_handler;
 pub use self::aggregate_stream::aggregate_handler as aggregate_stream_handler;
 pub use self::aggregate_stream::aggregate_default_handler as aggregate_stream_default_handler;
+pub use self::cache::cache_refresh_handler;
 pub use self::diagnosis::diagnosis_handler;
 pub use self::diagnosis::diagnosis_default_handler;
 pub use self::logic_layer::logic_layer_handler;

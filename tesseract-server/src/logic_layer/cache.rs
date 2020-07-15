@@ -6,6 +6,8 @@ use std::time::Instant;
 
 use serde_derive::Deserialize;
 
+use futures::future::Future;
+
 use tesseract_core::{Schema, Backend};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::{Level, Cube, InlineTable};
@@ -126,6 +128,35 @@ impl Cache {
             }
         }
         None
+    }
+
+    pub fn refresh_cube_cache(
+            &mut self,
+            cube: &Cube,
+            ll_config: &Option<LogicLayerConfig>,
+            backend: Box<dyn Backend + Sync + Send>,
+            sys: &mut SystemRunner
+    ) {
+
+        for (i, cube_cache) in self.cubes.iter().enumerate() {
+            if cube_cache.name == cube.name {
+                // Create a new CubeCache object for this cube
+
+                let new_cube_cache = match get_cube_cache(&cube, ll_config, backend.clone(), sys) {
+                    Ok(new_cube_cache) => new_cube_cache,
+                    Err(err) => {
+                        // If the update fails for whatever reason, we just keep
+                        // the current version of the CubeCache object
+                        cube_cache.clone()
+                    }
+                };
+
+                self.cubes[i] = new_cube_cache;
+
+                break;
+            }
+        }
+
     }
 }
 
@@ -275,6 +306,258 @@ pub struct DimensionCache {
 }
 
 
+pub fn get_cube_cache(
+        cube: &Cube,
+        ll_config: &Option<LogicLayerConfig>,
+        backend: Box<dyn Backend + Sync + Send>,
+        sys: &mut SystemRunner
+) -> Result<CubeCache, Error> {
+    let time_column_names = vec![
+        "Year".to_string(),
+        "Quarter".to_string(),
+        "Month".to_string(),
+        "Week".to_string(),
+        "Day".to_string()
+    ];
+
+    let mut year_level: Option<Level> = None;
+    let mut year_values: Option<Vec<String>> = None;
+    let mut quarter_level: Option<Level> = None;
+    let mut quarter_values: Option<Vec<String>> = None;
+    let mut month_level: Option<Level> = None;
+    let mut month_values: Option<Vec<String>> = None;
+    let mut week_level: Option<Level> = None;
+    let mut week_values: Option<Vec<String>> = None;
+    let mut day_level: Option<Level> = None;
+    let mut day_values: Option<Vec<String>> = None;
+    let mut time_level: Option<Level> = None;
+    let mut time_values: Option<Vec<String>> = None;
+
+    let mut level_caches: HashMap<LevelName, LevelCache> = HashMap::new();
+    let mut dimension_caches: HashMap<String, DimensionCache> = HashMap::new();
+
+    for dimension in &cube.dimensions {
+        let mut id_map: HashMap<String, Vec<LevelName>> = HashMap::new();
+
+        for hierarchy in &dimension.hierarchies {
+            let table = match &hierarchy.table {
+                Some(t) => &t.name,
+                None => &cube.table.name
+            };
+
+            for level in &hierarchy.levels {
+                if time_column_names.contains(&level.name) {
+                    let val = get_distinct_values(
+                        &level.key_column, &table, backend.clone(), sys
+                    )?;
+
+                    if level.name == "Year" {
+                        year_level = Some(level.clone());
+                        year_values = Some(val);
+                    } else if level.name == "Quarter" {
+                        quarter_level = Some(level.clone());
+                        quarter_values = Some(val);
+                    } else if level.name == "Month" {
+                        month_level = Some(level.clone());
+                        month_values = Some(val);
+                    } else if level.name == "Week" {
+                        week_level = Some(level.clone());
+                        week_values = Some(val);
+                    } else if level.name == "Day" {
+                        day_level = Some(level.clone());
+                        day_values = Some(val);
+                    }
+                } else if level.name == "Time" {
+                    // Identify what time of level this is based on the annotation name
+                    let mut found_time = false;
+
+                    // This is a hack for now. It handles the case where you
+                    // have a level called Time that is actually at a more
+                    // specific depth. It allows to cut on that depth using the
+                    // .latest/.oldest feature.
+                    match &level.annotations {
+                        Some(annotations) => {
+                            for annotation in annotations {
+                                if annotation.name == "level" && time_column_names.contains(&annotation.text) {
+                                    let val = get_distinct_values(
+                                        &level.key_column, &table, backend.clone(), sys
+                                    )?;
+
+                                    if annotation.text == "Year" {
+                                        year_level = Some(level.clone());
+                                        year_values = Some(val);
+                                        found_time = true;
+                                    } else if annotation.text == "Quarter" {
+                                        quarter_level = Some(level.clone());
+                                        quarter_values = Some(val);
+                                        found_time = true;
+                                    } else if annotation.text == "Month" {
+                                        month_level = Some(level.clone());
+                                        month_values = Some(val);
+                                        found_time = true;
+                                    } else if annotation.text == "Week" {
+                                        week_level = Some(level.clone());
+                                        week_values = Some(val);
+                                        found_time = true;
+                                    } else if annotation.text == "Day" {
+                                        day_level = Some(level.clone());
+                                        day_values = Some(val);
+                                        found_time = true;
+                                    } else if annotation.text == "Time" {
+                                        time_level = Some(level.clone());
+                                        time_values = Some(val);
+                                        found_time = true;
+                                    }
+                                }
+                            }
+                        },
+                        None => ()
+                    }
+
+                    // Consider this to be a time generic Time level
+                    if !found_time {
+                        // Want to get distinct time values from the fact table
+                        let val = get_distinct_values(
+                            &level.key_column, &cube.table.name, backend.clone(), sys
+                        )?;
+
+                        time_level = Some(level.clone());
+                        time_values = Some(val);
+                    }
+                }
+
+                let level_name = LevelName::new(
+                    dimension.name.clone(),
+                    hierarchy.name.clone(),
+                    level.name.clone()
+                );
+
+                // Get unique name for this level
+                let unique_name = match get_unique_level_name(&cube, ll_config, &level_name)? {
+                    Some(name) => name,
+                    None => return Err(format_err!("Couldn't find unique name for {}", level.name.clone()))
+                };
+
+                let mut parent_map: Option<HashMap<String, String>> = None;
+                let mut children_map: Option<HashMap<String, Vec<String>>> = None;
+
+                let parent_levels = cube.get_level_parents(&level_name)?;
+                let child_level = cube.get_child_level(&level_name)?;
+
+                let mut distinct_ids: Vec<String> = vec![];
+
+                if hierarchy.inline_table.is_some() {
+                    // Inline table
+
+                    let inline_table = match &hierarchy.inline_table {
+                        Some(t) => t,
+                        None => return Err(format_err!("Could not get inline table for {}", level.name.clone()))
+                    };
+
+                    if parent_levels.len() >= 1 {
+                        parent_map = Some(get_inline_parent_data(
+                            &parent_levels[parent_levels.len() - 1], &level,
+                            &inline_table
+                        ));
+                    }
+
+                    match child_level {
+                        Some(child_level) => {
+                            children_map = Some(get_inline_children_data(
+                                &level, &child_level, &inline_table
+                            ));
+                        },
+                        None => ()
+                    }
+
+                    // Get all IDs for this level
+                    for row in &inline_table.rows {
+                        for row_value in &row.row_values {
+                            if row_value.column == level.key_column {
+                                distinct_ids.push(row_value.value.clone());
+                            }
+                        }
+                    }
+                } else {
+                    // Database table
+
+                    if parent_levels.len() >= 1 {
+                        parent_map = Some(get_parent_data(
+                            &parent_levels[parent_levels.len() - 1], &level,
+                            table, backend.clone(), sys
+                        )?);
+                    }
+
+                    match child_level {
+                        Some(child_level) => {
+                            children_map = Some(get_children_data(
+                                &level, &child_level,
+                                table, backend.clone(), sys
+                            )?);
+                        },
+                        None => ()
+                    }
+
+                    // Get all IDs for this level
+                    distinct_ids = get_distinct_values(
+                        &level.key_column, &table, backend.clone(), sys
+                    )?;
+                }
+
+                let neighbors_map = get_neighbors_map(&distinct_ids);
+
+                // Add each distinct ID to the id_map HashMap
+                for distinct_id in distinct_ids {
+                    id_map.entry(distinct_id.clone()).or_insert(vec![]);
+                    let map_entry = id_map.get_mut(&distinct_id).unwrap();
+                    map_entry.push(level_name.clone());
+                }
+
+                // neighbors are not optional, iterate over the keys of neighbors to get all
+                // members.
+                let members = neighbors_map.keys().cloned().collect();
+
+                level_caches.insert(
+                    level_name,
+                    LevelCache {
+                        unique_name: unique_name.clone(),
+                        parent_map,
+                        children_map,
+                        neighbors_map,
+                        members
+                    }
+                );
+            }
+        }
+
+        dimension_caches.insert(dimension.name.clone(), DimensionCache { id_map });
+    }
+
+    let level_map = get_level_map(&cube, ll_config)?;
+    let property_map = get_property_map(&cube, ll_config)?;
+
+    Ok(CubeCache {
+        name: cube.name.clone(),
+        year_level,
+        year_values,
+        quarter_level,
+        quarter_values,
+        month_level,
+        month_values,
+        week_level,
+        week_values,
+        day_level,
+        day_values,
+        time_level,
+        time_values,
+        level_map,
+        property_map,
+        level_caches,
+        dimension_caches,
+    })
+}
+
+
 /// Populates a `Cache` object that will be shared through `AppState`.
 pub fn populate_cache(
         schema: Schema,
@@ -285,252 +568,14 @@ pub fn populate_cache(
     info!("Populating cache...");
     let time_start = Instant::now();
 
-    let time_column_names = vec![
-        "Year".to_string(),
-        "Quarter".to_string(),
-        "Month".to_string(),
-        "Week".to_string(),
-        "Day".to_string()
-    ];
-
     let mut cubes: Vec<CubeCache> = vec![];
 
     for cube in schema.cubes {
-        let mut year_level: Option<Level> = None;
-        let mut year_values: Option<Vec<String>> = None;
-        let mut quarter_level: Option<Level> = None;
-        let mut quarter_values: Option<Vec<String>> = None;
-        let mut month_level: Option<Level> = None;
-        let mut month_values: Option<Vec<String>> = None;
-        let mut week_level: Option<Level> = None;
-        let mut week_values: Option<Vec<String>> = None;
-        let mut day_level: Option<Level> = None;
-        let mut day_values: Option<Vec<String>> = None;
-        let mut time_level: Option<Level> = None;
-        let mut time_values: Option<Vec<String>> = None;
-
-        let mut level_caches: HashMap<LevelName, LevelCache> = HashMap::new();
-        let mut dimension_caches: HashMap<String, DimensionCache> = HashMap::new();
-
-        for dimension in &cube.dimensions {
-            let mut id_map: HashMap<String, Vec<LevelName>> = HashMap::new();
-
-            for hierarchy in &dimension.hierarchies {
-                let table = match &hierarchy.table {
-                    Some(t) => &t.name,
-                    None => &cube.table.name
-                };
-
-                for level in &hierarchy.levels {
-                    if time_column_names.contains(&level.name) {
-                        let val = get_distinct_values(
-                            &level.key_column, &table, backend.clone(), sys
-                        )?;
-
-                        if level.name == "Year" {
-                            year_level = Some(level.clone());
-                            year_values = Some(val);
-                        } else if level.name == "Quarter" {
-                            quarter_level = Some(level.clone());
-                            quarter_values = Some(val);
-                        } else if level.name == "Month" {
-                            month_level = Some(level.clone());
-                            month_values = Some(val);
-                        } else if level.name == "Week" {
-                            week_level = Some(level.clone());
-                            week_values = Some(val);
-                        } else if level.name == "Day" {
-                            day_level = Some(level.clone());
-                            day_values = Some(val);
-                        }
-                    } else if level.name == "Time" {
-                        // Identify what time of level this is based on the annotation name
-                        let mut found_time = false;
-
-                        // This is a hack for now. It handles the case where you
-                        // have a level called Time that is actually at a more
-                        // specific depth. It allows to cut on that depth using the
-                        // .latest/.oldest feature.
-                        match &level.annotations {
-                            Some(annotations) => {
-                                for annotation in annotations {
-                                    if annotation.name == "level" && time_column_names.contains(&annotation.text) {
-                                        let val = get_distinct_values(
-                                            &level.key_column, &table, backend.clone(), sys
-                                        )?;
-
-                                        if annotation.text == "Year" {
-                                            year_level = Some(level.clone());
-                                            year_values = Some(val);
-                                            found_time = true;
-                                        } else if annotation.text == "Quarter" {
-                                            quarter_level = Some(level.clone());
-                                            quarter_values = Some(val);
-                                            found_time = true;
-                                        } else if annotation.text == "Month" {
-                                            month_level = Some(level.clone());
-                                            month_values = Some(val);
-                                            found_time = true;
-                                        } else if annotation.text == "Week" {
-                                            week_level = Some(level.clone());
-                                            week_values = Some(val);
-                                            found_time = true;
-                                        } else if annotation.text == "Day" {
-                                            day_level = Some(level.clone());
-                                            day_values = Some(val);
-                                            found_time = true;
-                                        } else if annotation.text == "Time" {
-                                            time_level = Some(level.clone());
-                                            time_values = Some(val);
-                                            found_time = true;
-                                        }
-                                    }
-                                }
-                            },
-                            None => ()
-                        }
-
-                        // Consider this to be a time generic Time level
-                        if !found_time {
-                            // Want to get distinct time values from the fact table
-                            let val = get_distinct_values(
-                                &level.key_column, &cube.table.name, backend.clone(), sys
-                            )?;
-
-                            time_level = Some(level.clone());
-                            time_values = Some(val);
-                        }
-                    }
-
-                    let level_name = LevelName::new(
-                        dimension.name.clone(),
-                        hierarchy.name.clone(),
-                        level.name.clone()
-                    );
-
-                    // Get unique name for this level
-                    let unique_name = match get_unique_level_name(&cube, ll_config, &level_name)? {
-                        Some(name) => name,
-                        None => return Err(format_err!("Couldn't find unique name for {}", level.name.clone()))
-                    };
-
-                    let mut parent_map: Option<HashMap<String, String>> = None;
-                    let mut children_map: Option<HashMap<String, Vec<String>>> = None;
-
-                    let parent_levels = cube.get_level_parents(&level_name)?;
-                    let child_level = cube.get_child_level(&level_name)?;
-
-                    let mut distinct_ids: Vec<String> = vec![];
-
-                    if hierarchy.inline_table.is_some() {
-                        // Inline table
-
-                        let inline_table = match &hierarchy.inline_table {
-                            Some(t) => t,
-                            None => return Err(format_err!("Could not get inline table for {}", level.name.clone()))
-                        };
-
-                        if parent_levels.len() >= 1 {
-                            parent_map = Some(get_inline_parent_data(
-                                &parent_levels[parent_levels.len() - 1], &level,
-                                &inline_table
-                            ));
-                        }
-
-                        match child_level {
-                            Some(child_level) => {
-                                children_map = Some(get_inline_children_data(
-                                    &level, &child_level, &inline_table
-                                ));
-                            },
-                            None => ()
-                        }
-
-                        // Get all IDs for this level
-                        for row in &inline_table.rows {
-                            for row_value in &row.row_values {
-                                if row_value.column == level.key_column {
-                                    distinct_ids.push(row_value.value.clone());
-                                }
-                            }
-                        }
-                    } else {
-                        // Database table
-
-                        if parent_levels.len() >= 1 {
-                            parent_map = Some(get_parent_data(
-                                &parent_levels[parent_levels.len() - 1], &level,
-                                table, backend.clone(), sys
-                            )?);
-                        }
-
-                        match child_level {
-                            Some(child_level) => {
-                                children_map = Some(get_children_data(
-                                    &level, &child_level,
-                                    table, backend.clone(), sys
-                                )?);
-                            },
-                            None => ()
-                        }
-
-                        // Get all IDs for this level
-                        distinct_ids = get_distinct_values(
-                            &level.key_column, &table, backend.clone(), sys
-                        )?;
-                    }
-
-                    let neighbors_map = get_neighbors_map(&distinct_ids);
-
-                    // Add each distinct ID to the id_map HashMap
-                    for distinct_id in distinct_ids {
-                        id_map.entry(distinct_id.clone()).or_insert(vec![]);
-                        let map_entry = id_map.get_mut(&distinct_id).unwrap();
-                        map_entry.push(level_name.clone());
-                    }
-
-                    // neighbors are not optional, iterate over the keys of neighbors to get all
-                    // members.
-                    let members = neighbors_map.keys().cloned().collect();
-
-                    level_caches.insert(
-                        level_name,
-                        LevelCache {
-                            unique_name: unique_name.clone(),
-                            parent_map,
-                            children_map,
-                            neighbors_map,
-                            members
-                        }
-                    );
-                }
-            }
-
-            dimension_caches.insert(dimension.name.clone(), DimensionCache { id_map });
-        }
-
-        let level_map = get_level_map(&cube, ll_config)?;
-        let property_map = get_property_map(&cube, ll_config)?;
-
-        cubes.push(CubeCache {
-            name: cube.name,
-            year_level,
-            year_values,
-            quarter_level,
-            quarter_values,
-            month_level,
-            month_values,
-            week_level,
-            week_values,
-            day_level,
-            day_values,
-            time_level,
-            time_values,
-            level_map,
-            property_map,
-            level_caches,
-            dimension_caches,
-        })
+        let cube_cache = match get_cube_cache(&cube, ll_config, backend.clone(), sys) {
+            Ok(cube_cache) => cube_cache,
+            Err(err) => return Err(err)
+        };
+        cubes.push(cube_cache);
     }
 
     let timing = time_start.elapsed();
@@ -754,15 +799,34 @@ pub fn get_parent_data(
 ) -> Result<HashMap<String, String>, Error> {
     let mut parent_data: HashMap<String, String> = HashMap::new();
 
-    let future = backend
+//    let future = backend
+//        .exec_sql(
+//            format!(
+//                "select distinct {0}, {1} from {2} group by {0}, {1} order by {0}, {1}",
+//                parent_level.key_column, current_level.key_column, table,
+//            ).to_string()
+//        );
+//
+//    let df = match sys.block_on(future) {
+//        Ok(df) => df,
+//        Err(err) => {
+//            return Err(format_err!("Error populating cache with backend data: {}", err));
+//        }
+//    };
+
+    let res_df = backend
         .exec_sql(
             format!(
                 "select distinct {0}, {1} from {2} group by {0}, {1} order by {0}, {1}",
                 parent_level.key_column, current_level.key_column, table,
             ).to_string()
-        );
+        )
+        .wait()
+        .and_then(move |df| {
+            Ok(df)
+        });
 
-    let df = match sys.block_on(future) {
+    let df = match res_df {
         Ok(df) => df,
         Err(err) => {
             return Err(format_err!("Error populating cache with backend data: {}", err));

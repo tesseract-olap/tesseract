@@ -11,6 +11,7 @@ use crate::handlers::{
     aggregate_default_handler,
     aggregate_stream_handler,
     aggregate_stream_default_handler,
+    cache_refresh_handler,
     diagnosis_handler,
     diagnosis_default_handler,
     logic_layer_default_handler,
@@ -132,6 +133,11 @@ pub fn create_app(
         .resource("/flush", |r| {
             r.method(Method::POST).with(flush_handler)
         })
+
+        .resource("/cache/refresh", |r| {
+            r.method(Method::POST).with(cache_refresh_handler)
+        })
+
         // Allow the API to accept /my-path or /my-path/ for all requests
         .default_resource(|r| r.h(NormalizePath::default()));
 
