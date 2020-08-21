@@ -25,7 +25,7 @@ pub enum Aggregator {
     /// Needs two steps. It's slow because there won't be aggregation on the first step, only
     /// median on the second
     #[serde(rename="basic_grouped_median")]
-    BasicGroupedMedian{
+    BasicGroupedMedian {
         group_aggregator: String,
         group_dimension: String,
     },

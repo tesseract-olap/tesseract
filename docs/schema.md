@@ -3,6 +3,7 @@
 lots of TODO here: Drilldowns, cuts, etc. And adding xml equivalents.
 
 ## Measures
+
 in a cube:
 
 ```
@@ -14,10 +15,12 @@ in a cube:
     },
     ...
 ]
+```
 
 ### Aggregators
 
 basic aggregators
+
 ```
 {
     "name": "Enrollment <Agg>",
@@ -27,6 +30,7 @@ basic aggregators
 ```
 
 weighted sum
+
 ```
 {
     "name": "Enrollment Weighted Sum",
@@ -40,6 +44,7 @@ weighted sum
 ```
 
 weighted average
+
 ```
 {
     "name": "Enrollment Average",
@@ -53,6 +58,7 @@ weighted average
 ```
 
 moe
+
 ```
 {
     "name": "Enrollment MOE",
@@ -66,6 +72,7 @@ moe
 ```
 
 replicate weight moe
+
 ```
 {
     "name": "Enrollment MOE (replicate weight)",
@@ -84,6 +91,7 @@ replicate weight moe
 ```
 
 weighted average moe
+
 ```
 {
     "name": "Enrollment Weighted Average MOE",
@@ -103,6 +111,7 @@ weighted average moe
 ```
 
 grouped median
+
 ```
 {
     "name": "Grouped Median Enrollment",
