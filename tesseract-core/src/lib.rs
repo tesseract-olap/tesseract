@@ -90,7 +90,7 @@ impl Schema {
         Schema::from_json(&serialized)
     }
 
-    /// schema validation
+    /// Schema Validation
     pub fn validate(&mut self) -> Result<(), Error> {
         // There should be at least one dimension. Both dim and shared dim are optional,
         // so need to do a validation check here.
@@ -165,6 +165,9 @@ impl Schema {
         schema_metadata
     }
 
+    /// Checks for any level or property names that may not be unique within a given cube.
+    /// Unique level and property names are currently required for the logic layer to work.
+    /// Raw Tesseract will still work just fine if level and property names are not unique.
     pub fn has_unique_levels_properties(&self) -> CubeHasUniqueLevelsAndProperties {
         for cube in &self.cubes {
             let mut levels = HashSet::new();
@@ -387,6 +390,8 @@ impl Schema {
         dims
     }
 
+    /// Transforms a Tesseract Query object into a QueryIR that is then passed
+    /// onto a backend for execution.
     pub fn sql_query(
         &self,
         cube: &str,
