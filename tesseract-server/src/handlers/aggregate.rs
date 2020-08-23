@@ -16,6 +16,8 @@ use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
+use itertools::Itertools;
+
 use crate::handlers::util::validate_members;
 
 use crate::app::AppState;
@@ -45,7 +47,6 @@ pub fn aggregate_handler(
 {
     do_aggregate(req, cube_format.into_inner())
 }
-
 
 /// Performs data aggregation.
 pub fn do_aggregate(
@@ -170,7 +171,7 @@ impl TryFrom<AggregateQueryOpt> for TsQuery {
     fn try_from(agg_query_opt: AggregateQueryOpt) -> Result<Self, Self::Error> {
         let drilldowns: Result<Vec<_>, _> = agg_query_opt.drilldowns
             .map(|ds| {
-                ds.iter().map(|d| d.parse()).collect()
+                ds.iter().unique().map(|d| d.parse()).collect()
             })
             .unwrap_or(Ok(vec![]));
 
