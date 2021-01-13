@@ -177,10 +177,17 @@ pub fn do_members(
 
     let level: LevelName = ok_or_400!(query.level.parse());
 
-    info!("Members for cube: {}, level: {}", cube, level);
+    let filter = match query.filter {
+        Some(filter) => filter.to_owned(),
+        None => "".into(),
+    };
 
-    let members_sql_and_headers = req.state().schema.read().unwrap()
-        .members_sql(&cube, &level);
+    info!("Members for cube: {}, level: {}, filter: {}", cube, level, filter);
+
+    let members_sql_and_headers = req.state()
+        .schema.read()
+        .unwrap()
+        .members_sql(&cube, &level, &filter);
 
     let (members_sql, header) = ok_or_400!(members_sql_and_headers);
 
@@ -200,5 +207,6 @@ pub fn do_members(
 
 #[derive(Debug, Deserialize)]
 struct MembersQueryOpt {
+    filter: Option<String>,
     level: String,
 }

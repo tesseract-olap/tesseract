@@ -72,6 +72,11 @@ pub fn get_members(
     let mut cube_name = members_query.cube.clone();
     let mut level_name: Option<LevelName> = None;
 
+    let name_filter = match members_query.filter {
+        Some(filter) => filter.to_owned(),
+        None => "".into(),
+    };
+
     // Get cube object to check for API key
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
@@ -146,8 +151,8 @@ pub fn get_members(
     debug!("{:?}", level_name);
 
     let members_sql_and_headers = match members_query.locale {
-        Some(locale) => schema.members_locale_sql(&cube_name, &level_name, &locale),
-        None => schema.members_sql(&cube_name, &level_name)
+        Some(locale) => schema.members_locale_sql(&cube_name, &level_name, &name_filter, &locale),
+        None => schema.members_sql(&cube_name, &level_name, &name_filter)
     };
 
     let (members_sql, header) = match members_sql_and_headers {
@@ -183,6 +188,7 @@ pub fn get_members(
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MembersQueryOpt {
     pub cube: String,
+    pub filter: Option<String>,
     pub level: String,
     pub locale: Option<String>,
 }

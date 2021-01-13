@@ -10,6 +10,7 @@ pub mod query_ir;
 
 use failure::{Error, format_err, bail};
 use log::*;
+use regex::{Captures, Regex};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
@@ -212,27 +213,50 @@ impl Schema {
         &self,
         cube: &str,
         level_name: &LevelName,
+        filter: &str,
         ) -> Result<(String, Vec<String>), Error> // Sql and then Header
     {
         let members_query_ir = self.get_dim_col_table(cube, level_name)?;
 
-        let header = if members_query_ir.name_column.is_some() {
+        let has_label = members_query_ir.name_column.is_some();
+
+        let header = if has_label {
             vec!["ID".into(), "Label".into()]
         } else {
             vec!["ID".into()]
         };
 
+        let key_col = members_query_ir.key_column.clone();
         let name_col = if let Some(ref col) = members_query_ir.name_column {
            col.to_owned()
         } else {
             "".into()
         };
 
-        let sql = format!("select distinct {}{}{} from {}",
-            members_query_ir.key_column,
-            if members_query_ir.name_column.is_some() { ", " } else { "" },
+        let sanitize = Regex::new(r"\W").unwrap();
+        let filter_stmt = if filter.len() > 0 {
+            let filter_term = sanitize.replace_all(filter, |caps: &Captures| {
+                if caps.len() > 1 { "%" } else { "_" }
+            });
+            let table_cols = if has_label {
+                vec![key_col.clone(), name_col.clone()]
+            } else {
+                vec![key_col.clone()]
+            };
+            let filter_ilikes = table_cols.iter().map(|name| {
+                format!("ilike({},%{}%)", name.clone(), filter_term)
+            });
+            format!(" where {}", filter_ilikes.collect::<Vec<String>>().join(" or "))
+        } else {
+            "".into()
+        };
+
+        let sql = format!("select distinct {}{}{} from {}{}",
+            key_col,
+            if has_label { ", " } else { "" },
             name_col,
             members_query_ir.table_sql,
+            filter_stmt,
         );
 
         Ok((sql, header))
@@ -244,6 +268,7 @@ impl Schema {
         &self,
         cube_name: &str,
         level_name: &LevelName,
+        filter: &str,
         locale: &str
     ) -> Result<(String, Vec<String>), Error> // Sql and then Header
     {
@@ -310,11 +335,25 @@ impl Schema {
             table.full_name()
         };
 
-        let sql = format!("select distinct {}{}{} from {} order by {}",
+        let sanitize = Regex::new(r"\W").unwrap();
+        let filter_stmt = if filter.len() > 0 {
+            let filter_term = sanitize.replace_all(filter, |caps: &Captures| {
+                if caps.len() > 1 { "%" } else { "_" }
+            });
+            let filter_ilikes = name_columns.iter().map(|name| {
+                format!("ilike({},%{}%)", name, filter_term)
+            });
+            format!(" where {}", filter_ilikes.collect::<Vec<String>>().join(" or "))
+        } else {
+            "".into()
+        };
+
+        let sql = format!("select distinct {}{}{} from {}{} order by {}",
             key_column,
             if name_columns.len() > 0 { ", " } else { "" },
             name_columns.join(", "),
             table_sql,
+            filter_stmt,
             key_column
         );
 
