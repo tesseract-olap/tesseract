@@ -1,4 +1,5 @@
-use failure::{Error, format_err};
+use failure::{format_err, Error};
+use std::collections::HashMap;
 
 
 #[derive(Debug)]
@@ -20,33 +21,61 @@ impl DataFrame {
     }
 
     pub fn len(&self) -> usize {
-        if let Some(col) = self.columns.get(0) {
-            match col.column_data {
-                ColumnData::Int8(ref ns) => ns.len(),
-                ColumnData::Int16(ref ns) => ns.len(),
-                ColumnData::Int32(ref ns) => ns.len(),
-                ColumnData::Int64(ref ns) => ns.len(),
-                ColumnData::UInt8(ref ns) => ns.len(),
-                ColumnData::UInt16(ref ns) => ns.len(),
-                ColumnData::UInt32(ref ns) => ns.len(),
-                ColumnData::UInt64(ref ns) => ns.len(),
-                ColumnData::Float32(ref ns) => ns.len(),
-                ColumnData::Float64(ref ns) => ns.len(),
-                ColumnData::Text(ref ss) => ss.len(),
-                ColumnData::NullableInt8(ref ns) => ns.len(),
-                ColumnData::NullableInt16(ref ns) => ns.len(),
-                ColumnData::NullableInt32(ref ns) => ns.len(),
-                ColumnData::NullableInt64(ref ns) => ns.len(),
-                ColumnData::NullableUInt8(ref ns) => ns.len(),
-                ColumnData::NullableUInt16(ref ns) => ns.len(),
-                ColumnData::NullableUInt32(ref ns) => ns.len(),
-                ColumnData::NullableUInt64(ref ns) => ns.len(),
-                ColumnData::NullableFloat32(ref ns) => ns.len(),
-                ColumnData::NullableFloat64(ref ns) => ns.len(),
-                ColumnData::NullableText(ref ss) => ss.len(),
+        match self.columns.get(0) {
+            Some(col) => col.len(),
+            None => 0,
+        }
+    }
+
+    pub fn drain_filter<P>(&mut self, predicate: &mut P) -> ()
+    where
+        P: FnMut(HashMap<&str, Datum>, usize) -> bool,
+    {
+        let col_amount = self.columns.len();
+
+        let mut i = 0;
+        while i < self.len() {
+            let mut datum: HashMap<&str, Datum> = HashMap::with_capacity(col_amount);
+
+            for column in &self.columns {
+                let value: Datum = match &column.column_data {
+                    ColumnData::Int8(d) => Datum::Int8(d[i]),
+                    ColumnData::Int16(d) => Datum::Int16(d[i]),
+                    ColumnData::Int32(d) => Datum::Int32(d[i]),
+                    ColumnData::Int64(d) => Datum::Int64(d[i]),
+                    ColumnData::UInt8(d) => Datum::UInt8(d[i]),
+                    ColumnData::UInt16(d) => Datum::UInt16(d[i]),
+                    ColumnData::UInt32(d) => Datum::UInt32(d[i]),
+                    ColumnData::UInt64(d) => Datum::UInt64(d[i]),
+                    ColumnData::Float32(d) => Datum::Float32(d[i]),
+                    ColumnData::Float64(d) => Datum::Float64(d[i]),
+                    ColumnData::Text(d) => Datum::Text(d[i].to_string()),
+                    ColumnData::NullableInt8(d) => Datum::NullableInt8(d[i]),
+                    ColumnData::NullableInt16(d) => Datum::NullableInt16(d[i]),
+                    ColumnData::NullableInt32(d) => Datum::NullableInt32(d[i]),
+                    ColumnData::NullableInt64(d) => Datum::NullableInt64(d[i]),
+                    ColumnData::NullableUInt8(d) => Datum::NullableUInt8(d[i]),
+                    ColumnData::NullableUInt16(d) => Datum::NullableUInt16(d[i]),
+                    ColumnData::NullableUInt32(d) => Datum::NullableUInt32(d[i]),
+                    ColumnData::NullableUInt64(d) => Datum::NullableUInt64(d[i]),
+                    ColumnData::NullableFloat32(d) => Datum::NullableFloat32(d[i]),
+                    ColumnData::NullableFloat64(d) => Datum::NullableFloat64(d[i]),
+                    ColumnData::NullableText(d) => match &d[i] {
+                        Some(nt) => Datum::NullableText(Some(nt.to_string())),
+                        None => Datum::NullableText(None),
+                    },
+                };
+
+                datum.insert(&column.name, value);
             }
-        } else {
-            0
+
+            if !predicate(datum, i) {
+                for column in self.columns.iter_mut() {
+                    column.remove(i);
+                }
+            } else {
+                i += 1;
+            }
         }
     }
 }
@@ -67,6 +96,33 @@ impl Column {
 
     pub fn column_data(&mut self) ->&mut ColumnData {
         &mut self.column_data
+    }
+
+    pub fn len(&self) -> usize {
+        match self.column_data {
+            ColumnData::Int8(ref ns) => ns.len(),
+            ColumnData::Int16(ref ns) => ns.len(),
+            ColumnData::Int32(ref ns) => ns.len(),
+            ColumnData::Int64(ref ns) => ns.len(),
+            ColumnData::UInt8(ref ns) => ns.len(),
+            ColumnData::UInt16(ref ns) => ns.len(),
+            ColumnData::UInt32(ref ns) => ns.len(),
+            ColumnData::UInt64(ref ns) => ns.len(),
+            ColumnData::Float32(ref ns) => ns.len(),
+            ColumnData::Float64(ref ns) => ns.len(),
+            ColumnData::Text(ref ss) => ss.len(),
+            ColumnData::NullableInt8(ref ns) => ns.len(),
+            ColumnData::NullableInt16(ref ns) => ns.len(),
+            ColumnData::NullableInt32(ref ns) => ns.len(),
+            ColumnData::NullableInt64(ref ns) => ns.len(),
+            ColumnData::NullableUInt8(ref ns) => ns.len(),
+            ColumnData::NullableUInt16(ref ns) => ns.len(),
+            ColumnData::NullableUInt32(ref ns) => ns.len(),
+            ColumnData::NullableUInt64(ref ns) => ns.len(),
+            ColumnData::NullableFloat32(ref ns) => ns.len(),
+            ColumnData::NullableFloat64(ref ns) => ns.len(),
+            ColumnData::NullableText(ref ss) => ss.len(),
+        }
     }
 
     /// Sort column entries for all types, but floats.
@@ -211,6 +267,77 @@ impl Column {
                 }).collect()
             },
         }
+    }
+
+    pub fn remove(&mut self, index: usize) -> () {
+        match self.column_data {
+            ColumnData::Int8(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::Int16(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::Int32(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::Int64(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::UInt8(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::UInt16(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::UInt32(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::UInt64(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::Float32(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::Float64(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::Text(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableInt8(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableInt16(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableInt32(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableInt64(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableUInt8(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableUInt16(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableUInt32(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableUInt64(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableFloat32(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableFloat64(ref mut v) => {
+                v.remove(index);
+            }
+            ColumnData::NullableText(ref mut v) => {
+                v.remove(index);
+            }
+        };
     }
 }
 
@@ -375,5 +502,126 @@ pub fn is_same_columndata_type(col_1: &ColumnData, col_2: &ColumnData) -> bool {
                 _ => false
             }
         },
+    }
+}
+
+pub enum Datum {
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
+    Float32(f32),
+    Float64(f64),
+    Text(String),
+    NullableInt8(Option<i8>),
+    NullableInt16(Option<i16>),
+    NullableInt32(Option<i32>),
+    NullableInt64(Option<i64>),
+    NullableUInt8(Option<u8>),
+    NullableUInt16(Option<u16>),
+    NullableUInt32(Option<u32>),
+    NullableUInt64(Option<u64>),
+    NullableFloat32(Option<f32>),
+    NullableFloat64(Option<f64>),
+    NullableText(Option<String>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Column, ColumnData, DataFrame, Datum};
+
+    #[test]
+    fn test_column_remove() {
+        let mut col = Column::new("test".to_string(), ColumnData::Int8(vec![2, 3, 4, 5]));
+        col.remove(1);
+
+        assert_eq!(3, col.len());
+
+        match col.column_data {
+            ColumnData::Int8(v) => {
+                assert_eq!(2, v[0]);
+                assert_ne!(3, v[1]);
+                assert_eq!(4, v[1]);
+                assert_ne!(4, v[2]);
+                assert_eq!(5, v[2]);
+            },
+            _ => {
+                panic!("Unexpected ColumnData type");
+            },
+        };
+    }
+
+    #[test]
+    fn test_dataframe_filter() {
+        let mut df = DataFrame::from_vec(vec![
+            Column::new("id".to_string(), ColumnData::Int8(vec![1, 2, 3, 4, 5])),
+            Column::new(
+                "label".to_string(),
+                ColumnData::Text(vec![
+                    "one".to_string(),
+                    "two".to_string(),
+                    "three".to_string(),
+                    "four".to_string(),
+                    "five".to_string(),
+                ]),
+            ),
+            Column::new(
+                "value".to_string(),
+                ColumnData::NullableInt8(vec![
+                    Some(64),
+                    Some(49),
+                    Some(36),
+                    None,
+                    Some(16),
+                ])
+            ),
+        ]);
+
+        assert_eq!(5, df.len());
+
+        df.drain_filter(&mut |row, _| match row.get("id") {
+            Some(value) => match value {
+                Datum::Int8(id) => id % 2 != 0,
+                _ => false,
+            },
+            None => false,
+        });
+
+        assert_eq!(3, df.len());
+        
+        match &df.columns[0].column_data {
+            ColumnData::Int8(v) => {
+                assert_eq!(1, v[0]);
+                assert_eq!(3, v[1]);
+                assert_eq!(5, v[2]);
+            },
+            _ => {
+                panic!("Unexpected ColumnData type");
+            },
+        }
+        match &df.columns[1].column_data {
+            ColumnData::Text(v) => {
+                assert_eq!("one".to_string(), v[0]);
+                assert_eq!("three".to_string(), v[1]);
+                assert_eq!("five".to_string(), v[2]);
+            },
+            _ => {
+                panic!("Unexpected ColumnData type");
+            },
+        }
+        match &df.columns[2].column_data {
+            ColumnData::NullableInt8(v) => {
+                assert_eq!(64, v[0].unwrap());
+                assert_eq!(36, v[1].unwrap());
+                assert_eq!(16, v[2].unwrap());
+            },
+            _ => {
+                panic!("Unexpected ColumnData type");
+            },
+        }
     }
 }

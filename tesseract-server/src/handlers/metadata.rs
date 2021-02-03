@@ -15,7 +15,7 @@ use serde_qs as qs;
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::metadata::{CubeMetadata, PropertyMetadata};
-use tesseract_core::DEFAULT_ALLOWED_ACCESS;
+use tesseract_core::{DEFAULT_ALLOWED_ACCESS, DataFrame, Datum};
 
 use crate::app::AppState;
 use crate::logic_layer::LogicLayerConfig;
@@ -177,17 +177,17 @@ pub fn do_members(
 
     let level: LevelName = ok_or_400!(query.level.parse());
 
-    let filter = match query.filter {
+    let filter_term = match query.filter {
         Some(filter) => filter.to_owned(),
         None => "".into(),
     };
 
-    info!("Members for cube: {}, level: {}, filter: {}", cube, level, filter);
+    info!("Members for cube: {}, level: {}", cube, level);
 
     let members_sql_and_headers = req.state()
         .schema.read()
         .unwrap()
-        .members_sql(&cube, &level, &filter);
+        .members_sql(&cube, &level);
 
     let (members_sql, header) = ok_or_400!(members_sql_and_headers);
 
@@ -196,6 +196,17 @@ pub fn do_members(
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
+            let mut df = DataFrame {..df};
+            if filter_term.len() > 0 {
+                df.drain_filter(&mut |datum, _| match datum.get("Label") {
+                    Some(value) => match value {
+                        Datum::Text(txt) => txt.contains(filter_term.as_str()),
+                        _ => true,
+                    },
+                    None => true,
+                });
+            }
+
             match format_records(&header, df, format, None, false) {
                 Ok(res) => Ok(HttpResponse::Ok().body(res)),
                 Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),

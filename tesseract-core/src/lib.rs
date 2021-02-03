@@ -10,7 +10,6 @@ pub mod query_ir;
 
 use failure::{Error, format_err, bail};
 use log::*;
-use regex::{Captures, Regex};
 use serde_xml_rs as serde_xml;
 use serde_xml::from_reader;
 use std::collections::{HashSet, HashMap};
@@ -18,7 +17,7 @@ use std::str::FromStr;
 use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
-pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
+pub use self::dataframe::{DataFrame, Datum, Column, ColumnData, is_same_columndata_type};
 
 pub static DEFAULT_ALLOWED_ACCESS: i32 = 0;
 
@@ -213,7 +212,6 @@ impl Schema {
         &self,
         cube: &str,
         level_name: &LevelName,
-        filter: &str,
         ) -> Result<(String, Vec<String>), Error> // Sql and then Header
     {
         let members_query_ir = self.get_dim_col_table(cube, level_name)?;
@@ -233,30 +231,11 @@ impl Schema {
             "".into()
         };
 
-        let sanitize = Regex::new(r"\W").unwrap();
-        let filter_stmt = if filter.len() > 0 {
-            let filter_term = sanitize.replace_all(filter, |caps: &Captures| {
-                if caps.len() > 1 { "%" } else { "_" }
-            });
-            let table_cols = if has_label {
-                vec![key_col.clone(), name_col.clone()]
-            } else {
-                vec![key_col.clone()]
-            };
-            let filter_ilikes = table_cols.iter().map(|name| {
-                format!("ilike({},%{}%)", name.clone(), filter_term)
-            });
-            format!(" where {}", filter_ilikes.collect::<Vec<String>>().join(" or "))
-        } else {
-            "".into()
-        };
-
-        let sql = format!("select distinct {}{}{} from {}{}",
+        let sql = format!("select distinct {}{}{} from {}",
             key_col,
             if has_label { ", " } else { "" },
             name_col,
             members_query_ir.table_sql,
-            filter_stmt,
         );
 
         Ok((sql, header))
@@ -268,7 +247,6 @@ impl Schema {
         &self,
         cube_name: &str,
         level_name: &LevelName,
-        filter: &str,
         locale: &str
     ) -> Result<(String, Vec<String>), Error> // Sql and then Header
     {
@@ -335,25 +313,11 @@ impl Schema {
             table.full_name()
         };
 
-        let sanitize = Regex::new(r"\W").unwrap();
-        let filter_stmt = if filter.len() > 0 {
-            let filter_term = sanitize.replace_all(filter, |caps: &Captures| {
-                if caps.len() > 1 { "%" } else { "_" }
-            });
-            let filter_ilikes = name_columns.iter().map(|name| {
-                format!("ilike({},%{}%)", name, filter_term)
-            });
-            format!(" where {}", filter_ilikes.collect::<Vec<String>>().join(" or "))
-        } else {
-            "".into()
-        };
-
-        let sql = format!("select distinct {}{}{} from {}{} order by {}",
+        let sql = format!("select distinct {}{}{} from {} order by {}",
             key_column,
             if name_columns.len() > 0 { ", " } else { "" },
             name_columns.join(", "),
             table_sql,
-            filter_stmt,
             key_column
         );
 

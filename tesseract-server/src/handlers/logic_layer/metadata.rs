@@ -17,6 +17,7 @@ use crate::logic_layer::{LogicLayerConfig};
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
+use tesseract_core::{DataFrame, Datum};
 
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
@@ -71,11 +72,6 @@ pub fn get_members(
 
     let mut cube_name = members_query.cube.clone();
     let mut level_name: Option<LevelName> = None;
-
-    let name_filter = match members_query.filter {
-        Some(filter) => filter.to_owned(),
-        None => "".into(),
-    };
 
     // Get cube object to check for API key
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
@@ -151,8 +147,8 @@ pub fn get_members(
     debug!("{:?}", level_name);
 
     let members_sql_and_headers = match members_query.locale {
-        Some(locale) => schema.members_locale_sql(&cube_name, &level_name, &name_filter, &locale),
-        None => schema.members_sql(&cube_name, &level_name, &name_filter)
+        Some(locale) => schema.members_locale_sql(&cube_name, &level_name, &locale),
+        None => schema.members_sql(&cube_name, &level_name)
     };
 
     let (members_sql, header) = match members_sql_and_headers {
@@ -169,12 +165,25 @@ pub fn get_members(
     debug!("{:?}", members_sql);
     debug!("{:?}", header);
 
+    let filter_term = members_query.filter.unwrap_or("".to_string()).to_lowercase();
+
     req.state()
         .backend
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
+
+            let mut df = DataFrame::from_vec(df.columns);
+            if filter_term.len() > 0 {
+                df.drain_filter(&mut |datum, _| match datum.get("") {
+                    Some(value) => match value {
+                        Datum::Text(txt) => txt.to_lowercase().contains(filter_term.as_str()),
+                        _ => true,
+                    },
+                    None => true,
+                });
+            }
 
             match format_records(&header, df, format, None, false) {
                 Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
