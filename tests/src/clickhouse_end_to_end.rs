@@ -201,6 +201,24 @@ mod tests {
         
         use actix_web::{actix, client};
         use futures::Future;
+
+        // Test member filtering
+        actix::run(
+            || client::get("http://127.0.0.1:7777/members?cube=Sales&level=Unique+Category&filter=v")
+                .header("User-Agent", "Actix-web")
+                .finish().unwrap()
+                .send()
+                .map_err(|_| ())
+                .and_then(|response| {
+                    assert_eq!(response.status(), 200);
+                    let res = response.body().wait().expect("Failed to parse test API response body");
+                    let expected = "{\"data\":[{\"ID\":3,\"Label\":\"Various\"},{\"ID\":4,\"Label\":\"Videos\"}]}";
+                    assert_eq!(res, expected);
+                    actix::System::current().stop();
+                    Ok(())
+                })
+        );
+
         actix::run(
             || client::get("http://127.0.0.1:7777/data?cube=Sales&drilldowns=Year&measures=Quantity&Year=2017")
                 .header("User-Agent", "Actix-web")
