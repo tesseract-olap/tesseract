@@ -15,7 +15,7 @@ use serde_qs as qs;
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::metadata::{CubeMetadata, PropertyMetadata};
-use tesseract_core::{DEFAULT_ALLOWED_ACCESS, DataFrame, Datum};
+use tesseract_core::{DEFAULT_ALLOWED_ACCESS, ColumnData, DataFrame, Datum};
 
 use crate::app::AppState;
 use crate::logic_layer::LogicLayerConfig;
@@ -177,11 +177,6 @@ pub fn do_members(
 
     let level: LevelName = ok_or_400!(query.level.parse());
 
-    let filter_term = match query.filter {
-        Some(filter) => filter.to_owned(),
-        None => "".into(),
-    };
-
     info!("Members for cube: {}, level: {}", cube, level);
 
     let members_sql_and_headers = req.state()
@@ -191,19 +186,43 @@ pub fn do_members(
 
     let (members_sql, header) = ok_or_400!(members_sql_and_headers);
 
+    let filter_term = query.filter.unwrap_or("".to_string()).to_lowercase();
+
     req.state()
         .backend
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
             let mut df = DataFrame {..df};
+
+            // If there's a filtering term
             if filter_term.len() > 0 {
-                df.drain_filter(&mut |datum, _| match datum.get("Label") {
-                    Some(value) => match value {
-                        Datum::Text(txt) => txt.contains(filter_term.as_str()),
-                        _ => true,
-                    },
-                    None => true,
+                debug!("Filtering by: {}", filter_term);
+
+                // Collect all column names with text data
+                let mut columns: Vec<String> = Vec::new();
+                for column in &df.columns {
+                    match &column.column_data {
+                        ColumnData::Text(_) => columns.push(column.name.clone()),
+                        ColumnData::NullableText(_) => columns.push(column.name.clone()),
+                        _ => {},
+                    };
+                }
+
+                df.drain_filter(&mut |datum, _| {
+                    columns.iter().all(|name| {
+                        match datum.get(name.as_str()) {
+                            Some(value) => match value {
+                                Datum::Text(txt) => txt.to_lowercase().contains(filter_term.as_str()),
+                                Datum::NullableText(res) => match res {
+                                    Some(txt) => txt.to_lowercase().contains(filter_term.as_str()),
+                                    None => false
+                                },
+                                _ => true,
+                            },
+                            None => true,
+                        }
+                    })
                 });
             }
 

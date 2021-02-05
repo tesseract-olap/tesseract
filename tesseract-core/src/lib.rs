@@ -231,11 +231,12 @@ impl Schema {
             "".into()
         };
 
-        let sql = format!("select distinct {}{}{} from {}",
+        let sql = format!("select distinct {}{}{} from {} order by {}",
             key_col,
             if has_label { ", " } else { "" },
             name_col,
             members_query_ir.table_sql,
+            key_col,
         );
 
         Ok((sql, header))

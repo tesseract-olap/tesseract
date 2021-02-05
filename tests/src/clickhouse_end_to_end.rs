@@ -203,8 +203,8 @@ mod tests {
         use futures::Future;
 
         // Test member filtering
-        actix::run(
-            || client::get("http://127.0.0.1:7777/members?cube=Sales&level=Unique+Category&filter=v")
+        actix::run(|| {
+            let f1 = client::get("http://127.0.0.1:7777/members?cube=Sales&level=Unique+Category&filter=v")
                 .header("User-Agent", "Actix-web")
                 .finish().unwrap()
                 .send()
@@ -214,13 +214,10 @@ mod tests {
                     let res = response.body().wait().expect("Failed to parse test API response body");
                     let expected = "{\"data\":[{\"ID\":3,\"Label\":\"Various\"},{\"ID\":4,\"Label\":\"Videos\"}]}";
                     assert_eq!(res, expected);
-                    actix::System::current().stop();
                     Ok(())
-                })
-        );
+                });
 
-        actix::run(
-            || client::get("http://127.0.0.1:7777/data?cube=Sales&drilldowns=Year&measures=Quantity&Year=2017")
+            client::get("http://127.0.0.1:7777/data?cube=Sales&drilldowns=Year&measures=Quantity&Year=2017")
                 .header("User-Agent", "Actix-web")
                 .finish().unwrap()
                 .send()
@@ -230,10 +227,14 @@ mod tests {
                     let res = response.body().wait().expect("Failed to parse test API response body");
                     let expected = "{\"data\":[{\"Year\":2017,\"Quantity\":266.0}],\n\"source\": [\n{\"name\":\"Sales\",\"measures\":[\"Price Total\",\"Quantity\"],\"annotations\":null}\n]}";
                     assert_eq!(res, expected);
+
+                    f1
+                })
+                .and_then(|_| {
                     actix::System::current().stop();
                     Ok(())
                 })
-        );
+        });
     
     }
 }
