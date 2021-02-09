@@ -13,6 +13,7 @@ use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 
 use crate::app::AppState;
+use crate::handlers::metadata::apply_filter_term;
 use crate::logic_layer::{LogicLayerConfig};
 
 use tesseract_core::format::{format_records, FormatType};
@@ -164,12 +165,19 @@ pub fn get_members(
     debug!("{:?}", members_sql);
     debug!("{:?}", header);
 
+    let filter_term = members_query.filter.unwrap_or("".to_string()).to_lowercase();
+
     req.state()
         .backend
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
+
+            let df = match filter_term.len() {
+                0 => df,
+                _ => apply_filter_term(df, &filter_term),
+            };
 
             match format_records(&header, df, format, None, false) {
                 Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
@@ -183,6 +191,7 @@ pub fn get_members(
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MembersQueryOpt {
     pub cube: String,
+    pub filter: Option<String>,
     pub level: String,
     pub locale: Option<String>,
 }

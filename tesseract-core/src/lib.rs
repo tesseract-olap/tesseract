@@ -17,7 +17,7 @@ use std::str::FromStr;
 use crate::schema::{SchemaConfigJson, SchemaConfigXML};
 
 pub use self::backend::Backend;
-pub use self::dataframe::{DataFrame, Column, ColumnData, is_same_columndata_type};
+pub use self::dataframe::{DataFrame, Datum, Column, ColumnData, is_same_columndata_type};
 
 pub static DEFAULT_ALLOWED_ACCESS: i32 = 0;
 
@@ -216,23 +216,27 @@ impl Schema {
     {
         let members_query_ir = self.get_dim_col_table(cube, level_name)?;
 
-        let header = if members_query_ir.name_column.is_some() {
+        let has_label = members_query_ir.name_column.is_some();
+
+        let header = if has_label {
             vec!["ID".into(), "Label".into()]
         } else {
             vec!["ID".into()]
         };
 
+        let key_col = members_query_ir.key_column.clone();
         let name_col = if let Some(ref col) = members_query_ir.name_column {
            col.to_owned()
         } else {
             "".into()
         };
 
-        let sql = format!("select distinct {}{}{} from {}",
-            members_query_ir.key_column,
-            if members_query_ir.name_column.is_some() { ", " } else { "" },
+        let sql = format!("select distinct {}{}{} from {} order by {}",
+            key_col,
+            if has_label { ", " } else { "" },
             name_col,
             members_query_ir.table_sql,
+            key_col,
         );
 
         Ok((sql, header))
