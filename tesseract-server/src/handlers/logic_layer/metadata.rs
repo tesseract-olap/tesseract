@@ -13,11 +13,11 @@ use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 
 use crate::app::AppState;
+use crate::handlers::metadata::apply_filter_term;
 use crate::logic_layer::{LogicLayerConfig};
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
-use tesseract_core::{ColumnData, DataFrame, Datum};
 
 use super::super::util::{
     boxed_error_string, boxed_error_http_response,
@@ -173,38 +173,11 @@ pub fn get_members(
         .from_err()
         .and_then(move |df| {
             let content_type = format_to_content_type(&format);
-            let mut df = DataFrame::from_vec(df.columns);
 
-            // If there's a filtering term
-            if filter_term.len() > 0 {
-                debug!("Filtering by: {}", filter_term);
-
-                // Collect all column names with text data
-                let mut columns: Vec<String> = Vec::new();
-                for column in &df.columns {
-                    match &column.column_data {
-                        ColumnData::Text(_) => columns.push(column.name.clone()),
-                        ColumnData::NullableText(_) => columns.push(column.name.clone()),
-                        _ => {},
-                    };
-                }
-
-                df.drain_filter(&mut |datum, _| {
-                    columns.iter().all(|name| {
-                        match datum.get(name.as_str()) {
-                            Some(value) => match value {
-                                Datum::Text(txt) => txt.to_lowercase().contains(filter_term.as_str()),
-                                Datum::NullableText(res) => match res {
-                                    Some(txt) => txt.to_lowercase().contains(filter_term.as_str()),
-                                    None => false
-                                },
-                                _ => true,
-                            },
-                            None => true,
-                        }
-                    })
-                });
-            }
+            let df = match filter_term.len() {
+                0 => df,
+                _ => apply_filter_term(df, &filter_term),
+            };
 
             match format_records(&header, df, format, None, false) {
                 Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),

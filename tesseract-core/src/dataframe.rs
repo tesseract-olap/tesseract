@@ -27,9 +27,9 @@ impl DataFrame {
         }
     }
 
-    pub fn drain_filter<P>(&mut self, predicate: &mut P) -> ()
+    pub fn drain_filter<P>(mut self, predicate: P) -> Self
     where
-        P: FnMut(HashMap<&str, Datum>, usize) -> bool,
+        P: Fn(HashMap<&str, Datum>, usize) -> bool,
     {
         let col_amount = self.columns.len();
 
@@ -77,6 +77,8 @@ impl DataFrame {
                 i += 1;
             }
         }
+
+        self
     }
 }
 
@@ -557,7 +559,7 @@ mod tests {
 
     #[test]
     fn test_dataframe_filter() {
-        let mut df = DataFrame::from_vec(vec![
+        let df = DataFrame::from_vec(vec![
             Column::new("id".to_string(), ColumnData::Int8(vec![1, 2, 3, 4, 5])),
             Column::new(
                 "label".to_string(),
@@ -583,7 +585,7 @@ mod tests {
 
         assert_eq!(5, df.len());
 
-        df.drain_filter(&mut |row, _| match row.get("id") {
+        let df = df.drain_filter(|row, _| match row.get("id") {
             Some(value) => match value {
                 Datum::Int8(id) => id % 2 != 0,
                 _ => false,

@@ -15,7 +15,7 @@ use serde_qs as qs;
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::{LevelName, Property};
 use tesseract_core::schema::metadata::{CubeMetadata, PropertyMetadata};
-use tesseract_core::{DEFAULT_ALLOWED_ACCESS, ColumnData, DataFrame, Datum};
+use tesseract_core::{DEFAULT_ALLOWED_ACCESS, Column, ColumnData, DataFrame, Datum};
 
 use crate::app::AppState;
 use crate::logic_layer::LogicLayerConfig;
@@ -193,38 +193,10 @@ pub fn do_members(
         .exec_sql(members_sql)
         .from_err()
         .and_then(move |df| {
-            let mut df = DataFrame {..df};
-
-            // If there's a filtering term
-            if filter_term.len() > 0 {
-                debug!("Filtering by: {}", filter_term);
-
-                // Collect all column names with text data
-                let mut columns: Vec<String> = Vec::new();
-                for column in &df.columns {
-                    match &column.column_data {
-                        ColumnData::Text(_) => columns.push(column.name.clone()),
-                        ColumnData::NullableText(_) => columns.push(column.name.clone()),
-                        _ => {},
-                    };
-                }
-
-                df.drain_filter(&mut |datum, _| {
-                    columns.iter().all(|name| {
-                        match datum.get(name.as_str()) {
-                            Some(value) => match value {
-                                Datum::Text(txt) => txt.to_lowercase().contains(filter_term.as_str()),
-                                Datum::NullableText(res) => match res {
-                                    Some(txt) => txt.to_lowercase().contains(filter_term.as_str()),
-                                    None => false
-                                },
-                                _ => true,
-                            },
-                            None => true,
-                        }
-                    })
-                });
-            }
+            let df = match filter_term.len() {
+                0 => df,
+                _ => apply_filter_term(df, &filter_term),
+            };
 
             match format_records(&header, df, format, None, false) {
                 Ok(res) => Ok(HttpResponse::Ok().body(res)),
@@ -232,6 +204,36 @@ pub fn do_members(
             }
         })
         .responder()
+}
+
+
+pub fn apply_filter_term(df: DataFrame, term: &str) -> DataFrame {
+    debug!("Filtering dataframe by: {}", term);
+
+    // Collect all column names with text data
+    let columns: Vec<String> = (&df.columns).iter()
+        .filter_map(|column| match column.column_data {
+            ColumnData::Text(_) => Some(column.name.clone()),
+            ColumnData::NullableText(_) => Some(column.name.clone()),
+            _ => None,
+        })
+        .collect();
+
+    df.drain_filter(|datum, _| {
+        columns.iter().all(|name| {
+            match datum.get(name.as_str()) {
+                Some(value) => match value {
+                    Datum::Text(txt) => txt.to_lowercase().contains(term),
+                    Datum::NullableText(res) => match res {
+                        Some(txt) => txt.to_lowercase().contains(term),
+                        None => false
+                    },
+                    _ => true,
+                },
+                None => true,
+            }
+        })
+    })
 }
 
 
