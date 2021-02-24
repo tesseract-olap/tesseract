@@ -11,6 +11,7 @@ futures = "0.1.25"
 itertools = "0.8.0"
 log = "0.4.3"
 regex = "1"
+tokio = "0.1"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"
