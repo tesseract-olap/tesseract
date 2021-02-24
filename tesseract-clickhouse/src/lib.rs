@@ -1,10 +1,11 @@
-use clickhouse_rs::Pool;
+use clickhouse_rs::{ClientHandle, Pool};
 use clickhouse_rs::types::{Options, Simple, Complex, Block};
 use failure::{Error, format_err};
 use futures::{future, Future, Stream};
 use log::*;
 use std::time::{Duration, Instant};
 use tesseract_core::{Backend, DataFrame, QueryIr};
+use tokio::prelude::FutureExt;
 
 use regex::Regex;
 
@@ -93,6 +94,19 @@ impl Backend for Clickhouse {
         clickhouse_sql(
             &query_ir
         )
+    }
+
+    fn ping(&self) -> Box<dyn Future<Item=(), Error=()>> {
+        let fut = self.pool
+            .get_handle()
+            .and_then(ClientHandle::ping)
+            .timeout(Duration::from_secs(1))
+            .then(|result| match result {
+                Ok(_) => Ok(()),
+                Err(_) => Err(()),
+            });
+
+        Box::new(fut)
     }
 }
 

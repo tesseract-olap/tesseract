@@ -38,6 +38,9 @@ pub trait Backend {
             &query_ir.growth,
         )
     }
+
+    /// Executes a healthcheck verification for the backend connection.
+    fn ping(&self) -> Box<dyn Future<Item=(), Error=()>>;
 }
 
 impl Clone for Box<dyn Backend + Send + Sync> {

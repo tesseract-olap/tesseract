@@ -1,6 +1,8 @@
 use failure::{Error, format_err};
 use futures::future::Future;
+use std::time::Duration;
 use tesseract_core::{Backend, DataFrame};
+use tokio::prelude::FutureExt;
 
 extern crate futures;
 extern crate mysql_async as my;
@@ -42,6 +44,18 @@ impl Backend for MySql {
 
     fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
         Box::new((*self).clone())
+    }
+
+    fn ping(&self) -> Box<dyn Future<Item=(), Error=()>> {
+        let future = self.pool.get_conn()
+            .and_then(my::Conn::ping)
+            .timeout(Duration::from_secs(1))
+            .then(|result| match result {
+                Ok(_) => Ok(()),
+                Err(_) => Err(()),
+            });
+
+        Box::new(future)
     }
 }
 

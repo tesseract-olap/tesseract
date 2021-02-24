@@ -76,6 +76,20 @@ impl Backend for Postgres {
     fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
         Box::new((*self).clone())
     }
+
+    fn ping(&self) -> Box<dyn Future<Item=(), Error=()>> {
+        // TODO: check implementation
+        // let fut = self.pool.run(move |conn| {
+        //     conn.prepare("SELECT 1")
+        //         .and_then(|statement| conn.query(&statement, &[]).collect())
+        //         .then(|result| match result {
+        //             Ok(_) => Ok(((), conn)),
+        //             Err(_) => Err(((), conn)),
+        //         })
+        // });
+        let fut = futures::future::result(Ok(()));
+        Box::new(fut)
+    }
 }
 
 

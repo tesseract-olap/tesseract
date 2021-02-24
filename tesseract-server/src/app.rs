@@ -20,6 +20,7 @@ use crate::handlers::{
     logic_layer_members_handler,
     logic_layer_members_default_handler,
     flush_handler,
+    healthcheck_handler,
     index_handler,
     metadata_handler,
     metadata_all_handler,
@@ -129,6 +130,12 @@ pub fn create_app(
             r.method(Method::GET).with(diagnosis_handler)
         })
 
+        // Healthcheck
+        .resource("/healthcheck", |r| {
+            r.method(Method::GET).with(healthcheck_handler)
+        })
+
+        // Cache flush
         .resource("/flush", |r| {
             r.method(Method::POST).with(flush_handler)
         })

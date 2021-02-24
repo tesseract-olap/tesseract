@@ -5,10 +5,11 @@ name = "tesseract-mysql"
 version = "0.1.0"
 
 [dependencies]
-mysql_async = "0.16.0"
 failure = "0.1.2"
 futures = "0.1.25"
 log = "0.4.3"
+mysql_async = "0.16.0"
+tokio = "0.1"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"
