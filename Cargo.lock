@@ -3254,10 +3254,10 @@ dependencies = [
 name = "tesseract-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bytes 0.4.12",
  "csv",
- "failure",
- "futures 0.1.30",
+ "futures 0.3.13",
  "indexmap",
  "itertools 0.7.11",
  "log",
