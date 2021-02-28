@@ -4,12 +4,11 @@ use actix_web::{
     HttpResponse,
 };
 
-use std::future::{self, Future};
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
@@ -51,7 +50,7 @@ pub async fn aggregate_handler(
 pub async fn do_aggregate(
     req: HttpRequest,
     state: web::Data<AppState>,
-    cube_format: web::Path<(String, String)>,
+    cube_format: (String, String),
     ) -> HttpResponse
 {
     let (cube, format) = cube_format;

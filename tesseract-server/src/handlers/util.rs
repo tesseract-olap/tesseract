@@ -4,7 +4,6 @@ use actix_web::{
     HttpRequest,
     HttpResponse,
 };
-use futures::future;
 use actix_web::http::header::ContentType;
 use log::*;
 use mime;
@@ -16,7 +15,6 @@ use tesseract_core::schema::metadata::SourceMetadata;
 
 use crate::app::AppState;
 
-use failure::{bail, format_err, Error};
 use tesseract_core::names::Cut;
 use crate::logic_layer::CubeCache;
 use crate::auth::{validate_web_token, extract_token, user_auth_level};
@@ -91,10 +89,8 @@ macro_rules! ok_or_400 {
         match $expr {
             Ok(val) => val,
             Err(err) => {
-                return Box::new(
-                    future::result(
-                        Ok(HttpResponse::BadRequest().json(err.to_string()))
-                    )
+                return future::result(
+                    Ok(HttpResponse::BadRequest().json(err.to_string()))
                 );
             }
         }
@@ -108,10 +104,8 @@ macro_rules! ok_or_404 {
         match $expr {
             Ok(val) => val,
             Err(err) => {
-                return Box::new(
-                    future::result(
-                        Ok(HttpResponse::NotFound().json(err.to_string()))
-                    )
+                return std::future::result(
+                    Ok(HttpResponse::NotFound().json(err.to_string()))
                 );
             }
         }
@@ -125,10 +119,8 @@ macro_rules! some_or_404 {
         match $expr {
             Some(val) => val,
             None => {
-                return Box::new(
-                    future::result(
-                        Ok(HttpResponse::NotFound().json($note.to_string()))
-                    )
+                return future::result(
+                    Ok(HttpResponse::NotFound().json($note.to_string()))
                 );
             }
         }
