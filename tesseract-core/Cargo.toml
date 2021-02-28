@@ -6,6 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 anyhow = "1"
+async-trait = "0.1.42"
 bytes = "0.4.12"
 csv = "1.0.2"
 futures = "0.3.13"
