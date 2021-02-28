@@ -1,8 +1,8 @@
 use actix_web::{
-    FutureResponse,
+    web,
     HttpRequest,
     HttpResponse,
-    Path,
+    Result as ActixResult,
 };
 use futures::future;
 use lazy_static::lazy_static;
@@ -20,29 +20,34 @@ use super::util::{boxed_error_http_response, verify_authorization, format_to_con
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub fn aggregate_default_handler(
-    (req, cube): (HttpRequest<AppState>, Path<String>)
-    ) -> FutureResponse<HttpResponse>
+pub async fn aggregate_default_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube: web::Path<String>,
+) -> ActixResult<HttpResponse>
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
-    do_aggregate(req, cube_format)
+    do_aggregate(req, cube_format).await
 }
 
 
 /// Handles aggregation when a format is specified.
-pub fn aggregate_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
-    ) -> FutureResponse<HttpResponse>
+pub async fn aggregate_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<(String, String)>,
+) -> ActixResult<HttpResponse>
 {
-    do_aggregate(req, cube_format.into_inner())
+    do_aggregate(req, cube_format.into_inner()).await
 }
 
 
 /// Performs data aggregation.
-pub fn do_aggregate(
-    req: HttpRequest<AppState>,
-    cube_format: (String, String),
-    ) -> FutureResponse<HttpResponse>
+pub async fn do_aggregate(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<(String, String)>,
+) -> ActixResult<HttpResponse>
 {
     let (cube, format) = cube_format;
 

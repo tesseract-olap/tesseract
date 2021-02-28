@@ -1,9 +1,7 @@
 use actix_web::{
-    AsyncResponder,
-    FutureResponse,
+    web,
     HttpRequest,
     HttpResponse,
-    Path,
     Result as ActixResult
 };
 
@@ -22,12 +20,14 @@ use crate::logic_layer::LogicLayerConfig;
 use super::util::{boxed_error_http_response, verify_authorization, get_user_auth_level};
 
 
-pub fn metadata_handler(
-    (req, cube): (HttpRequest<AppState>, Path<String>)
+pub async fn metadata_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube: web::Path<String>,
     ) -> ActixResult<HttpResponse>
 {
     info!("Metadata for cube: {}", cube);
-    let cube = match req.state().schema.read().unwrap().cube_metadata(&cube){
+    let cube = match state.schema.read().unwrap().cube_metadata(&cube){
         Some(c) => c,
         None => return Ok(HttpResponse::NotFound().finish()),
     };
@@ -36,7 +36,7 @@ pub fn metadata_handler(
         return Ok(err);
     }
 
-    let ll_config = match &req.state().logic_layer_config {
+    let ll_config = match &state.logic_layer_config {
         Some(llc) => llc.read().unwrap().clone(),
         None => return  Ok(HttpResponse::Ok().json(cube))
     };
@@ -45,14 +45,15 @@ pub fn metadata_handler(
 }
 
 
-pub fn metadata_all_handler(
-    req: HttpRequest<AppState>
+pub async fn metadata_all_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
     ) -> ActixResult<HttpResponse>
 {
     info!("Metadata for all");
     let user_auth_level = get_user_auth_level(&req);
-    let mut schema_details = req.state().schema.read().unwrap().metadata(user_auth_level);
-    let ll_config = match &req.state().logic_layer_config {
+    let mut schema_details = state.schema.read().unwrap().metadata(user_auth_level);
+    let ll_config = match &state.logic_layer_config {
         Some(llc) => llc.read().unwrap().clone(),
         None => {
             return  Ok(HttpResponse::Ok().json(schema_details))
@@ -76,18 +77,22 @@ pub fn metadata_all_handler(
 }
 
 
-pub fn members_default_handler(
-    (req, cube): (HttpRequest<AppState>, Path<String>)
-    ) -> FutureResponse<HttpResponse>
+pub async fn members_default_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube: web::Path<String>,
+    ) -> ActixResult<HttpResponse>
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
     do_members(req, cube_format)
 }
 
 
-pub fn members_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
-    ) -> FutureResponse<HttpResponse>
+pub async fn members_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<(String, String)>,
+    ) -> ActixResult<HttpResponse>
 {
     do_members(req, cube_format.into_inner())
 }
@@ -149,15 +154,16 @@ pub fn get_cube_metadata(
 }
 
 
-pub fn do_members(
-    req: HttpRequest<AppState>,
-    cube_format: (String, String),
-    ) -> FutureResponse<HttpResponse>
+pub async fn do_members(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<(String, String)>,
+    ) -> ActixResult<HttpResponse>
 {
     let (cube, format) = cube_format;
 
     // Get cube object to check for API key
-    let schema = &req.state().schema.read().unwrap().clone();
+    let schema = &state.schema.read().unwrap().clone();
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
 
     if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
@@ -179,12 +185,12 @@ pub fn do_members(
 
     info!("Members for cube: {}, level: {}", cube, level);
 
-    let members_sql_and_headers = req.state().schema.read().unwrap()
+    let members_sql_and_headers = state.schema.read().unwrap()
         .members_sql(&cube, &level);
 
     let (members_sql, header) = ok_or_400!(members_sql_and_headers);
 
-    req.state()
+    state
         .backend
         .exec_sql(members_sql)
         .from_err()

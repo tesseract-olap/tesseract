@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use actix_web::{
-    FutureResponse,
+    web,
     HttpRequest,
     HttpResponse,
 };
-use futures::future::{self};
+use futures::future;
 use actix_web::http::header::ContentType;
 use log::*;
 use mime;
@@ -31,7 +31,7 @@ pub(crate) fn format_to_content_type(format_type: &FormatType) -> ContentType {
 
 
 /// Helper method to return errors (FutureResponse<HttpResponse>) from String.
-pub fn boxed_error_string(message: String) -> FutureResponse<HttpResponse> {
+pub fn boxed_error_string(message: String) -> HttpResponse {
     Box::new(
         future::result(
             Ok(HttpResponse::NotFound().json(message))
@@ -40,7 +40,7 @@ pub fn boxed_error_string(message: String) -> FutureResponse<HttpResponse> {
 }
 
 /// Helper method to return errors (FutureResponse<HttpResponse>) from HttpResponse.
-pub fn boxed_error_http_response(response: HttpResponse) -> FutureResponse<HttpResponse> {
+pub fn boxed_error_http_response(response: HttpResponse) -> HttpResponse {
     Box::new(future::result(Ok(response)))
 }
 
@@ -68,14 +68,14 @@ pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
     }
 }
 
-pub fn get_user_auth_level(req: &HttpRequest<AppState>) -> Option<i32> {
-    let jwt_secret = &req.state().env_vars.jwt_secret;
+pub fn get_user_auth_level(req: &HttpRequest, state: web::Data<AppState>) -> Option<i32> {
+    let jwt_secret = &state.env_vars.jwt_secret;
     let user_token = extract_token(req);
     user_auth_level(jwt_secret, &user_token)
 }
 
-pub fn verify_authorization(req: &HttpRequest<AppState>, min_auth_level: i32) -> Result<(), HttpResponse> {
-    let jwt_secret = &req.state().env_vars.jwt_secret;
+pub fn verify_authorization(req: &HttpRequest, state: web::Data<AppState>, min_auth_level: i32) -> Result<(), HttpResponse> {
+    let jwt_secret = &state.env_vars.jwt_secret;
     let user_token = extract_token(req);
     if !validate_web_token(jwt_secret, &user_token, min_auth_level) {
         return Err(HttpResponse::Unauthorized().json("This cube is not public".to_string()));
@@ -153,7 +153,7 @@ pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Erro
 
 /// Gets the Redis cache key for a given query.
 /// The sorting of query param keys is an attempt to increase cache hits.
-pub fn get_redis_cache_key(prefix: &str, req: &HttpRequest<AppState>, cube: &str, format: &FormatType) -> String {
+pub fn get_redis_cache_key(prefix: &str, req: &HttpRequest, state: web::Data<AppState>, cube: &str, format: &FormatType) -> String {
     let mut qry = req.query().clone();
     qry.remove("x-tesseract-jwt-token");
 
@@ -181,7 +181,7 @@ pub fn check_redis_cache(
         format: &FormatType,
         redis_pool: &Option<r2d2::Pool<RedisConnectionManager>>,
         redis_cache_key: &str
-) -> Option<FutureResponse<HttpResponse>> {
+) -> Option<HttpResponse> {
     if let Some(rpool) = redis_pool {
         let conn_result = rpool.get();
 

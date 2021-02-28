@@ -29,7 +29,6 @@ mod schema_config;
 
 use actix_web::server;
 use dotenv::dotenv;
-use failure::{Error, format_err};
 use log::*;
 use std::env;
 use structopt::StructOpt;
@@ -37,7 +36,7 @@ use url::Url;
 
 use std::sync::{Arc, RwLock};
 
-use crate::app::{EnvVars, SchemaSource, create_app};
+use crate::app::{EnvVars, SchemaSource, config_app};
 use r2d2_redis::{r2d2, RedisConnectionManager};
 
 fn main() -> Result<(), Error> {
@@ -196,26 +195,28 @@ fn main() -> Result<(), Error> {
     };
 
     // Initialize Server
-    server::new(
-        move|| create_app(
-                debug,
-                db.clone(),
-                match &redis_pool {
-                    Some(pool) => Some(pool.clone()),
-                    None => None
-                },
-                db_type.clone(),
-                env_vars.clone(),
-                schema_arc.clone(),
-                cache_arc.clone(),
-                logic_layer_config.clone(),
-                streaming_response,
-                has_unique_levels_properties.clone(),
-            )
-        )
-        .bind(&server_addr)
-        .expect(&format!("cannot bind to {}", server_addr))
-        .start();
+    HttpServer::new(move|| {
+        App::new()
+            .configure(|cfg: &mut web::ServiceConfig| {
+                config_app(
+                    cfg,
+                    debug,
+                    db.clone(),
+                    db_type.clone(),
+                    env_vars.clone(),
+                    schema_arc.clone(),
+                    cache_arc.clone(),
+                    logic_layer_config.clone(),
+                    streaming_response,
+                    has_unique_levels_properties.clone(),
+                )
+            })
+        .wrap(middleware::Logger::default())
+        .wrap(middleware::DefaultHeaders::new().header("Vary", "Accept-Encoding"))
+    })
+    .bind(&server_addr)
+    .run()
+    .await;
 
     println!("Tesseract listening on: {}", server_addr);
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);

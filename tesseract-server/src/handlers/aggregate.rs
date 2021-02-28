@@ -1,13 +1,10 @@
 use actix_web::{
-    AsyncResponder,
-    FutureResponse,
+    web,
     HttpRequest,
     HttpResponse,
-    Path,
 };
 
-use failure::Error;
-use futures::future::{self, Future};
+use std::future::{self, Future};
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
@@ -25,38 +22,42 @@ use super::util::{
     format_to_content_type, generate_source_data,
     get_redis_cache_key, check_redis_cache, insert_into_redis_cache
 };
-use r2d2_redis::{redis};
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub fn aggregate_default_handler(
-    (req, cube): (HttpRequest<AppState>, Path<String>)
-    ) -> FutureResponse<HttpResponse>
+pub async fn aggregate_default_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube: web::Path<String>,
+    ) -> HttpResponse
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
-    do_aggregate(req, cube_format)
+    do_aggregate(req, state, cube_format).await
 }
 
 
 /// Handles aggregation when a format is specified.
-pub fn aggregate_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String, String)>)
-    ) -> FutureResponse<HttpResponse>
+pub async fn aggregate_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<(String, String)>,
+    ) -> HttpResponse
 {
-    do_aggregate(req, cube_format.into_inner())
+    do_aggregate(req, state, cube_format.into_inner()).await
 }
 
 
 /// Performs data aggregation.
-pub fn do_aggregate(
-    req: HttpRequest<AppState>,
-    cube_format: (String, String),
-    ) -> FutureResponse<HttpResponse>
+pub async fn do_aggregate(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<(String, String)>,
+    ) -> HttpResponse
 {
     let (cube, format) = cube_format;
 
     // Get cube object to check for API key
-    let schema = &req.state().schema.read().unwrap().clone();
+    let schema = &state.schema.read().unwrap().clone();
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
 
     if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
@@ -78,7 +79,7 @@ pub fn do_aggregate(
     info!("query opts:{:?}", agg_query);
 
     // Check if this query is already cached
-    let redis_pool = req.state().redis_pool.clone();
+    let redis_pool = state.redis_pool.clone();
     let redis_cache_key = get_redis_cache_key("core", &req, &cube, &format);
 
     if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
@@ -97,7 +98,7 @@ pub fn do_aggregate(
     // this is in braces to explicitly the scope in which
     // req is borrowed, since req is moved later in the `map_err`
     {
-        let cache = req.state().cache.read().unwrap();
+        let cache = state.cache.read().unwrap();
         let cube_cache = some_or_404!(cache.find_cube_info(&cube), format!("Cube {} not found", cube));
         ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));
     }
@@ -105,14 +106,14 @@ pub fn do_aggregate(
     let query_ir_headers = schema.sql_query(&cube, &ts_query, None);
     let (query_ir, headers) = ok_or_404!(query_ir_headers);
 
-    let sql = req.state()
+    let sql = state
         .backend
         .generate_sql(query_ir);
 
     info!("Sql query: {}", sql);
     info!("Headers: {:?}", headers);
     
-    req.state()
+    state
         .backend
         .exec_sql(sql)
         .and_then(move |df| {
@@ -131,7 +132,7 @@ pub fn do_aggregate(
             }
         })
         .map_err(move |e| {
-            if req.state().debug {
+            if state.debug {
                 ServerError::Db { cause: e.to_string() }.into()
             } else {
                 ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()

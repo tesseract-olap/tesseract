@@ -1,46 +1,45 @@
-use std::collections::HashMap;
 use std::str;
 
 use actix_web::{
+    web,
     HttpRequest,
     HttpResponse,
-    Path,
     Result as ActixResult,
 };
-use failure::{Error, format_err};
+use failure::Error;
 use futures::future::Future;
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
 use serde_derive::Deserialize;
-use url::Url;
 
-use tesseract_core::names::{Property, LevelName};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::{DataFrame, Column, ColumnData};
-use tesseract_core::schema::{Cube, DimensionType, Level};
+use tesseract_core::schema::{Cube, Level};
 use crate::app::AppState;
-use crate::logic_layer::{LogicLayerConfig, CubeCache};
 use crate::handlers::util::{verify_authorization, format_to_content_type};
-use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is jsonrecords.
-pub fn diagnosis_default_handler(
-    (req, _cube): (HttpRequest<AppState>, Path<()>)
+pub async fn diagnosis_default_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    _cube: web::Path<()>,
 ) -> ActixResult<HttpResponse>
 {
-    perform_diagnosis(req, "jsonrecords".to_owned())
+    perform_diagnosis(req, "jsonrecords".to_owned()).await
 }
 
 
 /// Handles aggregation when a format is specified.
-pub fn diagnosis_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String)>)
+pub async fn diagnosis_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<String>,
 ) -> ActixResult<HttpResponse>
 {
-    perform_diagnosis(req, cube_format.to_owned())
+    perform_diagnosis(req, cube_format.to_owned()).await
 }
 
 
@@ -51,8 +50,9 @@ pub struct DiagnosisQueryOpt {
 
 
 pub fn perform_diagnosis(
-    req: HttpRequest<AppState>,
-    format: String,
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    format: web::Path<String>,
 ) -> ActixResult<HttpResponse>
 {
     let format = format.parse::<FormatType>();
@@ -64,8 +64,8 @@ pub fn perform_diagnosis(
     info!("Format: {:?}", format);
 
     let query = req.query_string();
-    let schema = req.state().schema.read().unwrap();
-    let _debug = req.state().debug;
+    let schema = state.schema.read().unwrap();
+    let _debug = state.debug;
 
     lazy_static! {
         static ref QS_NON_STRICT: qs::Config = qs::Config::new(5, false);
@@ -125,7 +125,7 @@ pub fn perform_diagnosis(
 }
 
 
-fn diagnose_cube(req: &HttpRequest<AppState>, cube: &Cube) -> (Vec<String>, Vec<String>) {
+fn diagnose_cube(req: &HttpRequest, state: web::Data<AppState>, cube: &Cube) -> (Vec<String>, Vec<String>) {
     let mut error_types: Vec<String> = vec![];
     let mut error_messages: Vec<String> = vec![];
 
@@ -275,8 +275,8 @@ fn format_diagnosis_response(
 }
 
 
-fn get_res_df(req: &HttpRequest<AppState>, sql_str: String) -> Result<DataFrame, Error> {
-    req.state().backend
+async fn get_res_df(req: &HttpRequest, state: web::Data<AppState>, sql_str: String) -> Result<DataFrame, Error> {
+    state.backend
         .exec_sql(sql_str)
         .wait()
         .and_then(move |df| {
