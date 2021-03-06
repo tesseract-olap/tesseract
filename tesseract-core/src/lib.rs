@@ -1260,6 +1260,7 @@ impl Schema {
         Ok(column)
     }
 
+    #[allow(dead_code)]
     fn get_mea_col(&self, cube_name: &str, measure: &Measure) -> Result<String, Error> {
         let cube = self.cubes.iter()
             .find(|cube| &cube.name == &cube_name)
