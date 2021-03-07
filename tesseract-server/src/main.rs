@@ -23,8 +23,8 @@ mod app;
 mod db_config;
 mod errors;
 mod auth;
-pub mod handlers;
-mod logic_layer;
+mod handlers;
+//mod logic_layer;
 mod schema_config;
 
 use actix_web::server;
