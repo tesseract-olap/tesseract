@@ -24,10 +24,17 @@ mod db_config;
 mod errors;
 mod auth;
 mod handlers;
+// TODO turn on again
 //mod logic_layer;
 mod schema_config;
 
-use actix_web::server;
+use actix_web::{
+    middleware,
+    web,
+    App,
+    HttpServer,
+};
+use anyhow::{format_err, Error};
 use dotenv::dotenv;
 use log::*;
 use std::env;
@@ -39,7 +46,8 @@ use std::sync::{Arc, RwLock};
 use crate::app::{EnvVars, SchemaSource, config_app};
 use r2d2_redis::{r2d2, RedisConnectionManager};
 
-fn main() -> Result<(), Error> {
+#[actix_web::main]
+async fn main() -> Result<(), Error> {
     // Configuration
 
     pretty_env_logger::init();
@@ -151,13 +159,10 @@ fn main() -> Result<(), Error> {
         Err(_) => None
     };
 
-    // Initialize actix system
-    let mut sys = actix::System::new("tesseract");
-
     // Populate internal cache
-    let cache = logic_layer::populate_cache(
-        schema.clone(), &logic_layer_config, db.clone(), &mut sys
-    ).map_err(|err| format_err!("Cache population error: {}", err))?;
+    let cache = actix_web::web::block(logic_layer::populate_cache(
+        schema.clone(), &logic_layer_config, db.clone()
+    )).await.map_err(|err| format_err!("Cache population error: {}", err))?;
 
     let cache_arc = Arc::new(RwLock::new(cache));
 
@@ -230,8 +235,6 @@ fn main() -> Result<(), Error> {
     if streaming_response {
         println!("Tesseract streaming mode: ON");
     }
-
-    sys.run();
 
     Ok(())
 }

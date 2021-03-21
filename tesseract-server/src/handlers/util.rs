@@ -1,3 +1,4 @@
+use anyhow::{bail, format_err, Error};
 use std::collections::HashMap;
 use actix_web::{
     web,
@@ -27,21 +28,6 @@ pub(crate) fn format_to_content_type(format_type: &FormatType) -> ContentType {
     }
 }
 
-
-/// Helper method to return errors (FutureResponse<HttpResponse>) from String.
-pub fn boxed_error_string(message: String) -> HttpResponse {
-    Box::new(
-        future::result(
-            Ok(HttpResponse::NotFound().json(message))
-        )
-    )
-}
-
-/// Helper method to return errors (FutureResponse<HttpResponse>) from HttpResponse.
-pub fn boxed_error_http_response(response: HttpResponse) -> HttpResponse {
-    Box::new(future::result(Ok(response)))
-}
-
 // Generates the source data/annotation of the cube for which the query is executed
 pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
     let cube_name = &cube.name;
@@ -66,13 +52,13 @@ pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
     }
 }
 
-pub fn get_user_auth_level(req: &HttpRequest, state: web::Data<AppState>) -> Option<i32> {
+pub fn get_user_auth_level(req: &HttpRequest, state: &web::Data<AppState>) -> Option<i32> {
     let jwt_secret = &state.env_vars.jwt_secret;
     let user_token = extract_token(req);
     user_auth_level(jwt_secret, &user_token)
 }
 
-pub fn verify_authorization(req: &HttpRequest, state: web::Data<AppState>, min_auth_level: i32) -> Result<(), HttpResponse> {
+pub fn verify_authorization(req: &HttpRequest, state: &web::Data<AppState>, min_auth_level: i32) -> Result<(), HttpResponse> {
     let jwt_secret = &state.env_vars.jwt_secret;
     let user_token = extract_token(req);
     if !validate_web_token(jwt_secret, &user_token, min_auth_level) {
@@ -89,9 +75,7 @@ macro_rules! ok_or_400 {
         match $expr {
             Ok(val) => val,
             Err(err) => {
-                return future::result(
-                    Ok(HttpResponse::BadRequest().json(err.to_string()))
-                );
+                return Ok(HttpResponse::BadRequest().json(err.to_string()));
             }
         }
     };
@@ -104,9 +88,7 @@ macro_rules! ok_or_404 {
         match $expr {
             Ok(val) => val,
             Err(err) => {
-                return std::future::result(
-                    Ok(HttpResponse::NotFound().json(err.to_string()))
-                );
+                return Ok(HttpResponse::NotFound().json(err.to_string()));
             }
         }
     };
@@ -119,9 +101,7 @@ macro_rules! some_or_404 {
         match $expr {
             Some(val) => val,
             None => {
-                return future::result(
-                    Ok(HttpResponse::NotFound().json($note.to_string()))
-                );
+                return Ok(HttpResponse::NotFound().json($note.to_string()));
             }
         }
     };

@@ -27,7 +27,7 @@ pub async fn aggregate_default_handler(
 ) -> ActixResult<HttpResponse>
 {
     let cube_format = (cube.into_inner(), "csv".to_owned());
-    do_aggregate(req, cube_format).await
+    do_aggregate(req, state, cube_format).await
 }
 
 
@@ -38,7 +38,7 @@ pub async fn aggregate_handler(
     cube_format: web::Path<(String, String)>,
 ) -> ActixResult<HttpResponse>
 {
-    do_aggregate(req, cube_format.into_inner()).await
+    do_aggregate(req, state, cube_format.into_inner()).await
 }
 
 
@@ -46,13 +46,13 @@ pub async fn aggregate_handler(
 pub async fn do_aggregate(
     req: HttpRequest,
     state: web::Data<AppState>,
-    cube_format: web::Path<(String, String)>,
+    cube_format: (String, String),
 ) -> ActixResult<HttpResponse>
 {
     let (cube, format) = cube_format;
 
     // Get cube object to check for API key
-    let schema = &req.state().schema.read().unwrap().clone();
+    let schema = state.schema.read().unwrap().clone();
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
 
     if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {

@@ -6,8 +6,7 @@ use actix_web::{
     HttpResponse,
     Result as ActixResult,
 };
-use failure::Error;
-use futures::future::Future;
+use anyhow::Error;
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
@@ -28,7 +27,7 @@ pub async fn diagnosis_default_handler(
     _cube: web::Path<()>,
 ) -> ActixResult<HttpResponse>
 {
-    perform_diagnosis(req, "jsonrecords".to_owned()).await
+    perform_diagnosis(req, state, "jsonrecords".to_owned()).await
 }
 
 
@@ -39,7 +38,7 @@ pub async fn diagnosis_handler(
     cube_format: web::Path<String>,
 ) -> ActixResult<HttpResponse>
 {
-    perform_diagnosis(req, cube_format.to_owned()).await
+    perform_diagnosis(req, state, cube_format.to_owned()).await
 }
 
 
@@ -49,10 +48,10 @@ pub struct DiagnosisQueryOpt {
 }
 
 
-pub fn perform_diagnosis(
+pub async fn perform_diagnosis(
     req: HttpRequest,
     state: web::Data<AppState>,
-    format: web::Path<String>,
+    format: String,
 ) -> ActixResult<HttpResponse>
 {
     let format = format.parse::<FormatType>();
@@ -82,11 +81,11 @@ pub fn perform_diagnosis(
         Some(cube_name) => {
             match schema.get_cube_by_name(&cube_name) {
                 Ok(cube) => {
-                    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
+                    if let Err(err) = verify_authorization(&req, &state, cube.min_auth_level) {
                         return Ok(err);
                     }
 
-                    let (error_types, error_messages) = diagnose_cube(&req, cube);
+                    let (error_types, error_messages) = diagnose_cube(&req, &state, cube).await;
 
                     format_diagnosis_response(error_types, error_messages, format, None)
                 },
@@ -99,11 +98,11 @@ pub fn perform_diagnosis(
             let mut error_messages: Vec<String> = vec![];
 
             for cube in &schema.cubes {
-                if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
+                if let Err(err) = verify_authorization(&req, &state, cube.min_auth_level) {
                     continue;
                 }
 
-                let (new_error_types, new_error_messages) = diagnose_cube(&req, &cube);
+                let (new_error_types, new_error_messages) = diagnose_cube(&req, &state, &cube).await;
 
                 // Add these to the overall list
                 if new_error_types.len() != 0 {
@@ -125,7 +124,7 @@ pub fn perform_diagnosis(
 }
 
 
-fn diagnose_cube(req: &HttpRequest, state: web::Data<AppState>, cube: &Cube) -> (Vec<String>, Vec<String>) {
+async fn diagnose_cube(req: &HttpRequest, state: &web::Data<AppState>, cube: &Cube) -> (Vec<String>, Vec<String>) {
     let mut error_types: Vec<String> = vec![];
     let mut error_messages: Vec<String> = vec![];
 
@@ -146,7 +145,7 @@ fn diagnose_cube(req: &HttpRequest, state: web::Data<AppState>, cube: &Cube) -> 
                         dimension_table.name,
                     );
 
-                    match get_res_df(&req, sql_str) {
+                    match get_res_df(&req, &state, sql_str).await {
                         Ok(res_df) => {
                             match res_df.columns.get(0) {
                                 Some(column) => {
@@ -184,7 +183,7 @@ fn diagnose_cube(req: &HttpRequest, state: web::Data<AppState>, cube: &Cube) -> 
                         last_level.key_column,
                     );
 
-                    match get_res_df(&req, sql_str) {
+                    match get_res_df(&req, &state, sql_str).await {
                         Ok(res_df) => {
                             match res_df.columns.get(0) {
                                 Some(column) => {
@@ -266,7 +265,7 @@ fn format_diagnosis_response(
         match format_records(&headers, df, format, None, true) {
             Ok(res) => {
                 Ok(HttpResponse::ExpectationFailed()
-                    .set(content_type)
+                    .content_type(content_type)
                     .body(res))
             },
             Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
@@ -275,11 +274,6 @@ fn format_diagnosis_response(
 }
 
 
-async fn get_res_df(req: &HttpRequest, state: web::Data<AppState>, sql_str: String) -> Result<DataFrame, Error> {
-    state.backend
-        .exec_sql(sql_str)
-        .wait()
-        .and_then(move |df| {
-            Ok(df)
-        })
+async fn get_res_df(req: &HttpRequest, state: &web::Data<AppState>, sql_str: String) -> Result<DataFrame, Error> {
+    state.backend.exec_sql(sql_str).await
 }

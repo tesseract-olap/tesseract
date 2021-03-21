@@ -3,12 +3,13 @@ use actix_web::{
     HttpRequest,
     HttpResponse,
 };
+use anyhow::Error;
 
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::Query as TsQuery;
 
@@ -59,7 +60,7 @@ pub async fn do_aggregate(
     let schema = &state.schema.read().unwrap().clone();
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube));
 
-    if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
+    if let Err(err) = verify_authorization(&req, &state, cube_obj.min_auth_level) {
         return boxed_error_http_response(err);
     }
 
@@ -78,12 +79,13 @@ pub async fn do_aggregate(
     info!("query opts:{:?}", agg_query);
 
     // Check if this query is already cached
-    let redis_pool = state.redis_pool.clone();
-    let redis_cache_key = get_redis_cache_key("core", &req, &cube, &format);
+    // TODO refactor
+    //let redis_pool = state.redis_pool.clone();
+    //let redis_cache_key = get_redis_cache_key("core", &req, &cube, &format);
 
-    if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
-        return res;
-    }
+    //if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
+    //    return res;
+    //}
 
     // Gets the Source Data
     let source_data = Some(generate_source_data(&cube_obj));
