@@ -17,7 +17,7 @@ use tesseract_core::schema::metadata::SourceMetadata;
 use crate::app::AppState;
 
 use tesseract_core::names::Cut;
-//use crate::logic_layer::CubeCache;
+use crate::logic_layer::CubeCache;
 use crate::auth::{validate_web_token, extract_token, user_auth_level};
 
 pub(crate) fn format_to_content_type(format_type: &FormatType) -> ContentType {
@@ -119,19 +119,19 @@ macro_rules! ok_or_500 {
     };
 }
 
-//pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Error> {
-//    for cut in cuts {
-//        // get level cache
-//        let member_cache = cube_cache.members_for_level(&cut.level_name)
-//            .ok_or_else(|| format_err!("Level not found in cache"))?;
-//        for member in &cut.members {
-//            if !member_cache.contains(member) {
-//                bail!("Cut member not found");
-//            }
-//        }
-//    }
-//    Ok(())
-//}
+pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Error> {
+    for cut in cuts {
+        // get level cache
+        let member_cache = cube_cache.members_for_level(&cut.level_name)
+            .ok_or_else(|| format_err!("Level not found in cache"))?;
+        for member in &cut.members {
+            if !member_cache.contains(member) {
+                bail!("Cut member not found");
+            }
+        }
+    }
+    Ok(())
+}
 
 
 ///// Gets the Redis cache key for a given query.
