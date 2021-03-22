@@ -5,7 +5,6 @@ use actix_web::{
     Result as ActixResult
 };
 
-use futures::future::{self, Future};
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::Deserialize;
