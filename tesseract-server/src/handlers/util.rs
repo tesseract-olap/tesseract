@@ -69,44 +69,55 @@ pub fn verify_authorization(req: &HttpRequest, state: &web::Data<AppState>, min_
 }
 
 
-//#[macro_export]
-//macro_rules! ok_or_400 {
-//    ($expr:expr) => {
-//        match $expr {
-//            Ok(val) => val,
-//            Err(err) => {
-//                return Ok(HttpResponse::BadRequest().json(err.to_string()));
-//            }
-//        }
-//    };
-//}
-//
-//
-//#[macro_export]
-//macro_rules! ok_or_404 {
-//    ($expr:expr) => {
-//        match $expr {
-//            Ok(val) => val,
-//            Err(err) => {
-//                return Ok(HttpResponse::NotFound().json(err.to_string()));
-//            }
-//        }
-//    };
-//}
-//
-//
-//#[macro_export]
-//macro_rules! some_or_404 {
-//    ($expr:expr, $note:expr) => {
-//        match $expr {
-//            Some(val) => val,
-//            None => {
-//                return Ok(HttpResponse::NotFound().json($note.to_string()));
-//            }
-//        }
-//    };
-//}
+#[macro_export]
+macro_rules! ok_or_400 {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(err) => {
+                return Ok(HttpResponse::BadRequest().json(err.to_string()));
+            }
+        }
+    };
+}
 
+
+#[macro_export]
+macro_rules! ok_or_404 {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(err) => {
+                return Ok(HttpResponse::NotFound().json(err.to_string()));
+            }
+        }
+    };
+}
+
+
+#[macro_export]
+macro_rules! some_or_404 {
+    ($expr:expr, $note:expr) => {
+        match $expr {
+            Some(val) => val,
+            None => {
+                return Ok(HttpResponse::NotFound().json($note.to_string()));
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! ok_or_500 {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(err) => {
+                return Ok(HttpResponse::InternalServerError().json(err.to_string()));
+            }
+        }
+    };
+}
 
 //pub fn validate_members(cuts: &[Cut], cube_cache: &CubeCache) -> Result<(), Error> {
 //    for cut in cuts {

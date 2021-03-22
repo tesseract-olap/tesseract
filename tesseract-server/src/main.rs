@@ -24,8 +24,7 @@ mod db_config;
 mod errors;
 mod auth;
 mod handlers;
-// TODO turn on again
-//mod logic_layer;
+mod logic_layer;
 mod schema_config;
 
 use actix_web::{
