@@ -117,9 +117,9 @@ pub async fn do_aggregate(
         state.backend.exec_sql(sql).await
             .map_err(move |e| {
                 if state.debug {
-                    ServerError::Db { cause: e.to_string() }.into()
+                    ServerError::Db { cause: e.to_string() }
                 } else {
-                    ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
+                    ServerError::Db { cause: "Internal Server Error 1010".to_owned() }
                 }
             })
     );
