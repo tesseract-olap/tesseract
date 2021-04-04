@@ -10,7 +10,7 @@ use structopt::clap::crate_version;
 /// Returns server status and Tesseract version.
 pub async fn index_handler(_req: HttpRequest) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(
-        Status {
+        &Status {
             status: "ok".to_owned(),
             // TODO set this as the Cargo.toml version, after structopt added
             tesseract_version: crate_version!().to_owned(),
