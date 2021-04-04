@@ -322,7 +322,7 @@ pub async fn populate_cache(
                 for level in &hierarchy.levels {
                     if time_column_names.contains(&level.name) {
                         let val = get_distinct_values(
-                            &level.key_column, &table, backend.clone()
+                            level.key_column.clone(), table.clone(), backend.clone()
                         ).await?;
 
                         if level.name == "Year" {
@@ -354,7 +354,7 @@ pub async fn populate_cache(
                                 for annotation in annotations {
                                     if annotation.name == "level" && time_column_names.contains(&annotation.text) {
                                         let val = get_distinct_values(
-                                            &level.key_column, &table, backend.clone()
+                                            level.key_column.clone(), table.clone(), backend.clone()
                                         ).await?;
 
                                         if annotation.text == "Year" {
@@ -392,7 +392,7 @@ pub async fn populate_cache(
                         if !found_time {
                             // Want to get distinct time values from the fact table
                             let val = get_distinct_values(
-                                &level.key_column, &cube.table.name, backend.clone()
+                                level.key_column.clone(), cube.table.name.clone(), backend.clone()
                             ).await?;
 
                             time_level = Some(level.clone());
@@ -457,7 +457,7 @@ pub async fn populate_cache(
 
                         if parent_levels.len() >= 1 {
                             parent_map = Some(get_parent_data(
-                                &parent_levels[parent_levels.len() - 1], &level,
+                                parent_levels[parent_levels.len() - 1].clone(), level.clone(),
                                 table, backend.clone()
                             ).await?);
                         }
@@ -465,7 +465,7 @@ pub async fn populate_cache(
                         match child_level {
                             Some(child_level) => {
                                 children_map = Some(get_children_data(
-                                    &level, &child_level,
+                                    level.clone(), child_level.clone(),
                                     table, backend.clone()
                                 ).await?);
                             },
@@ -474,7 +474,7 @@ pub async fn populate_cache(
 
                         // Get all IDs for this level
                         distinct_ids = get_distinct_values(
-                            &level.key_column, &table, backend.clone()
+                            level.key_column.clone(), table.clone(), backend.clone()
                         ).await?;
                     }
 
@@ -743,9 +743,11 @@ pub fn get_inline_children_data(
 }
 
 
+// Level moved because of some bug in async fn
+// https://github.com/rust-lang/rust/issues/63033
 async fn get_parent_data(
-        parent_level: &Level,
-        current_level: &Level,
+        parent_level: Level,
+        current_level: Level,
         table: &str,
         backend: Box<dyn Backend + Sync + Send>,
 ) -> Result<HashMap<String, String>, Error> {
@@ -757,14 +759,10 @@ async fn get_parent_data(
                 "select distinct {0}, {1} from {2} group by {0}, {1} order by {0}, {1}",
                 parent_level.key_column, current_level.key_column, table,
             ).to_string()
-        ).await;
-
-    let df = match df {
-        Ok(df) => df,
-        Err(err) => {
-            return Err(format_err!("Error populating cache with backend data: {}", err));
-        }
-    };
+        ).await
+        .map_err(|err| {
+            format_err!("Error populating cache with backend data: {}", err)
+        })?;
 
     let parent_column = df.columns[0].stringify_column_data();
     let current_column = df.columns[1].stringify_column_data();
@@ -777,9 +775,11 @@ async fn get_parent_data(
 }
 
 
+// Level moved because of some bug in async fn
+// https://github.com/rust-lang/rust/issues/63033
 async fn get_children_data(
-        current_level: &Level,
-        child_level: &Level,
+        current_level: Level,
+        child_level: Level,
         table: &str,
         backend: Box<dyn Backend + Sync + Send>,
 ) -> Result<HashMap<String, Vec<String>>, Error> {
@@ -791,14 +791,10 @@ async fn get_children_data(
                 "select distinct {0}, {1} from {2} group by {0}, {1} order by {0}, {1}",
                 current_level.key_column, child_level.key_column, table,
             ).to_string()
-        ).await;
-
-    let df = match df {
-        Ok(df) => df,
-        Err(err) => {
-            return Err(format_err!("Error populating cache with backend data: {}", err));
-        }
-    };
+        ).await
+        .map_err(|err| {
+            format_err!("Error populating cache with backend data: {}", err)
+        })?;
 
     let current_column = df.columns[0].stringify_column_data();
     let children_column = df.columns[1].stringify_column_data();
@@ -827,23 +823,21 @@ async fn get_children_data(
 }
 
 
+// String moved because of some bug in async fn
+// https://github.com/rust-lang/rust/issues/63033
 /// Queries the database to get all the distinct values for a given level.
 async fn get_distinct_values(
-        column: &str,
-        table: &str,
+        column: String,
+        table: String,
         backend: Box<dyn Backend + Sync + Send>,
 ) -> Result<Vec<String>, Error> {
-    let future = backend
+    let mut df = backend
         .exec_sql(
             format!("select distinct {} from {}", column, table).to_string()
-        ).await;
-
-    let mut df = match df {
-        Ok(df) => df,
-        Err(err) => {
-            return Err(format_err!("Error populating cache with backend data: {}", err));
-        }
-    };
+        ).await
+        .map_err(|err| {
+            format_err!("Error populating cache with backend data: {}", err)
+        })?;
 
     if df.columns.len() >= 1 {
         df.columns[0].sort_column_data()?;
