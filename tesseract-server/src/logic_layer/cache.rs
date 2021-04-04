@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use actix::SystemRunner;
-use failure::{Error, format_err};
+use anyhow::{Error, format_err};
 use log::{info, debug};
 use std::time::Instant;
 

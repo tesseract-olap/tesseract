@@ -28,7 +28,7 @@ use crate::handlers::{
     //logic_layer_relations_non_unique_levels_default_handler,
     //logic_layer_relations_non_unique_levels_handler
 };
-//use crate::logic_layer::{Cache, LogicLayerConfig};
+use crate::logic_layer::{Cache, LogicLayerConfig};
 
 use std::sync::{Arc, RwLock};
 use url::Url;
