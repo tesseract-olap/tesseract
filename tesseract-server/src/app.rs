@@ -7,8 +7,8 @@ use crate::db_config::Database;
 use crate::handlers::{
     aggregate_handler,
     aggregate_default_handler,
-    aggregate_stream_handler,
-    aggregate_stream_default_handler,
+    //aggregate_stream_handler,
+    //aggregate_stream_default_handler,
     diagnosis_handler,
     diagnosis_default_handler,
     //logic_layer_default_handler,
@@ -120,8 +120,8 @@ pub fn config_app(
 
     let app = if streaming_response {
         app
-            .route("/cubes/{cube}/aggregate", web::get().to(aggregate_stream_default_handler))
-            .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate_stream_handler))
+        //    .route("/cubes/{cube}/aggregate", web::get().to(aggregate_stream_default_handler))
+        //    .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate_stream_handler))
     } else {
         app
             .route("/cubes/{cube}/aggregate", web::get().to(aggregate_default_handler))
