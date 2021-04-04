@@ -206,6 +206,7 @@ async fn main() -> Result<(), Error> {
                     cfg,
                     debug,
                     db.clone(),
+                    None, // redis_pool
                     db_type.clone(),
                     env_vars.clone(),
                     schema_arc.clone(),
@@ -218,7 +219,7 @@ async fn main() -> Result<(), Error> {
         .wrap(middleware::Logger::default())
         .wrap(middleware::DefaultHeaders::new().header("Vary", "Accept-Encoding"))
     })
-    .bind(&server_addr)
+    .bind(&server_addr)?
     .run()
     .await;
 
