@@ -159,9 +159,13 @@ async fn main() -> Result<(), Error> {
     };
 
     // Populate internal cache
-    let cache = actix_web::web::block(logic_layer::populate_cache(
-        schema.clone(), &logic_layer_config, db.clone()
-    )).await.map_err(|err| format_err!("Cache population error: {}", err))?;
+    let cache = actix_web::web::block(|| {
+            logic_layer::populate_cache(
+                schema.clone(), &logic_layer_config, db.clone()
+            )
+    })
+    .await.map_err(|err| format_err!("Cache population error: {}", err))?
+    .await?;
 
     let cache_arc = Arc::new(RwLock::new(cache));
 
