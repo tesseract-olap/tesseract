@@ -159,26 +159,25 @@ async fn main() -> Result<(), Error> {
     };
 
     // Populate internal cache
-    let cache = actix_web::web::block(|| {
-            logic_layer::populate_cache(
-                schema.clone(), &logic_layer_config, db.clone()
-            )
-    })
-    .await.map_err(|err| format_err!("Cache population error: {}", err))?
-    .await?;
-
-    let cache_arc = Arc::new(RwLock::new(cache));
+    let db_for_cache = db.clone(); // TODO remove clone
+    let cache = logic_layer::populate_cache(
+            schema.clone(), logic_layer_config.as_ref(), db_for_cache
+        )
+        .await.map_err(|err| format_err!("Cache population error: {}", err))?;
 
     // Create lock on logic layer config
     let logic_layer_config = match logic_layer_config {
-        Some(ll_config) => Some(Arc::new(RwLock::new(ll_config))),
+        Some(ll_config) => Some(Arc::new(RwLock::new(ll_config.clone()))),
         None => None
     };
+
+    let cache_arc = Arc::new(RwLock::new(cache));
+
 
     let redis_url = env::var("TESSERACT_REDIS_URL").ok();
 
     // Setup redis pool and settings if enabled by user
-    let redis_pool = match redis_url {
+    let _redis_pool = match redis_url {
         Some(conn_str) => {
             let redis_connection_timeout = env::var("TESSERACT_REDIS_TIMEOUT").ok();
             let redis_max_size = env::var("TESSERACT_REDIS_MAX_SIZE").ok();
@@ -203,7 +202,7 @@ async fn main() -> Result<(), Error> {
     };
 
     // Initialize Server
-    HttpServer::new(move|| {
+    HttpServer::new(move || {
         App::new()
             .configure(|cfg: &mut web::ServiceConfig| {
                 config_app(
@@ -225,7 +224,7 @@ async fn main() -> Result<(), Error> {
     })
     .bind(&server_addr)?
     .run()
-    .await;
+    .await?;
 
     println!("Tesseract listening on: {}", server_addr);
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);

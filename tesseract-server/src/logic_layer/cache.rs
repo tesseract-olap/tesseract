@@ -277,7 +277,7 @@ pub struct DimensionCache {
 /// Populates a `Cache` object that will be shared through `AppState`.
 pub async fn populate_cache(
         schema: Schema,
-        ll_config: &Option<LogicLayerConfig>,
+        ll_config: Option<&LogicLayerConfig>,
         backend: Box<dyn Backend + Sync + Send>,
 ) -> Result<Cache, Error> {
     info!("Populating cache...");
@@ -537,7 +537,7 @@ pub async fn populate_cache(
 }
 
 
-pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, level_name: &LevelName) -> Result<Option<String>, Error> {
+pub fn get_unique_level_name(cube: &Cube, ll_config: Option<&LogicLayerConfig>, level_name: &LevelName) -> Result<Option<String>, Error> {
     for dimension in &cube.dimensions {
         for hierarchy in &dimension.hierarchies {
             for level in &hierarchy.levels {
@@ -578,7 +578,7 @@ pub fn get_unique_level_name(cube: &Cube, ll_config: &Option<LogicLayerConfig>, 
 }
 
 
-pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, LevelName>, Error> {
+pub fn get_level_map(cube: &Cube, ll_config: Option<&LogicLayerConfig>) -> Result<HashMap<String, LevelName>, Error> {
     let mut level_name_map = HashMap::new();
 
     for dimension in &cube.dimensions {
@@ -622,7 +622,7 @@ pub fn get_level_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Resul
 }
 
 
-pub fn get_property_map(cube: &Cube, ll_config: &Option<LogicLayerConfig>) -> Result<HashMap<String, Property>, Error> {
+pub fn get_property_map(cube: &Cube, ll_config: Option<&LogicLayerConfig>) -> Result<HashMap<String, Property>, Error> {
     let mut property_map = HashMap::new();
 
     for dimension in &cube.dimensions {
