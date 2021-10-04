@@ -110,7 +110,7 @@ impl Time {
 
 
 /// Holds cache information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Cache {
     pub cubes: Vec<CubeCache>,
 }
