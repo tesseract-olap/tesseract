@@ -97,7 +97,8 @@ pub async fn do_aggregate(
     // - Check that cut members exist in members cache
     // this is in braces to explicitly the scope in which
     // req is borrowed, since req is moved later in the `map_err`
-    {
+    // Only use if logic layer is used (which means ll cache is populated)
+    if !state.no_logic_layer {
         let cache = state.cache.read().unwrap();
         let cube_cache = some_or_404!(cache.find_cube_info(&cube), format!("Cube {} not found", cube));
         ok_or_404!(validate_members(&ts_query.cuts, &cube_cache));

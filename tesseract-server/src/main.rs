@@ -215,6 +215,7 @@ async fn main() -> Result<(), Error> {
         cache: cache_arc,
         logic_layer_config,
         has_unique_levels_properties,
+        no_logic_layer: opt.no_logic_layer,
     };
 
     // Initialize Server

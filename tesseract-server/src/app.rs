@@ -70,6 +70,7 @@ pub struct AppState {
     // capture, but the handlers need to implement Fn, not FnOnce (which happens once capturing
     // variables from environment
     pub has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
+    pub no_logic_layer: bool,
 }
 
 /// Creates an ActixWeb application with an `AppState`.
@@ -99,7 +100,7 @@ pub fn config_app(
         // Allow the API to accept /my-path or /my-path/ for all requests
         //.default_resource(|r| r.h(NormalizePath::default()));
 
-    let app = if streaming_response {
+    if streaming_response {
         app
         //    .route("/cubes/{cube}/aggregate", web::get().to(aggregate_stream_default_handler))
         //    .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate_stream_handler))
