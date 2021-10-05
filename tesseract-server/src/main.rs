@@ -160,10 +160,14 @@ async fn main() -> Result<(), Error> {
 
     // Populate internal cache
     let db_for_cache = db.clone(); // TODO remove clone
-    let cache = logic_layer::populate_cache(
-            schema.clone(), logic_layer_config.as_ref(), db_for_cache
-        )
-        .await.map_err(|err| format_err!("Cache population error: {}", err))?;
+    let cache = if opt.no_logic_layer {
+        Default::default()
+    } else {
+        logic_layer::populate_cache(
+                schema.clone(), logic_layer_config.as_ref(), db_for_cache
+            )
+            .await.map_err(|err| format_err!("Cache population error: {}", err))?
+    };
 
     // Create lock on logic layer config
     let logic_layer_config = match logic_layer_config {
@@ -261,4 +265,7 @@ struct Opt {
 
     #[structopt(long="streaming")]
     streaming_response: bool,
+
+    #[structopt(long="no-logic-layer")]
+    no_logic_layer: bool,
 }
