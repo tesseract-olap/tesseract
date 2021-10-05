@@ -54,6 +54,7 @@ pub struct EnvVars {
 }
 
 /// Holds [ActixWeb State](https://actix.rs/docs/application/).
+#[derive(Clone)]
 pub struct AppState {
     pub debug: bool,
     pub backend: Box<dyn Backend + Sync + Send>,
@@ -74,34 +75,14 @@ pub struct AppState {
 /// Creates an ActixWeb application with an `AppState`.
 pub fn config_app(
         cfg: &mut web::ServiceConfig,
-        debug: bool,
-        backend: Box<dyn Backend + Sync + Send>,
-        redis_pool: Option<r2d2::Pool<RedisConnectionManager>>,
-        db_type: Database,
-        env_vars: EnvVars,
-        schema: Arc<RwLock<Schema>>,
-        cache: Arc<RwLock<Cache>>,
-        logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
+        appstate: AppState,
         streaming_response: bool,
-        has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
     )
 {
     let app = cfg;
 
     app
-        .data(
-            AppState {
-                debug,
-                backend,
-                redis_pool,
-                db_type,
-                env_vars,
-                schema,
-                cache,
-                logic_layer_config,
-                has_unique_levels_properties: has_unique_levels_properties.clone(),
-            }
-        )
+        .data(appstate)
         // Metadata
         .route("/", web::get().to(index_handler))
         .route("/cubes", web::get().to(metadata_all_handler))

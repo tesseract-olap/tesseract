@@ -42,7 +42,7 @@ use url::Url;
 
 use std::sync::{Arc, RwLock};
 
-use crate::app::{EnvVars, SchemaSource, config_app};
+use crate::app::{AppState, EnvVars, SchemaSource, config_app};
 use r2d2_redis::{r2d2, RedisConnectionManager};
 
 #[actix_web::main]
@@ -205,22 +205,26 @@ async fn main() -> Result<(), Error> {
         None => None,
     };
 
+    let appstate = AppState {
+        debug,
+        backend: db,
+        redis_pool: None,
+        db_type,
+        env_vars,
+        schema: schema_arc,
+        cache: cache_arc,
+        logic_layer_config,
+        has_unique_levels_properties,
+    };
+
     // Initialize Server
     HttpServer::new(move || {
         App::new()
             .configure(|cfg: &mut web::ServiceConfig| {
                 config_app(
                     cfg,
-                    debug,
-                    db.clone(),
-                    None, // redis_pool
-                    db_type.clone(),
-                    env_vars.clone(),
-                    schema_arc.clone(),
-                    cache_arc.clone(),
-                    logic_layer_config.clone(),
+                    appstate.clone(),
                     streaming_response,
-                    has_unique_levels_properties.clone(),
                 )
             })
         .wrap(middleware::Logger::default())
