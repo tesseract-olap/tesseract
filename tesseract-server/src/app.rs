@@ -62,9 +62,10 @@ pub struct AppState {
 pub fn config_app(
         cfg: &mut web::ServiceConfig,
         appstate: AppState,
-        streaming_response: bool,
+        _streaming_response: bool,
     )
 {
+    let has_unique_levels_properties = appstate.has_unique_levels_properties.clone();
     let app = cfg;
 
     app
@@ -81,21 +82,14 @@ pub fn config_app(
         // Data Quality Assurance
         .route("/diagnosis", web::get().to(diagnosis::default_handler))
         .route("/diagnosis.{format}", web::get().to(diagnosis::handler))
-        .route("/flush", web::post().to(flush::handler));
+        .route("/flush", web::post().to(flush::handler))
         // Allow the API to accept /my-path or /my-path/ for all requests
         //.default_resource(|r| r.h(NormalizePath::default()));
 
-    if streaming_response {
-        app
-        //    .route("/cubes/{cube}/aggregate", web::get().to(aggregate_stream_default_handler))
-        //    .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate_stream_handler))
-    } else {
-        app
-            .route("/cubes/{cube}/aggregate", web::get().to(aggregate::default_handler))
-            .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate::handler))
-    };
+        .route("/cubes/{cube}/aggregate", web::get().to(aggregate::default_handler))
+        .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate::handler));
 
-    match appstate.has_unique_levels_properties {
+    match has_unique_levels_properties {
         CubeHasUniqueLevelsAndProperties::True => {
             // Logic Layer
             app
