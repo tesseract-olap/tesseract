@@ -20,7 +20,7 @@ pub struct FlushQueryOpt {
     pub secret: String,
 }
 
-pub async fn flush_handler(req: HttpRequest, state: web::Data<AppState>) -> ActixResult<HttpResponse> {
+pub async fn handler(req: HttpRequest, state: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let query = req.query_string();
 
     lazy_static!{

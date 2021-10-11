@@ -8,7 +8,7 @@ use structopt::clap::crate_version;
 
 
 /// Returns server status and Tesseract version.
-pub async fn index_handler(_req: HttpRequest) -> ActixResult<HttpResponse> {
+pub async fn handler(_req: HttpRequest) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(
         &Status {
             status: "ok".to_owned(),

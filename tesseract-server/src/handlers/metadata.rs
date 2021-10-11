@@ -19,7 +19,7 @@ use crate::logic_layer::LogicLayerConfig;
 use super::util::{verify_authorization, get_user_auth_level};
 
 
-pub async fn metadata_handler(
+pub async fn handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube: web::Path<String>,
@@ -44,7 +44,7 @@ pub async fn metadata_handler(
 }
 
 
-pub async fn metadata_all_handler(
+pub async fn all_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     ) -> ActixResult<HttpResponse>

@@ -26,7 +26,7 @@ use super::util::{
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub async fn aggregate_default_handler(
+pub async fn default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube: web::Path<String>,
@@ -38,7 +38,7 @@ pub async fn aggregate_default_handler(
 
 
 /// Handles aggregation when a format is specified.
-pub async fn aggregate_handler(
+pub async fn handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<(String, String)>,

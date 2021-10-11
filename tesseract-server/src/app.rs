@@ -5,28 +5,13 @@ use actix_web::{
 use tesseract_core::{Backend, Schema, CubeHasUniqueLevelsAndProperties};
 use crate::db_config::Database;
 use crate::handlers::{
-    aggregate_handler,
-    aggregate_default_handler,
-    //aggregate_stream_handler,
-    //aggregate_stream_default_handler,
-    diagnosis_handler,
-    diagnosis_default_handler,
-    //logic_layer_default_handler,
-    //logic_layer_handler,
-    //logic_layer_non_unique_levels_handler,
-    //logic_layer_non_unique_levels_default_handler,
-    //logic_layer_members_handler,
-    //logic_layer_members_default_handler,
-    flush_handler,
-    index_handler,
-    metadata_handler,
-    metadata_all_handler,
-    members_handler,
-    members_default_handler,
-    //logic_layer_relations_handler,
-    //logic_layer_relations_default_handler,
-    //logic_layer_relations_non_unique_levels_default_handler,
-    //logic_layer_relations_non_unique_levels_handler
+    aggregate,
+    //aggregate_stream,
+    diagnosis,
+    flush,
+    index,
+    //logic_layer,
+    metadata,
 };
 use crate::logic_layer::{Cache, LogicLayerConfig};
 
@@ -85,18 +70,18 @@ pub fn config_app(
     app
         .data(appstate)
         // Metadata
-        .route("/", web::get().to(index_handler))
-        .route("/cubes", web::get().to(metadata_all_handler))
-        .route("/cubes/{cube}", web::get().to(metadata_handler))
+        .route("/", web::get().to(index::handler))
+        .route("/cubes", web::get().to(metadata::all_handler))
+        .route("/cubes/{cube}", web::get().to(metadata::handler))
 
         // Helpers
-        .route("/cubes/{cube}/members",web::get().to(members_default_handler))
-        .route("/cubes/{cube}/members.{format}", web::get().to(members_handler))
+        .route("/cubes/{cube}/members",web::get().to(metadata::members_default_handler))
+        .route("/cubes/{cube}/members.{format}", web::get().to(metadata::members_handler))
 
         // Data Quality Assurance
-        .route("/diagnosis", web::get().to(diagnosis_default_handler))
-        .route("/diagnosis.{format}", web::get().to(diagnosis_handler))
-        .route("/flush", web::post().to(flush_handler));
+        .route("/diagnosis", web::get().to(diagnosis::default_handler))
+        .route("/diagnosis.{format}", web::get().to(diagnosis::handler))
+        .route("/flush", web::post().to(flush::handler));
         // Allow the API to accept /my-path or /my-path/ for all requests
         //.default_resource(|r| r.h(NormalizePath::default()));
 
@@ -106,8 +91,8 @@ pub fn config_app(
         //    .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate_stream_handler))
     } else {
         app
-            .route("/cubes/{cube}/aggregate", web::get().to(aggregate_default_handler))
-            .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate_handler))
+            .route("/cubes/{cube}/aggregate", web::get().to(aggregate::default_handler))
+            .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate::handler))
     };
 
     //match has_unique_levels_properties {

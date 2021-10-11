@@ -21,7 +21,7 @@ use crate::handlers::util::{verify_authorization, format_to_content_type};
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is jsonrecords.
-pub async fn diagnosis_default_handler(
+pub async fn default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     _cube: web::Path<()>,
@@ -32,7 +32,7 @@ pub async fn diagnosis_default_handler(
 
 
 /// Handles aggregation when a format is specified.
-pub async fn diagnosis_handler(
+pub async fn handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>,
