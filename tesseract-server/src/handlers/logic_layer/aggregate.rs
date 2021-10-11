@@ -540,8 +540,9 @@ pub async fn logic_layer_aggregation(
 
             match format_records(&final_headers, final_df, format, source_data, false) {
                 Ok(res) => {
+                    // TODO turn on again?
                     // Try to insert this result in the Redis cache, if available
-                    insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
+                    //insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
 
                     Ok(HttpResponse::Ok()
                         .set(content_type)
