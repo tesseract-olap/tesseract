@@ -1,17 +1,11 @@
-mod aggregate;
-mod geoservice;
-mod metadata;
-mod relations;
+pub mod aggregate;
+pub mod geoservice;
+pub mod metadata;
+pub mod relations;
 
-pub use self::aggregate::logic_layer_handler;
-pub use self::aggregate::logic_layer_default_handler;
 pub use self::geoservice::GeoserviceQuery;
 pub use self::geoservice::GeoServiceResponseJson;
 pub use self::geoservice::query_geoservice;
-pub use self::metadata::logic_layer_members_handler;
-pub use self::metadata::logic_layer_members_default_handler;
-pub use self::relations::logic_layer_relations_handler;
-pub use self::relations::logic_layer_relations_default_handler;
 
 use actix_web::{web, HttpRequest, HttpResponse, ResponseError};
 use crate::app::AppState;
@@ -19,7 +13,7 @@ use crate::errors::ServerError;
 use tesseract_core::CubeHasUniqueLevelsAndProperties;
 
 
-pub async fn logic_layer_non_unique_levels_default_handler(
+pub async fn non_unique_levels_default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<()>,
@@ -38,7 +32,7 @@ pub async fn logic_layer_non_unique_levels_default_handler(
 }
 
 
-pub async fn logic_layer_non_unique_levels_handler(
+pub async fn non_unique_levels_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>,
@@ -57,7 +51,7 @@ pub async fn logic_layer_non_unique_levels_handler(
 }
 
 
-pub async fn logic_layer_relations_non_unique_levels_default_handler(
+pub async fn relations_non_unique_levels_default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<()>,
@@ -76,7 +70,7 @@ pub async fn logic_layer_relations_non_unique_levels_default_handler(
 }
 
 
-pub async fn logic_layer_relations_non_unique_levels_handler(
+pub async fn relations_non_unique_levels_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>,

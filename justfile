@@ -16,5 +16,5 @@ serve-release-debug:
 deploy to:
     cargo build --release && scp target/release/tesseract-olap {{to}}
 
-check:
-    watchexec cargo check
+watch:
+    cargo watch

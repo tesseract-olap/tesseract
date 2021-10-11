@@ -25,7 +25,7 @@ use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is jsonrecords.
-pub async fn logic_layer_relations_default_handler(
+pub async fn default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube: web::Path<()>,
@@ -36,7 +36,7 @@ pub async fn logic_layer_relations_default_handler(
 
 
 /// Handles aggregation when a format is specified.
-pub async fn logic_layer_relations_handler(
+pub async fn handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>,

@@ -24,7 +24,7 @@ use super::super::util::{
 
 /// Handles default members query when a format is not specified.
 /// Default format is CSV.
-pub async fn logic_layer_members_default_handler(
+pub async fn members_default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     _cube: web::Path<()>
@@ -35,7 +35,7 @@ pub async fn logic_layer_members_default_handler(
 
 
 /// Handles members query when a format is specified.
-pub async fn logic_layer_members_handler(
+pub async fn members_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>

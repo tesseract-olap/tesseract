@@ -10,7 +10,7 @@ use crate::handlers::{
     diagnosis,
     flush,
     index,
-    //logic_layer,
+    logic_layer,
     metadata,
 };
 use crate::logic_layer::{Cache, LogicLayerConfig};
@@ -95,27 +95,27 @@ pub fn config_app(
             .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate::handler))
     };
 
-    //match has_unique_levels_properties {
-    //    CubeHasUniqueLevelsAndProperties::True => {
-    //        // Logic Layer
-    //        app
-    //            .route("/data", web::get().to(logic_layer_default_handler))
-    //            .route("/data.{format}", web::get().to(logic_layer_handler))
-    //            .route("/members", web::get().to(logic_layer_members_default_handler))
-    //            .route("/members.{format}", web::get().to(logic_layer_members_handler))
-    //            .route("/relations", web::get().to(logic_layer_relations_default_handler))
-    //            .route("/relations.{foramt}", web::get().to(logic_layer_relations_handler))
-    //    },
-    //    CubeHasUniqueLevelsAndProperties::False { .. } => {
-    //        // No Logic Layer, give error instead
-    //        app
-    //            .route("/data", web::get().to(logic_layer_non_unique_levels_default_handler))
-    //            .route("/data.{format}", web::get().to(logic_layer_non_unique_levels_handler))
-    //            .route("/members", web::get().to(logic_layer_non_unique_levels_default_handler))
-    //            .route("/members.{format}", web::get().to(logic_layer_non_unique_levels_handler))
-    //            .route("/relations", web::get().to(logic_layer_relations_non_unique_levels_default_handler))
-    //            // FIXME format typo
-    //            .route("/relations.{foramt}", web::get().to(logic_layer_relations_non_unique_levels_handler))
-    //    },
-    //};
+    match appstate.has_unique_levels_properties {
+        CubeHasUniqueLevelsAndProperties::True => {
+            // Logic Layer
+            app
+                .route("/data", web::get().to(logic_layer::aggregate::default_handler))
+                .route("/data.{format}", web::get().to(logic_layer::aggregate::handler))
+                .route("/members", web::get().to(logic_layer::metadata::members_default_handler))
+                .route("/members.{format}", web::get().to(logic_layer::metadata::members_handler))
+                .route("/relations", web::get().to(logic_layer::relations::default_handler))
+                .route("/relations.{foramt}", web::get().to(logic_layer::relations::handler))
+        },
+        CubeHasUniqueLevelsAndProperties::False { .. } => {
+            // No Logic Layer, give error instead
+            app
+                .route("/data", web::get().to(logic_layer::non_unique_levels_default_handler))
+                .route("/data.{format}", web::get().to(logic_layer::non_unique_levels_handler))
+                .route("/members", web::get().to(logic_layer::non_unique_levels_default_handler))
+                .route("/members.{format}", web::get().to(logic_layer::non_unique_levels_handler))
+                .route("/relations", web::get().to(logic_layer::relations_non_unique_levels_default_handler))
+                // FIXME format typo
+                .route("/relations.{foramt}", web::get().to(logic_layer::relations_non_unique_levels_handler))
+        },
+    };
 }

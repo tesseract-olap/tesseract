@@ -50,7 +50,7 @@ macro_rules! some_or_break {
 
 /// Handles default aggregation when a format is not specified.
 /// Default format is CSV.
-pub async fn logic_layer_default_handler(
+pub async fn default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     _cube: web::Path<()>,
@@ -61,7 +61,7 @@ pub async fn logic_layer_default_handler(
 
 
 /// Handles aggregation when a format is specified.
-pub async fn logic_layer_handler(
+pub async fn handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>,
