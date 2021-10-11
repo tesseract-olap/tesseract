@@ -1,7 +1,7 @@
 use std::str;
 
+use actix_web::Result as ActixResult;
 use actix_web::client::Client;
-use anyhow::{bail, Error};
 use serde_derive::Deserialize;
 use url::Url;
 
@@ -27,25 +27,24 @@ pub async fn query_geoservice(
     base_url: &Url,
     geoservice_query: &GeoserviceQuery,
     geo_id: &str
-) -> Result<Vec<GeoServiceResponseJson>, Error> {
+) -> ActixResult<Vec<GeoServiceResponseJson>> {
     let join_str = match geoservice_query {
         GeoserviceQuery::Neighbors => format!("neighbors/{}", geo_id),
         GeoserviceQuery::Children => format!("relations/children/{}", geo_id),
         GeoserviceQuery::Parents => format!("relations/parents/{}", geo_id),
-        _ => return Err(bail!("This type of geoservice query is not yet supported"))
+        _ => return Ok(Vec::new()) //"This type of geoservice query is not yet supported"
     };
 
     let query_url = base_url.join(&join_str).unwrap();
 
     // TODO put client in AppData
     let client = Client::default();
-    let resp: Result<Vec<GeoServiceResponseJson>, Result<(), Error>> = client.get(query_url.as_str())
+    let mut resp = client.get(query_url.as_str())
         .insert_header(("User-Agent", "Actix-web"))
         .send()
         .await?;
 
-    let body = resp.body();
-    let data: Vec<GeoServiceResponseJson> = serde_json::from_str(body)?;
+    let data: Vec<GeoServiceResponseJson> = resp.json().await?;
 
     Ok(data)
 }
