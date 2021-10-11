@@ -10,7 +10,7 @@ use super::{
 
 use crate::sql::primary_agg::primary_agg;
 
-use tesseract_core::{Aggregator};
+use tesseract_core::Aggregator;
 
 
 pub fn rate_calculation(
@@ -41,8 +41,6 @@ pub fn rate_calculation(
         primary_agg(table, cuts, &new_drills, meas, None)
     };
 
-    let mut rate_sql = "".to_string();
-
     // Wrap that around a pivot
     let original_drill_cols = drills.iter().map(|drill| drill.col_alias_only_string());
     let original_drill_cols = join(original_drill_cols, ", ");
@@ -52,7 +50,7 @@ pub fn rate_calculation(
         _ => "sum".to_string()
     };
 
-    rate_sql = format!("select {}, {}(final_m0) as final_m0_agg, groupArray(final_m0) as final_m0_rate",
+    let mut rate_sql = format!("select {}, {}(final_m0) as final_m0_agg, groupArray(final_m0) as final_m0_rate",
         original_drill_cols, rate_aggregator
     );
 
