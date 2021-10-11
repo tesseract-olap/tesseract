@@ -2,8 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::str;
 
 use actix_web::{web, HttpRequest, HttpResponse};
-use failure::{Error, format_err, bail};
-use futures::future;
+use anyhow::{bail, Error};
 use futures::future::*;
 use lazy_static::lazy_static;
 use log::*;
@@ -339,7 +338,7 @@ pub async fn logic_layer_aggregation(
 
             let num_cols = match dfs.get(0) {
                 Some(df) => df.columns.len(),
-                None => return Err(format_err!("No dataframes were returned."))
+                None => return Err(bail!("No dataframes were returned."))
             };
 
             let mut exclude_row_indexes: HashSet<usize> = HashSet::new();
@@ -426,7 +425,7 @@ pub async fn logic_layer_aggregation(
 
                 let first_col: &Column = match &dfs[0].columns.get(col_i) {
                     Some(col) => col,
-                    None => return Err(format_err!("Unable to index column."))
+                    None => return Err(bail!("Unable to index column."))
                 };
 
                 for df in &dfs {
@@ -673,10 +672,10 @@ pub fn generate_ts_queries(
                     }
 
                     if !found {
-                        return Err(format_err!("The measure name provided in the `filter` param is not valid."))
+                        return Err(bail!("The measure name provided in the `filter` param is not valid."))
                     }
                 },
-                _ => return Err(format_err!("Could not parse a filter query"))
+                _ => return Err(bail!("Could not parse a filter query"))
             }
 
             f.parse()
@@ -688,7 +687,7 @@ pub fn generate_ts_queries(
             let top_split: Vec<String> = t.split(',').map(|s| s.to_string()).collect();
 
             if top_split.len() != 4 {
-                return Err(format_err!("Bad formatting for top param."));
+                return Err(bail!("Bad formatting for top param."));
             }
 
             let level_name = some_or_bail!(level_map.get(&top_split[1]));
@@ -718,9 +717,9 @@ pub fn generate_ts_queries(
             let gro_split: Vec<String> = g.split(',').map(|s| s.to_string()).collect();
 
             if gro_split.len() == 1 {
-                return Err(format_err!("Please provide a growth measure name."));
+                return Err(bail!("Please provide a growth measure name."));
             } else if gro_split.len() != 2 {
-                return Err(format_err!("Bad formatting for growth param."));
+                return Err(bail!("Bad formatting for growth param."));
             }
 
             let level_key = gro_split[0].clone();
@@ -745,7 +744,7 @@ pub fn generate_ts_queries(
             let rca_split: Vec<String> = r.split(",").map(|s| s.to_string()).collect();
 
             if rca_split.len() != 3 {
-                return Err(format_err!("Bad formatting for RCA param."));
+                return Err(bail!("Bad formatting for RCA param."));
             }
 
             let drill1_level_key = rca_split[0].clone();
@@ -978,17 +977,17 @@ pub fn clean_cuts_map(
                 let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
 
                 if tc.len() != 2 {
-                    return Err(format_err!("Malformatted time cut"));
+                    return Err(bail!("Malformatted time cut"));
                 }
 
                 let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
                     Ok(time) => time,
-                    Err(err) => return Err(format_err!("{}", err.to_string()))
+                    Err(err) => return Err(bail!("{}", err.to_string()))
                 };
 
                 let (cut, cut_value) = match cube_cache.get_time_cut(time) {
                     Ok(cut) => cut,
-                    Err(err) => return Err(format_err!("{}", err.to_string()))
+                    Err(err) => return Err(bail!("{}", err.to_string()))
                 };
 
                 agg_query_opt_cuts.insert(cut, cut_value);
@@ -1075,7 +1074,7 @@ pub fn resolve_cuts(
 
             let cut = match elements.get(0) {
                 Some(cut) => cut,
-                None => return Err(format_err!("Malformatted cut."))
+                None => return Err(bail!("Malformatted cut."))
             };
 
             // Check to see if this matches any dimension names
@@ -1085,12 +1084,12 @@ pub fn resolve_cuts(
                     match dimension_cache.id_map.get(cut) {
                         Some(level_names) => {
                             if level_names.len() > 1 {
-                                return Err(format_err!("{} matches multiple levels in this dimension.", cut))
+                                return Err(bail!("{} matches multiple levels in this dimension.", cut))
                             }
 
                             match level_names.get(0) {
                                 Some(ln) => ln.clone(),
-                                None => return Err(format_err!("{} matches no levels in this dimension.", cut))
+                                None => return Err(bail!("{} matches no levels in this dimension.", cut))
                             }
                         },
                         None => continue
@@ -1115,7 +1114,7 @@ pub fn resolve_cuts(
             } else if elements.len() == 2 {
                 let operation = match elements.get(1) {
                     Some(operation) => operation.clone(),
-                    None => return Err(format_err!("Unable to extract cut operation."))
+                    None => return Err(bail!("Unable to extract cut operation."))
                 };
 
                 if operation == "children".to_string() {
@@ -1137,7 +1136,7 @@ pub fn resolve_cuts(
                     // Get children IDs from the cache
                     let level_cache = match cube_cache.level_caches.get(&level_name) {
                         Some(level_cache) => level_cache,
-                        None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                        None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
                     };
 
                     let children_ids = match &level_cache.children_map {
@@ -1176,7 +1175,7 @@ pub fn resolve_cuts(
                         // Get parent IDs from the cache
                         let level_cache = match cube_cache.level_caches.get(&level_name) {
                             Some(level_cache) => level_cache,
-                            None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                            None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
                         };
 
                         let parent_id = match &level_cache.parent_map {
@@ -1203,7 +1202,7 @@ pub fn resolve_cuts(
 
                     // Find dimension for the level name
                     let dimension = cube.get_dimension(&level_name)
-                        .ok_or_else(|| format_err!("Could not find dimension for {}.", level_name.level))?;
+                        .ok_or_else(|| bail!("Could not find dimension for {}.", level_name.level))?;
 
                     match dimension.dim_type {
                         DimensionType::Geo => {
@@ -1222,13 +1221,13 @@ pub fn resolve_cuts(
                                     // Add neighbors IDs to the `dimension_cuts_map`
                                     dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, neighbors_ids);
                                 },
-                                None => return Err(format_err!("Unable to perform geoservice request: A Geoservice URL has not been provided."))
+                                None => return Err(bail!("Unable to perform geoservice request: A Geoservice URL has not been provided."))
                             };
                         },
                         _ => {
                             let level_cache = match cube_cache.level_caches.get(&level_name) {
                                 Some(level_cache) => level_cache,
-                                None => return Err(format_err!("Could not find cached entries for {}.", level_name.level))
+                                None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
                             };
 
                             let neighbors_ids = match level_cache.neighbors_map.get(cut) {
@@ -1242,10 +1241,10 @@ pub fn resolve_cuts(
                     }
 
                 } else {
-                    return Err(format_err!("Unrecognized operation: `{}`.", operation));
+                    return Err(bail!("Unrecognized operation: `{}`.", operation));
                 }
             } else {
-                return Err(format_err!("Multiple cut operations are not supported on the same element."));
+                return Err(bail!("Multiple cut operations are not supported on the same element."));
             }
         }
     }

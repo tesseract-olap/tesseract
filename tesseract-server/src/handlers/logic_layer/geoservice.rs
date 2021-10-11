@@ -1,7 +1,7 @@
 use std::str;
 
 use actix_web::client::Client;
-use failure::{Error, format_err};
+use anyhow::{bail, Error};
 use serde_derive::Deserialize;
 use url::Url;
 
@@ -32,7 +32,7 @@ pub async fn query_geoservice(
         GeoserviceQuery::Neighbors => format!("neighbors/{}", geo_id),
         GeoserviceQuery::Children => format!("relations/children/{}", geo_id),
         GeoserviceQuery::Parents => format!("relations/parents/{}", geo_id),
-        _ => return Err(format_err!("This type of geoservice query is not yet supported"))
+        _ => return Err(bail!("This type of geoservice query is not yet supported"))
     };
 
     let query_url = base_url.join(&join_str).unwrap();

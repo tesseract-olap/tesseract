@@ -3,8 +3,7 @@ use actix_web::{
     HttpRequest,
     HttpResponse,
 };
-use failure::Error;
-use futures::future::{self, Future};
+use anyhow::Error;
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
