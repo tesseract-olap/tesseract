@@ -17,7 +17,6 @@ use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
 
 use super::super::util::{
-    boxed_error_string, boxed_error_http_response,
     verify_authorization, format_to_content_type
 };
 
@@ -79,7 +78,7 @@ pub async fn get_members(
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
     if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
-        return boxed_error_http_response(err);
+        return err;
     }
 
     if let Some(logic_layer_config) = &logic_layer_config {
@@ -142,7 +141,7 @@ pub async fn get_members(
 
     let level_name = match level_name {
         Some(level_name) => level_name,
-        None => return boxed_error_string("Unable to find a level with the name provided".to_string())
+        None => return HttpResponse::NotFound().json("Unable to find a level with the name provided")
     };
 
     debug!("{:?}", cube_name);

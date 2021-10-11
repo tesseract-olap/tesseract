@@ -21,7 +21,6 @@ use crate::app::AppState;
 use crate::errors::ServerError;
 use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
-    boxed_error_string, boxed_error_http_response,
     verify_authorization, format_to_content_type, generate_source_data,
     validate_members,
     get_redis_cache_key, check_redis_cache, insert_into_redis_cache
@@ -234,7 +233,7 @@ pub async fn logic_layer_aggregation(
     let cube = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
     if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
-        return boxed_error_http_response(err);
+        return err;
     }
 
     // Check if this query is already cached
@@ -249,7 +248,7 @@ pub async fn logic_layer_aggregation(
 
     let cube_cache = match cache.find_cube_info(&cube_name) {
         Some(cube_cache) => cube_cache,
-        None => return boxed_error_string("Unable to access cube cache".to_string())
+        None => return HttpResponse::NotFound().json("Unable to access cube cache")
     };
 
     info!("Aggregate query: {:?}", agg_query);
@@ -265,7 +264,7 @@ pub async fn logic_layer_aggregation(
     let (ts_queries, header_map) = ok_or_404!(ts_queries);
 
     if ts_queries.len() == 0 {
-        return boxed_error_string("Unable to generate queries".to_string())
+        return HttpResponse::NotFound().json("Unable to generate queries")
     }
 
     // Need to create a map here to help create unique header names in the next step
