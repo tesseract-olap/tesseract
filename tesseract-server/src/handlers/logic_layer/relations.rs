@@ -29,7 +29,7 @@ use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 pub async fn default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
-    cube: web::Path<()>,
+    _cube: web::Path<()>,
 ) -> ActixResult<HttpResponse>
 {
     logic_layer_relations(req, state, "jsonrecords".to_owned()).await

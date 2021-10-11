@@ -1,6 +1,6 @@
 use std::str;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use actix_web::client::Client;
 use serde_derive::Deserialize;
 use url::Url;
@@ -15,10 +15,11 @@ pub struct GeoServiceResponseJson {
 
 pub enum GeoserviceQuery {
     Neighbors,
-    Children,
-    Parents,
-    Intersects,
-    Distance,
+    // Not constructed yet
+    //Children,
+    //Parents,
+    //Intersects,
+    //Distance,
 }
 
 
@@ -30,9 +31,9 @@ pub async fn query_geoservice(
 ) -> Result<Vec<GeoServiceResponseJson>> {
     let join_str = match geoservice_query {
         GeoserviceQuery::Neighbors => format!("neighbors/{}", geo_id),
-        GeoserviceQuery::Children => format!("relations/children/{}", geo_id),
-        GeoserviceQuery::Parents => format!("relations/parents/{}", geo_id),
-        _ => bail!("This type of geoservice query is not yet supported")
+        //GeoserviceQuery::Children => format!("relations/children/{}", geo_id),
+        //GeoserviceQuery::Parents => format!("relations/parents/{}", geo_id),
+        //_ => bail!("This type of geoservice query is not yet supported")
     };
 
     let query_url = base_url.join(&join_str).unwrap();

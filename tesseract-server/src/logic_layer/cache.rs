@@ -75,6 +75,8 @@ pub struct Time {
 
 
 impl Time {
+    // TODO This is unused at present
+    #[allow(dead_code)]
     pub fn from_str(raw: String) -> Result<Self, Error> {
         let e: Vec<&str> = raw.split(".").collect();
 
