@@ -14,9 +14,9 @@ use tesseract_core::CubeHasUniqueLevelsAndProperties;
 
 
 pub async fn non_unique_levels_default_handler(
-    req: HttpRequest,
+    _req: HttpRequest,
     state: web::Data<AppState>,
-    cube_format: web::Path<()>,
+    _cube_format: web::Path<()>,
     ) -> HttpResponse
 {
     if state.debug {
@@ -33,9 +33,9 @@ pub async fn non_unique_levels_default_handler(
 
 
 pub async fn non_unique_levels_handler(
-    req: HttpRequest,
+    _req: HttpRequest,
     state: web::Data<AppState>,
-    cube_format: web::Path<String>,
+    _cube_format: web::Path<String>,
     ) -> HttpResponse
 {
     if state.debug {
@@ -52,9 +52,9 @@ pub async fn non_unique_levels_handler(
 
 
 pub async fn relations_non_unique_levels_default_handler(
-    req: HttpRequest,
+    _req: HttpRequest,
     state: web::Data<AppState>,
-    cube_format: web::Path<()>,
+    _cube_format: web::Path<()>,
     ) -> HttpResponse
 {
     if state.debug {
@@ -71,9 +71,9 @@ pub async fn relations_non_unique_levels_default_handler(
 
 
 pub async fn relations_non_unique_levels_handler(
-    req: HttpRequest,
+    _req: HttpRequest,
     state: web::Data<AppState>,
-    cube_format: web::Path<String>,
+    _cube_format: web::Path<String>,
     ) -> HttpResponse
 {
     if state.debug {
