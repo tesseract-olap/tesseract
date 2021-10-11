@@ -2,6 +2,7 @@ use actix_web::{
     web,
     HttpRequest,
     HttpResponse,
+    Result as ActixResult
 };
 use anyhow::Error;
 use lazy_static::lazy_static;
@@ -26,9 +27,9 @@ pub async fn members_default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     _cube: web::Path<()>
-) -> HttpResponse
+) -> ActixResult<HttpResponse>
 {
-    get_members(req, state, "jsonrecords".to_owned()).await
+    get_members(req, state, "jsonrecords").await
 }
 
 
@@ -37,9 +38,9 @@ pub async fn members_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>
-) -> HttpResponse
+) -> ActixResult<HttpResponse>
 {
-    get_members(req, state, cube_format.to_owned()).await
+    get_members(req, state, &cube_format).await
 }
 
 
@@ -47,8 +48,8 @@ pub async fn members_handler(
 pub async fn get_members(
     req: HttpRequest,
     state: web::Data<AppState>,
-    format: web::Path<String>
-) -> HttpResponse
+    format: &str,
+) -> ActixResult<HttpResponse>
 {
     let format = ok_or_404!(format.parse::<FormatType>());
 
@@ -76,9 +77,7 @@ pub async fn get_members(
     // Get cube object to check for API key
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
-    if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
-        return err;
-    }
+    verify_authorization(&req, &state, cube_obj.min_auth_level)?;
 
     if let Some(logic_layer_config) = &logic_layer_config {
         if let Some(aliases) = &logic_layer_config.aliases {
@@ -140,7 +139,7 @@ pub async fn get_members(
 
     let level_name = match level_name {
         Some(level_name) => level_name,
-        None => return HttpResponse::NotFound().json("Unable to find a level with the name provided")
+        None => return Ok(HttpResponse::NotFound().json("Unable to find a level with the name provided"))
     };
 
     debug!("{:?}", cube_name);
@@ -154,30 +153,20 @@ pub async fn get_members(
     let (members_sql, header) = match members_sql_and_headers {
         Ok(s) => s,
         Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::BadRequest().json(err.to_string()))
-                )
-            );
+            return Ok(HttpResponse::BadRequest().json(err.to_string()));
         },
     };
 
     debug!("{:?}", members_sql);
     debug!("{:?}", header);
 
-    state
-        .backend
-        .exec_sql(members_sql)
-        .from_err()
-        .and_then(move |df| {
-            let content_type = format_to_content_type(&format);
+    let df = ok_or_500!(state.backend.exec_sql(members_sql).await);
+    let content_type = format_to_content_type(&format);
 
-            match format_records(&header, df, format, None, false) {
-                Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
-                Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
-            }
-        })
-        .responder()
+    match format_records(&header, df, format, None, false) {
+        Ok(res) => Ok(HttpResponse::Ok().content_type(content_type).body(res)),
+        Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+    }
 }
 
 
