@@ -85,7 +85,7 @@ pub async fn perform_diagnosis(
                         return Ok(err);
                     }
 
-                    let (error_types, error_messages) = diagnose_cube(&req, &state, cube).await;
+                    let (error_types, error_messages) = diagnose_cube(&state, cube).await;
 
                     format_diagnosis_response(error_types, error_messages, format, None)
                 },
@@ -98,17 +98,17 @@ pub async fn perform_diagnosis(
             let mut error_messages: Vec<String> = vec![];
 
             for cube in &schema.cubes {
-                if let Err(err) = verify_authorization(&req, &state, cube.min_auth_level) {
+                if let Err(_) = verify_authorization(&req, &state, cube.min_auth_level) {
                     continue;
                 }
 
-                let (new_error_types, new_error_messages) = diagnose_cube(&req, &state, &cube).await;
+                let (new_error_types, new_error_messages) = diagnose_cube(&state, &cube).await;
 
                 // Add these to the overall list
                 if new_error_types.len() != 0 {
                     let mut new_error_cubes: Vec<String> = vec![];
 
-                    for i in 0..new_error_types.len() {
+                    for _ in 0..new_error_types.len() {
                         new_error_cubes.push(cube.name.clone());
                     }
 
@@ -124,7 +124,7 @@ pub async fn perform_diagnosis(
 }
 
 
-async fn diagnose_cube(req: &HttpRequest, state: &web::Data<AppState>, cube: &Cube) -> (Vec<String>, Vec<String>) {
+async fn diagnose_cube(state: &web::Data<AppState>, cube: &Cube) -> (Vec<String>, Vec<String>) {
     let mut error_types: Vec<String> = vec![];
     let mut error_messages: Vec<String> = vec![];
 
@@ -145,7 +145,7 @@ async fn diagnose_cube(req: &HttpRequest, state: &web::Data<AppState>, cube: &Cu
                         dimension_table.name,
                     );
 
-                    match get_res_df(&req, &state, sql_str).await {
+                    match get_res_df(&state, sql_str).await {
                         Ok(res_df) => {
                             match res_df.columns.get(0) {
                                 Some(column) => {
@@ -183,7 +183,7 @@ async fn diagnose_cube(req: &HttpRequest, state: &web::Data<AppState>, cube: &Cu
                         last_level.key_column,
                     );
 
-                    match get_res_df(&req, &state, sql_str).await {
+                    match get_res_df(&state, sql_str).await {
                         Ok(res_df) => {
                             match res_df.columns.get(0) {
                                 Some(column) => {
@@ -274,6 +274,6 @@ fn format_diagnosis_response(
 }
 
 
-async fn get_res_df(req: &HttpRequest, state: &web::Data<AppState>, sql_str: String) -> Result<DataFrame, Error> {
+async fn get_res_df(state: &web::Data<AppState>, sql_str: String) -> Result<DataFrame, Error> {
     state.backend.exec_sql(sql_str).await
 }
