@@ -7,7 +7,7 @@ use actix_web::{
     HttpResponse,
     Result as ActixResult,
 };
-use anyhow::{bail, Error};
+use anyhow::{anyhow, bail, Error};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
@@ -32,7 +32,7 @@ pub async fn default_handler(
     cube: web::Path<()>,
 ) -> ActixResult<HttpResponse>
 {
-    logic_layer_relations(req, state, "jsonrecords".to_owned())
+    logic_layer_relations(req, state, "jsonrecords".to_owned()).await
 }
 
 
@@ -43,7 +43,7 @@ pub async fn handler(
     cube_format: web::Path<String>,
 ) -> ActixResult<HttpResponse>
 {
-    logic_layer_relations(req, state, cube_format.to_owned())
+    logic_layer_relations(req, state, cube_format.to_owned()).await
 }
 
 
@@ -56,7 +56,7 @@ pub struct LogicLayerRelationQueryOpt {
 }
 
 
-pub fn logic_layer_relations(
+pub async fn logic_layer_relations(
     req: HttpRequest,
     state: web::Data<AppState>,
     format: String,
@@ -103,9 +103,7 @@ pub fn logic_layer_relations(
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string()))
     };
 
-    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
-        return Ok(err);
-    }
+    verify_authorization(&req, &state, cube.min_auth_level)?;
 
     let cache = state.cache.read().unwrap();
 
@@ -120,7 +118,7 @@ pub fn logic_layer_relations(
     let property_map = &cube_cache.property_map;
     let geoservice_url = &state.env_vars.geoservice_url;
 
-    let dimensions_map: Vec<Vec<String>> = match get_relations(&cuts_map, &cube, &cube_cache, &level_map, &property_map, &geoservice_url) {
+    let dimensions_map: Vec<Vec<String>> = match get_relations(&cuts_map, &cube, &cube_cache, &level_map, &property_map, &geoservice_url).await {
         Ok(dm) => dm,
         Err(err) => return Ok(HttpResponse::NotFound().json(err.to_string())),
     };
@@ -164,7 +162,7 @@ pub fn logic_layer_relations(
     match format_records(&final_headers, final_df, format, None, false) {
         Ok(res) => {
             Ok(HttpResponse::Ok()
-                .set(content_type)
+                .content_type(content_type)
                 .body(res))
         },
         Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
@@ -172,7 +170,7 @@ pub fn logic_layer_relations(
 }
 
 
-pub fn get_relations(
+pub async fn get_relations(
     cuts_map: &HashMap<String, String>,
     cube: &Cube,
     cube_cache: &CubeCache,
@@ -182,7 +180,7 @@ pub fn get_relations(
 ) -> Result<Vec<Vec<String>>, Error> {
 
     if cuts_map.len() == 0 {
-        return Err(bail!("Please provide at least one cut"));
+        bail!("Please provide at least one cut");
     }
 
     let mut relations: Vec<Vec<String>> = vec![];
@@ -209,11 +207,11 @@ pub fn get_relations(
                         match dimension_cache.id_map.get(&cut) {
                             Some(level_name) => {
                                 if level_name.len() > 1 {
-                                    return Err(bail!("{} matches multiple levels in this dimension.", cut))
+                                    bail!("{} matches multiple levels in this dimension.", cut)
                                 }
                                 match level_name.get(0) {
                                     Some(ln) => ln.clone(),
-                                    None => return Err(bail!("{} matches no levels in this dimension.", cut))
+                                    None => bail!("{} matches no levels in this dimension.", cut)
                                 }
                             },
                             None => continue
@@ -246,7 +244,7 @@ pub fn get_relations(
                     // Get children IDs from the cache
                     let level_cache = match cube_cache.level_caches.get(&level_name) {
                         Some(level_cache) => level_cache,
-                        None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
+                        None => bail!("Could not find cached entries for {}.", level_name.level)
                     };
 
                     let children_ids = match &level_cache.children_map {
@@ -286,7 +284,7 @@ pub fn get_relations(
                         // Get parent IDs from the cache
                         let level_cache = match cube_cache.level_caches.get(&level_name) {
                             Some(level_cache) => level_cache,
-                            None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
+                            None => bail!("Could not find cached entries for {}.", level_name.level)
                         };
 
                         let parent_id = match &level_cache.parent_map {
@@ -317,7 +315,7 @@ pub fn get_relations(
                 else if op.to_string() == "neighbors".to_string() {
                     // Find dimension for the level name
                     let dimension = cube.get_dimension(&level_name)
-                        .ok_or_else(|| bail!("Could not find dimension for {}.", level_name.level))?;
+                        .ok_or_else(|| anyhow!("Could not find dimension for {}.", level_name.level))?;
 
                     match dimension.dim_type {
                         DimensionType::Geo => {
@@ -327,7 +325,7 @@ pub fn get_relations(
 
                                     let geoservice_response = query_geoservice(
                                         geoservice_url, &GeoserviceQuery::Neighbors, &cut
-                                    )?;
+                                    ).await?;
 
                                     for res in &geoservice_response {
                                         neighbors_ids.push(res.geoid.clone());
@@ -338,13 +336,13 @@ pub fn get_relations(
                                     }
 
                                 },
-                                None => return Err(bail!("Unable to perform geoservice request: A Geoservice URL has not been provided."))
+                                None => bail!("Unable to perform geoservice request: A Geoservice URL has not been provided.")
                             };
                         },
                         _ => {
                             let level_cache = match cube_cache.level_caches.get(&level_name) {
                                 Some(level_cache) => level_cache,
-                                None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
+                                None => bail!("Could not find cached entries for {}.", level_name.level)
                             };
 
                             let neighbors_ids = match level_cache.neighbors_map.get(&cut) {
@@ -358,7 +356,7 @@ pub fn get_relations(
                         }
                     }
                 }
-                else { return Err(bail!("Unrecognized operation: `{}`.", op));
+                else { bail!("Unrecognized operation: `{}`.", op);
                 }
             }
         }
