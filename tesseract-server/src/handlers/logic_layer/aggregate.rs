@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::str;
 
-use actix_web::{web, HttpRequest, HttpResponse};
-use anyhow::{bail, Error};
-use futures::future::*;
+use actix_web::{web, HttpRequest, HttpResponse, Result as ActixResult};
+use anyhow::{anyhow, bail, Error};
 use lazy_static::lazy_static;
 use log::*;
 use serde_qs as qs;
@@ -52,9 +51,9 @@ pub async fn default_handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     _cube: web::Path<()>,
-) -> HttpResponse
+) -> ActixResult<HttpResponse>
 {
-    logic_layer_aggregation(req, "jsonrecords".to_owned()).await
+    logic_layer_aggregation(req, state, "jsonrecords").await
 }
 
 
@@ -63,9 +62,9 @@ pub async fn handler(
     req: HttpRequest,
     state: web::Data<AppState>,
     cube_format: web::Path<String>,
-) -> HttpResponse
+) -> ActixResult<HttpResponse>
 {
-    logic_layer_aggregation(req, cube_format.to_owned()).await
+    logic_layer_aggregation(req, state, &cube_format).await
 }
 
 
@@ -194,8 +193,8 @@ macro_rules! consolidate_null_column_data {
 pub async fn logic_layer_aggregation(
     req: HttpRequest,
     state: web::Data<AppState>,
-    format: String,
-) -> HttpResponse
+    format: &str,
+) -> ActixResult<HttpResponse>
 {
     let format = ok_or_404!(format.parse::<FormatType>());
 
@@ -203,7 +202,6 @@ pub async fn logic_layer_aggregation(
 
     let query = req.query_string();
     let schema = state.schema.read().unwrap();
-    let debug = state.debug;
 
     let logic_layer_config: Option<LogicLayerConfig> = match &state.logic_layer_config {
         Some(llc) => Some(llc.read().unwrap().clone()),
@@ -231,9 +229,7 @@ pub async fn logic_layer_aggregation(
 
     let cube = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
-    if let Err(err) = verify_authorization(&req, cube.min_auth_level) {
-        return err;
-    }
+    verify_authorization(&req, &state, cube.min_auth_level)?;
 
     // TODO why not move redis cache to http layer?
     // Check if this query is already cached
@@ -248,7 +244,7 @@ pub async fn logic_layer_aggregation(
 
     let cube_cache = match cache.find_cube_info(&cube_name) {
         Some(cube_cache) => cube_cache,
-        None => return HttpResponse::NotFound().json("Unable to access cube cache")
+        None => return Ok(HttpResponse::NotFound().json("Unable to access cube cache"))
     };
 
     info!("Aggregate query: {:?}", agg_query);
@@ -261,10 +257,10 @@ pub async fn logic_layer_aggregation(
         agg_query.clone(), &cube, &cube_cache,
         &logic_layer_config, &state.env_vars.geoservice_url
     );
-    let (ts_queries, header_map) = ok_or_404!(ts_queries);
+    let (ts_queries, header_map) = ok_or_404!(ts_queries.await);
 
     if ts_queries.len() == 0 {
-        return HttpResponse::NotFound().json("Unable to generate queries")
+        return Ok(HttpResponse::NotFound().json("Unable to generate queries"))
     }
 
     // Need to create a map here to help create unique header names in the next step
@@ -283,8 +279,7 @@ pub async fn logic_layer_aggregation(
 
         debug!("Tesseract query: {:?}", ts_query);
 
-        let query_ir_headers = req
-            .state()
+        let query_ir_headers = state
             .schema.read().unwrap()
             .sql_query(&cube_name, &ts_query, Some(&unique_header_map));
 
@@ -321,250 +316,244 @@ pub async fn logic_layer_aggregation(
     let exclude_map = agg_query.deserialize_exclude();
 
     // Joins all the futures for each TsQuery
-    let futs: JoinAll<Vec<Box<dyn Future<Item=DataFrame, Error=Error>>>> = join_all(sql_strings
-            .iter()
-            .map(|sql| {
-                state
-                    .backend
-                    .exec_sql(sql.clone())
-            })
-            .collect()
+    let mut dfs = Vec::new();
+    for sql in sql_strings {
+        let df = ok_or_500!(
+            state.backend.exec_sql(sql).await
+                .map_err(|e| {
+                    if state.debug {
+                        ServerError::Db { cause: e.to_string() }
+                    } else {
+                        ServerError::Db { cause: "Internal Server Error 1010".to_owned() }
+                    }
+                })
         );
+        dfs.push(df);
+    }
 
     // Process data received once all futures are resolved and return response
-    futs
-        .and_then(move |dfs| {
-            let mut final_columns: Vec<Column> = vec![];
+    let mut final_columns: Vec<Column> = vec![];
 
-            let num_cols = match dfs.get(0) {
-                Some(df) => df.columns.len(),
-                None => return Err(bail!("No dataframes were returned."))
+    let num_cols = match dfs.get(0) {
+        Some(df) => df.columns.len(),
+        None => return Ok(HttpResponse::NotFound().json("No dataframes were returned"))
+    };
+
+    let mut exclude_row_indexes: HashSet<usize> = HashSet::new();
+    let mut col_data_map: HashMap<usize, Vec<String>> = HashMap::new();
+
+    let mut unique_to_general_name_map: HashMap<String, String> = HashMap::new();
+
+    for (k, v) in unique_header_map.iter() {
+        let name: Vec<String> = k.split(".").map(|s| s.to_string()).collect();
+        let name_len = name.len();
+        let name = &name[name_len - 1];
+
+        unique_to_general_name_map.insert(
+            format!("{} ID", v), format!("{} ID", name)
+        );
+    }
+
+    // This first pass will combine the data from the different dataframes.
+    // We also find the rows that will be ignored in the next pass.
+    for col_i in 0..num_cols {
+        let mut col_data: Vec<String> = vec![];
+
+        for df in &dfs {
+            let c: &Column = &df.columns[col_i];
+            let rows = c.stringify_column_data();
+            col_data = [&col_data[..], &rows[..]].concat()
+        }
+
+        // Find rows that need to be excluded
+        if let Some(header) = final_headers.get(col_i) {
+            let mut has_match = false;
+
+            // First try to match on a unique name
+            if let Some(ids) = exclude_map.get(header) {
+                has_match = true;
+                let mut i = 0;
+
+                for entry in &col_data {
+                    if ids.contains(entry) {
+                        exclude_row_indexes.insert(i);
+                    }
+
+                    i += 1;
+                }
+            }
+
+            // If that doesn't work, try to match this header to a general
+            // name. Because of the way that the header name selection works
+            // this is guaranteed to only match a single general name, since
+            // if the query required the use of unique names those would be
+            // used for the headers. If they are not being used, it's because
+            // only one of the levels with this general name is present.
+            if !has_match {
+                for (k, v) in exclude_map.iter() {
+                    let opt = unique_to_general_name_map.get(k);
+
+                    if let Some(general_name) = opt {
+                        if header == general_name {
+                            let ids = v;
+
+                            let mut i = 0;
+
+                            for entry in &col_data {
+                                if ids.contains(entry) {
+                                    exclude_row_indexes.insert(i);
+                                }
+
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add this information for processing later
+        col_data_map.insert(col_i, col_data);
+    }
+
+    // Here we create the final dataframe by finding the correct data types
+    // and ignoring any rows that need to be excluded.
+    for col_i in 0..num_cols {
+        let mut same_type = true;
+
+        let first_col: &Column = match &dfs[0].columns.get(col_i) {
+            Some(col) => col,
+            None => return Ok(HttpResponse::NotFound().json("Unable to index column."))
+        };
+
+        for df in &dfs {
+            if !is_same_columndata_type(&first_col.column_data, &df.columns[col_i].column_data) {
+                same_type = false;
+                break;
+            }
+        }
+
+        let col_data = &col_data_map[&col_i];
+        let col_data: Vec<String> = col_data.iter()
+            .enumerate()
+            .filter(|&(i, _)| !exclude_row_indexes.contains(&i) )
+            .map(|(_, e) | e.to_string())
+            .collect();
+
+        // When returning data from multiple levels from the same
+        // hierarchy, there is a chance that this column will have
+        // multiple data types. In those cases, we will convert the
+        // whole column to string values.
+        if same_type {
+            let column_data = match first_col.column_data {
+                ColumnData::Int8(_) => {
+                    ColumnData::Int8(consolidate_column_data!(&col_data, i8))
+                },
+                ColumnData::Int16(_) => {
+                    ColumnData::Int16(consolidate_column_data!(&col_data, i16))
+                },
+                ColumnData::Int32(_) => {
+                    ColumnData::Int32(consolidate_column_data!(&col_data, i32))
+                },
+                ColumnData::Int64(_) => {
+                    ColumnData::Int64(consolidate_column_data!(&col_data, i64))
+                },
+                ColumnData::UInt8(_) => {
+                    ColumnData::UInt8(consolidate_column_data!(&col_data, u8))
+                },
+                ColumnData::UInt16(_) => {
+                    ColumnData::UInt16(consolidate_column_data!(&col_data, u16))
+                },
+                ColumnData::UInt32(_) => {
+                    ColumnData::UInt32(consolidate_column_data!(&col_data, u32))
+                },
+                ColumnData::UInt64(_) => {
+                    ColumnData::UInt64(consolidate_column_data!(&col_data, u64))
+                },
+                ColumnData::Float32(_) => {
+                    ColumnData::Float32(consolidate_column_data!(&col_data, f32))
+                },
+                ColumnData::Float64(_) => {
+                    ColumnData::Float64(consolidate_column_data!(&col_data, f64))
+                },
+                ColumnData::NullableInt8(_) => {
+                    ColumnData::NullableInt8(consolidate_null_column_data!(&col_data, i8))
+                },
+                ColumnData::NullableInt16(_) => {
+                    ColumnData::NullableInt16(consolidate_null_column_data!(&col_data, i16))
+                },
+                ColumnData::NullableInt32(_) => {
+                    ColumnData::NullableInt32(consolidate_null_column_data!(&col_data, i32))
+                },
+                ColumnData::NullableInt64(_) => {
+                    ColumnData::NullableInt64(consolidate_null_column_data!(&col_data, i64))
+                },
+                ColumnData::NullableUInt8(_) => {
+                    ColumnData::NullableUInt8(consolidate_null_column_data!(&col_data, u8))
+                },
+                ColumnData::NullableUInt16(_) => {
+                    ColumnData::NullableUInt16(consolidate_null_column_data!(&col_data, u16))
+                },
+                ColumnData::NullableUInt32(_) => {
+                    ColumnData::NullableUInt32(consolidate_null_column_data!(&col_data, u32))
+                },
+                ColumnData::NullableUInt64(_) => {
+                    ColumnData::NullableUInt64(consolidate_null_column_data!(&col_data, u64))
+                },
+                ColumnData::NullableFloat32(_) => {
+                    ColumnData::NullableFloat32(consolidate_null_column_data!(&col_data, f32))
+                },
+                ColumnData::NullableFloat64(_) => {
+                    ColumnData::NullableFloat64(consolidate_null_column_data!(&col_data, f64))
+                },
+                ColumnData::NullableText(_) => {
+                    ColumnData::NullableText(col_data.iter().map(|x| {
+                        if x == "" {
+                            None
+                        } else {
+                            Some(x.clone())
+                        }
+                    }).collect())
+                }
+                _ => {
+                    ColumnData::Text(col_data.clone())
+                }
             };
 
-            let mut exclude_row_indexes: HashSet<usize> = HashSet::new();
-            let mut col_data_map: HashMap<usize, Vec<String>> = HashMap::new();
+            final_columns.push(Column {
+                name: "placeholder".to_string(),
+                column_data
+            });
+        } else {
+            final_columns.push(Column {
+                name: "placeholder".to_string(),
+                column_data: ColumnData::Text(col_data.clone())
+            });
+        }
+    }
 
-            let mut unique_to_general_name_map: HashMap<String, String> = HashMap::new();
+    let final_df = DataFrame { columns: final_columns };
 
-            for (k, v) in unique_header_map.iter() {
-                let name: Vec<String> = k.split(".").map(|s| s.to_string()).collect();
-                let name_len = name.len();
-                let name = &name[name_len - 1];
+    let content_type = format_to_content_type(&format);
 
-                unique_to_general_name_map.insert(
-                    format!("{} ID", v), format!("{} ID", name)
-                );
-            }
+    match format_records(&final_headers, final_df, format, source_data, false) {
+        Ok(res) => {
+            // TODO turn on again?
+            // Try to insert this result in the Redis cache, if available
+            //insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
 
-            // This first pass will combine the data from the different dataframes.
-            // We also find the rows that will be ignored in the next pass.
-            for col_i in 0..num_cols {
-                let mut col_data: Vec<String> = vec![];
-
-                for df in &dfs {
-                    let c: &Column = &df.columns[col_i];
-                    let rows = c.stringify_column_data();
-                    col_data = [&col_data[..], &rows[..]].concat()
-                }
-
-                // Find rows that need to be excluded
-                if let Some(header) = final_headers.get(col_i) {
-                    let mut has_match = false;
-
-                    // First try to match on a unique name
-                    if let Some(ids) = exclude_map.get(header) {
-                        has_match = true;
-                        let mut i = 0;
-
-                        for entry in &col_data {
-                            if ids.contains(entry) {
-                                exclude_row_indexes.insert(i);
-                            }
-
-                            i += 1;
-                        }
-                    }
-
-                    // If that doesn't work, try to match this header to a general
-                    // name. Because of the way that the header name selection works
-                    // this is guaranteed to only match a single general name, since
-                    // if the query required the use of unique names those would be
-                    // used for the headers. If they are not being used, it's because
-                    // only one of the levels with this general name is present.
-                    if !has_match {
-                        for (k, v) in exclude_map.iter() {
-                            let opt = unique_to_general_name_map.get(k);
-
-                            if let Some(general_name) = opt {
-                                if header == general_name {
-                                   let ids = v;
-
-                                   let mut i = 0;
-
-                                   for entry in &col_data {
-                                       if ids.contains(entry) {
-                                           exclude_row_indexes.insert(i);
-                                       }
-
-                                       i += 1;
-                                   }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Add this information for processing later
-                col_data_map.insert(col_i, col_data);
-            }
-
-            // Here we create the final dataframe by finding the correct data types
-            // and ignoring any rows that need to be excluded.
-            for col_i in 0..num_cols {
-                let mut same_type = true;
-
-                let first_col: &Column = match &dfs[0].columns.get(col_i) {
-                    Some(col) => col,
-                    None => return Err(bail!("Unable to index column."))
-                };
-
-                for df in &dfs {
-                    if !is_same_columndata_type(&first_col.column_data, &df.columns[col_i].column_data) {
-                        same_type = false;
-                        break;
-                    }
-                }
-
-                let col_data = &col_data_map[&col_i];
-                let col_data: Vec<String> = col_data.iter()
-                    .enumerate()
-                    .filter(|&(i, _)| !exclude_row_indexes.contains(&i) )
-                    .map(|(_, e) | e.to_string())
-                    .collect();
-
-                // When returning data from multiple levels from the same
-                // hierarchy, there is a chance that this column will have
-                // multiple data types. In those cases, we will convert the
-                // whole column to string values.
-                if same_type {
-                    let column_data = match first_col.column_data {
-                        ColumnData::Int8(_) => {
-                            ColumnData::Int8(consolidate_column_data!(&col_data, i8))
-                        },
-                        ColumnData::Int16(_) => {
-                            ColumnData::Int16(consolidate_column_data!(&col_data, i16))
-                        },
-                        ColumnData::Int32(_) => {
-                            ColumnData::Int32(consolidate_column_data!(&col_data, i32))
-                        },
-                        ColumnData::Int64(_) => {
-                            ColumnData::Int64(consolidate_column_data!(&col_data, i64))
-                        },
-                        ColumnData::UInt8(_) => {
-                            ColumnData::UInt8(consolidate_column_data!(&col_data, u8))
-                        },
-                        ColumnData::UInt16(_) => {
-                            ColumnData::UInt16(consolidate_column_data!(&col_data, u16))
-                        },
-                        ColumnData::UInt32(_) => {
-                            ColumnData::UInt32(consolidate_column_data!(&col_data, u32))
-                        },
-                        ColumnData::UInt64(_) => {
-                            ColumnData::UInt64(consolidate_column_data!(&col_data, u64))
-                        },
-                        ColumnData::Float32(_) => {
-                            ColumnData::Float32(consolidate_column_data!(&col_data, f32))
-                        },
-                        ColumnData::Float64(_) => {
-                            ColumnData::Float64(consolidate_column_data!(&col_data, f64))
-                        },
-                        ColumnData::NullableInt8(_) => {
-                            ColumnData::NullableInt8(consolidate_null_column_data!(&col_data, i8))
-                        },
-                        ColumnData::NullableInt16(_) => {
-                            ColumnData::NullableInt16(consolidate_null_column_data!(&col_data, i16))
-                        },
-                        ColumnData::NullableInt32(_) => {
-                            ColumnData::NullableInt32(consolidate_null_column_data!(&col_data, i32))
-                        },
-                        ColumnData::NullableInt64(_) => {
-                            ColumnData::NullableInt64(consolidate_null_column_data!(&col_data, i64))
-                        },
-                        ColumnData::NullableUInt8(_) => {
-                            ColumnData::NullableUInt8(consolidate_null_column_data!(&col_data, u8))
-                        },
-                        ColumnData::NullableUInt16(_) => {
-                            ColumnData::NullableUInt16(consolidate_null_column_data!(&col_data, u16))
-                        },
-                        ColumnData::NullableUInt32(_) => {
-                            ColumnData::NullableUInt32(consolidate_null_column_data!(&col_data, u32))
-                        },
-                        ColumnData::NullableUInt64(_) => {
-                            ColumnData::NullableUInt64(consolidate_null_column_data!(&col_data, u64))
-                        },
-                        ColumnData::NullableFloat32(_) => {
-                            ColumnData::NullableFloat32(consolidate_null_column_data!(&col_data, f32))
-                        },
-                        ColumnData::NullableFloat64(_) => {
-                            ColumnData::NullableFloat64(consolidate_null_column_data!(&col_data, f64))
-                        },
-                        ColumnData::NullableText(_) => {
-                            ColumnData::NullableText(col_data.iter().map(|x| {
-                                if x == "" {
-                                    None
-                                } else {
-                                    Some(x.clone())
-                                }
-                            }).collect())
-                        }
-                        _ => {
-                            ColumnData::Text(col_data.clone())
-                        }
-                    };
-
-                    final_columns.push(Column {
-                        name: "placeholder".to_string(),
-                        column_data
-                    });
-                } else {
-                    final_columns.push(Column {
-                        name: "placeholder".to_string(),
-                        column_data: ColumnData::Text(col_data.clone())
-                    });
-                }
-            }
-
-            let final_df = DataFrame { columns: final_columns };
-
-            let content_type = format_to_content_type(&format);
-
-            match format_records(&final_headers, final_df, format, source_data, false) {
-                Ok(res) => {
-                    // TODO turn on again?
-                    // Try to insert this result in the Redis cache, if available
-                    //insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
-
-                    Ok(HttpResponse::Ok()
-                        .set(content_type)
-                        .body(res))
-                },
-                Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
-            }
-        })
-        .map_err(move |e| {
-            if debug {
-                ServerError::Db { cause: e.to_string() }.into()
-            } else {
-                ServerError::Db { cause: "Internal Server Error 1010".to_owned() }.into()
-            }
-        })
-        .responder()
+            Ok(HttpResponse::Ok()
+                .content_type(content_type)
+                .body(res))
+        },
+        Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+    }
 }
 
 
 /// Generates a series of Tesseract queries from a single LogicLayerQueryOpt.
 /// This function contains the bulk of the logic layer logic.
-pub fn generate_ts_queries(
+pub async fn generate_ts_queries(
         agg_query_opt: LogicLayerQueryOpt,
         cube: &Cube,
         cube_cache: &CubeCache,
@@ -673,10 +662,10 @@ pub fn generate_ts_queries(
                     }
 
                     if !found {
-                        return Err(bail!("The measure name provided in the `filter` param is not valid."))
+                        return Err(anyhow!("The measure name provided in the `filter` param is not valid."))
                     }
                 },
-                _ => return Err(bail!("Could not parse a filter query"))
+                _ => return Err(anyhow!("Could not parse a filter query"))
             }
 
             f.parse()
@@ -688,7 +677,7 @@ pub fn generate_ts_queries(
             let top_split: Vec<String> = t.split(',').map(|s| s.to_string()).collect();
 
             if top_split.len() != 4 {
-                return Err(bail!("Bad formatting for top param."));
+                return Err(anyhow!("Bad formatting for top param."));
             }
 
             let level_name = some_or_bail!(level_map.get(&top_split[1]));
@@ -718,9 +707,9 @@ pub fn generate_ts_queries(
             let gro_split: Vec<String> = g.split(',').map(|s| s.to_string()).collect();
 
             if gro_split.len() == 1 {
-                return Err(bail!("Please provide a growth measure name."));
+                return Err(anyhow!("Please provide a growth measure name."));
             } else if gro_split.len() != 2 {
-                return Err(bail!("Bad formatting for growth param."));
+                return Err(anyhow!("Bad formatting for growth param."));
             }
 
             let level_key = gro_split[0].clone();
@@ -745,7 +734,7 @@ pub fn generate_ts_queries(
             let rca_split: Vec<String> = r.split(",").map(|s| s.to_string()).collect();
 
             if rca_split.len() != 3 {
-                return Err(bail!("Bad formatting for RCA param."));
+                return Err(anyhow!("Bad formatting for RCA param."));
             }
 
             let drill1_level_key = rca_split[0].clone();
@@ -816,7 +805,7 @@ pub fn generate_ts_queries(
 
     let (dimension_cuts_map, header_map) = resolve_cuts(
         &cuts_map, &cube, &cube_cache, &level_map, &property_map, &geoservice_url
-    )?;
+    ).await?;
 
     // Groups together cuts for the same dimension
     // This is needed so we can generate all the possible cut combinations in the next step
@@ -978,17 +967,17 @@ pub fn clean_cuts_map(
                 let tc: Vec<String> = time_cut.split(".").map(|s| s.to_string()).collect();
 
                 if tc.len() != 2 {
-                    return Err(bail!("Malformatted time cut"));
+                    bail!("Malformatted time cut");
                 }
 
                 let time = match Time::from_key_value(tc[0].clone(), tc[1].clone()) {
                     Ok(time) => time,
-                    Err(err) => return Err(bail!("{}", err.to_string()))
+                    Err(err) => bail!("{}", err.to_string())
                 };
 
                 let (cut, cut_value) = match cube_cache.get_time_cut(time) {
                     Ok(cut) => cut,
-                    Err(err) => return Err(bail!("{}", err.to_string()))
+                    Err(err) => bail!("{}", err.to_string())
                 };
 
                 agg_query_opt_cuts.insert(cut, cut_value);
@@ -1038,7 +1027,7 @@ pub fn clean_cuts_map(
 /// the possible cut combinations in the next step.
 /// This method also returns a HashMap of header name substitutions that will help
 /// with the naming of the final column names in the response.
-pub fn resolve_cuts(
+pub async fn resolve_cuts(
         cuts_map: &HashMap<String, String>,
         cube: &Cube,
         cube_cache: &CubeCache,
@@ -1075,7 +1064,7 @@ pub fn resolve_cuts(
 
             let cut = match elements.get(0) {
                 Some(cut) => cut,
-                None => return Err(bail!("Malformatted cut."))
+                None => bail!("Malformatted cut.")
             };
 
             // Check to see if this matches any dimension names
@@ -1085,12 +1074,12 @@ pub fn resolve_cuts(
                     match dimension_cache.id_map.get(cut) {
                         Some(level_names) => {
                             if level_names.len() > 1 {
-                                return Err(bail!("{} matches multiple levels in this dimension.", cut))
+                                bail!("{} matches multiple levels in this dimension.", cut)
                             }
 
                             match level_names.get(0) {
                                 Some(ln) => ln.clone(),
-                                None => return Err(bail!("{} matches no levels in this dimension.", cut))
+                                None => bail!("{} matches no levels in this dimension.", cut)
                             }
                         },
                         None => continue
@@ -1115,7 +1104,7 @@ pub fn resolve_cuts(
             } else if elements.len() == 2 {
                 let operation = match elements.get(1) {
                     Some(operation) => operation.clone(),
-                    None => return Err(bail!("Unable to extract cut operation."))
+                    None => bail!("Unable to extract cut operation.")
                 };
 
                 if operation == "children".to_string() {
@@ -1137,7 +1126,7 @@ pub fn resolve_cuts(
                     // Get children IDs from the cache
                     let level_cache = match cube_cache.level_caches.get(&level_name) {
                         Some(level_cache) => level_cache,
-                        None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
+                        None => bail!("Could not find cached entries for {}.", level_name.level)
                     };
 
                     let children_ids = match &level_cache.children_map {
@@ -1176,7 +1165,7 @@ pub fn resolve_cuts(
                         // Get parent IDs from the cache
                         let level_cache = match cube_cache.level_caches.get(&level_name) {
                             Some(level_cache) => level_cache,
-                            None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
+                            None => bail!("Could not find cached entries for {}.", level_name.level)
                         };
 
                         let parent_id = match &level_cache.parent_map {
@@ -1203,7 +1192,7 @@ pub fn resolve_cuts(
 
                     // Find dimension for the level name
                     let dimension = cube.get_dimension(&level_name)
-                        .ok_or_else(|| bail!("Could not find dimension for {}.", level_name.level))?;
+                        .ok_or_else(|| anyhow!("Could not find dimension for {}.", level_name.level))?;
 
                     match dimension.dim_type {
                         DimensionType::Geo => {
@@ -1213,7 +1202,7 @@ pub fn resolve_cuts(
 
                                     let geoservice_response = query_geoservice(
                                         geoservice_url, &GeoserviceQuery::Neighbors, &cut
-                                    )?;
+                                    ).await?;
 
                                     for res in &geoservice_response {
                                         neighbors_ids.push(res.geoid.clone());
@@ -1222,13 +1211,13 @@ pub fn resolve_cuts(
                                     // Add neighbors IDs to the `dimension_cuts_map`
                                     dimension_cuts_map = add_cut_entries(dimension_cuts_map, &level_name, neighbors_ids);
                                 },
-                                None => return Err(bail!("Unable to perform geoservice request: A Geoservice URL has not been provided."))
+                                None => bail!("Unable to perform geoservice request: A Geoservice URL has not been provided.")
                             };
                         },
                         _ => {
                             let level_cache = match cube_cache.level_caches.get(&level_name) {
                                 Some(level_cache) => level_cache,
-                                None => return Err(bail!("Could not find cached entries for {}.", level_name.level))
+                                None => bail!("Could not find cached entries for {}.", level_name.level)
                             };
 
                             let neighbors_ids = match level_cache.neighbors_map.get(cut) {
@@ -1242,10 +1231,10 @@ pub fn resolve_cuts(
                     }
 
                 } else {
-                    return Err(bail!("Unrecognized operation: `{}`.", operation));
+                    bail!("Unrecognized operation: `{}`.", operation);
                 }
             } else {
-                return Err(bail!("Multiple cut operations are not supported on the same element."));
+                bail!("Multiple cut operations are not supported on the same element.");
             }
         }
     }
