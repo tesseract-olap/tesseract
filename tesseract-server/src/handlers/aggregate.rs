@@ -21,7 +21,7 @@ use crate::errors::ServerError;
 use super::util::{
     verify_authorization,
     format_to_content_type, generate_source_data,
-    //get_redis_cache_key, check_redis_cache, insert_into_redis_cache
+    get_redis_cache_key, check_redis_cache, insert_into_redis_cache
 };
 
 /// Handles default aggregation when a format is not specified.
@@ -78,13 +78,10 @@ pub async fn do_aggregate(
     info!("query opts:{:?}", agg_query);
 
     // Check if this query is already cached
-    // TODO refactor
-    //let redis_pool = state.redis_pool.clone();
-    //let redis_cache_key = get_redis_cache_key("core", &req, &cube, &format);
-
-    //if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
-    //    return res;
-    //}
+    let redis_cache_key = get_redis_cache_key("core", &req, &cube, &format);
+    if let Some(res) = check_redis_cache(&format, state.redis_pool.as_ref(), &redis_cache_key).await {
+        return Ok(res);
+    }
 
     // Gets the Source Data
     let source_data = Some(generate_source_data(&cube_obj));
@@ -116,7 +113,7 @@ pub async fn do_aggregate(
 
     let df = ok_or_500!(
         state.backend.exec_sql(sql).await
-            .map_err(move |e| {
+            .map_err(|e| {
                 if state.debug {
                     ServerError::Db { cause: e.to_string() }
                 } else {
@@ -131,7 +128,7 @@ pub async fn do_aggregate(
         Ok(res) => {
             // TODO turn redis cache back on
             // Try to insert this result in the Redis cache, if available
-            //insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
+            insert_into_redis_cache(&res, state.redis_pool.as_ref(), &redis_cache_key);
 
             Ok(HttpResponse::Ok()
                 .content_type(content_type)

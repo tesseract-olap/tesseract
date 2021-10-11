@@ -21,7 +21,7 @@ use crate::logic_layer::{LogicLayerConfig, CubeCache, Time};
 use super::super::util::{
     verify_authorization, format_to_content_type, generate_source_data,
     validate_members,
-    //get_redis_cache_key, check_redis_cache, insert_into_redis_cache
+    get_redis_cache_key, check_redis_cache, insert_into_redis_cache
 };
 use crate::handlers::logic_layer::{query_geoservice, GeoserviceQuery};
 
@@ -233,12 +233,10 @@ pub async fn logic_layer_aggregation(
 
     // TODO why not move redis cache to http layer?
     // Check if this query is already cached
-    //let redis_pool = state.redis_pool.clone();
-    //let redis_cache_key = get_redis_cache_key("logic-layer", &req, &cube_name, &format);
-
-    //if let Some(res) = check_redis_cache(&format, &redis_pool, &redis_cache_key) {
-    //    return res;
-    //}
+    let redis_cache_key = get_redis_cache_key("core", &req, &cube_name, &format);
+    if let Some(res) = check_redis_cache(&format, state.redis_pool.as_ref(), &redis_cache_key).await {
+        return Ok(res);
+    }
 
     let cache = state.cache.read().unwrap();
 
@@ -538,9 +536,8 @@ pub async fn logic_layer_aggregation(
 
     match format_records(&final_headers, final_df, format, source_data, false) {
         Ok(res) => {
-            // TODO turn on again?
             // Try to insert this result in the Redis cache, if available
-            //insert_into_redis_cache(&res, &redis_pool, &redis_cache_key);
+            insert_into_redis_cache(&res, state.redis_pool.as_ref(), &redis_cache_key);
 
             Ok(HttpResponse::Ok()
                 .content_type(content_type)
