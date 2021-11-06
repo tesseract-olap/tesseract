@@ -24,6 +24,12 @@ pub struct Clickhouse {
 
 impl Clickhouse {
     pub fn from_url(url: &str) -> Result<Self, Error> {
+        // Temporary hack, reading this config from here instead of in server.
+        // Clickhouse legacy read-only. We try to send readonly=1 as part of the connection url,
+        // but some versions of clickhouse may not accept it. Accepted value is TRUE
+        let clickhouse_legacy_readonly = std::env::var("TESSERACT_CLICKHOUSE_LEGACY_READONLY")
+            .map(|s| s.to_lowercase() == "true").unwrap_or(false);
+
         let rg = Regex::new(r"(?:readonly=)(?P<id>[0-2])").unwrap();
 
         let options = format!("tcp://{}", url).parse::<Options>()?;
@@ -35,9 +41,15 @@ impl Clickhouse {
                     let num_match = rg_match.parse::<u8>().expect(&format!("Failed to parse {} into a numeric value", rg_match));
                     Some(num_match)
                 },
-                // 1 is readonly
-                //None => Some(1)
-                None => None
+                None => {
+                    if clickhouse_legacy_readonly {
+                        None
+                    } else {
+                        // current clickhouse
+                        // 1 is readonly
+                        Some(1)
+                    }
+                }
             }
         ).ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
