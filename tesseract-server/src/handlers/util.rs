@@ -159,7 +159,9 @@ pub fn get_redis_cache_key(prefix: &str, req: &HttpRequest, cube: &str, format: 
         FormatType::JsonRecords => "jsonrecords",
     };
 
-    format!("{}/{}/{}/{}", prefix, cube, format_str, qry_strings.join("&"))
+    let res = format!("{}/{}/{}/{}", prefix, cube, format_str, qry_strings.join("&"));
+    info!("Generating redis cache key:{}", res);
+    res
 }
 
 
@@ -169,6 +171,7 @@ pub async fn check_redis_cache(
         redis_pool: Option<&r2d2::Pool<RedisConnectionManager>>,
         redis_cache_key: &str
 ) -> Option<HttpResponse> {
+    info!("Checking redis cache for key: {}", redis_cache_key);
     if let Some(rpool) = redis_pool {
         let conn_result = rpool.get();
 
@@ -182,7 +185,10 @@ pub async fn check_redis_cache(
                     .content_type(content_type)
                     .body(result_str);
 
+                info!("Returning result from redis cache for key: {}", redis_cache_key);
                 return Some(response);
+            } else {
+                info!("Miss for redis cache for key: {}", redis_cache_key);
             }
         } else {
             debug!("Failed to get redis pool handle!");
@@ -202,6 +208,7 @@ pub fn insert_into_redis_cache(
 ) {
     if let Some(rpool) = redis_pool {
         if let Ok(mut conn) = rpool.get() {
+            info!("Insert into redis cache for key: {}", redis_cache_key);
             let rs: redis::RedisResult<String> = redis::cmd("SET").arg(redis_cache_key).arg(res).query(&mut *conn);
             if rs.is_err() {
                 debug!("Error occurred when trying to save key: {}", redis_cache_key);

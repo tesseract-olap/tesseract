@@ -181,12 +181,12 @@ async fn main() -> Result<(), Error> {
     let redis_url = env::var("TESSERACT_REDIS_URL").ok();
 
     // Setup redis pool and settings if enabled by user
-    let _redis_pool = match redis_url {
-        Some(conn_str) => {
+    let redis_pool = match redis_url {
+        Some(ref conn_str) => {
             let redis_connection_timeout = env::var("TESSERACT_REDIS_TIMEOUT").ok();
             let redis_max_size = env::var("TESSERACT_REDIS_MAX_SIZE").ok();
 
-            let manager = RedisConnectionManager::new(conn_str).expect("Failed to connect to redis");
+            let manager = RedisConnectionManager::new(conn_str.clone()).expect("Failed to connect to redis");
             let pool: r2d2::Pool<RedisConnectionManager> = r2d2::Pool::builder()
                 .connection_timeout(if let Some(val) = redis_connection_timeout{
                     std::time::Duration::from_secs(val.parse::<u64>().expect("Invalid value for TESSERACT_REDIS_TIMEOUT"))
@@ -208,7 +208,7 @@ async fn main() -> Result<(), Error> {
     let appstate = AppState {
         debug,
         backend: db,
-        redis_pool: None,
+        redis_pool,
         db_type,
         env_vars,
         schema: schema_arc,
@@ -238,6 +238,7 @@ async fn main() -> Result<(), Error> {
     println!("Tesseract listening on: {}", server_addr);
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
+    println!("Tesseract redis cache:  {:?}", redis_url);
 
     println!("Tesseract JWT token protection: {}", jwt_status);
 
