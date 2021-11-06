@@ -19,6 +19,7 @@ maintainer-scripts = "pkg/deb/maintainer-scripts"
 [dependencies]
 anyhow = "1"
 dotenv = "0.13.0"
+indexmap = "1.0.2"
 lazy_static = "1.2.0"
 log = "0.4.3"
 pretty_env_logger = "0.2.4"

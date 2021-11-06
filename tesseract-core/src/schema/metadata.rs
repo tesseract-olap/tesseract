@@ -1,5 +1,5 @@
+use indexmap::IndexMap;
 use serde_derive::Serialize;
-use std::collections::HashMap;
 use std::convert::From;
 
 use super::{
@@ -199,7 +199,7 @@ impl From<&Property> for PropertyMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct AnnotationMetadata(HashMap<String, String>);
+pub struct AnnotationMetadata(IndexMap<String, String>);
 
 impl From<&Option<Vec<Annotation>>> for AnnotationMetadata {
     fn from(annotations: &Option<Vec<Annotation>>) -> Self {
@@ -208,7 +208,7 @@ impl From<&Option<Vec<Annotation>>> for AnnotationMetadata {
                 .map(|ann| (ann.name.to_owned(), ann.text.to_owned()) )
                 .collect()
         } else {
-            HashMap::new()
+            IndexMap::new()
         };
 
         AnnotationMetadata(res)
@@ -247,5 +247,5 @@ impl From<&Aggregator> for AggregatorMetadata {
 pub struct SourceMetadata {
     pub name: String,
     pub measures: Vec<String>,
-    pub annotations: Option<HashMap<String, String>>,
+    pub annotations: Option<IndexMap<String, String>>,
 }

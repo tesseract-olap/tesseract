@@ -6,6 +6,7 @@ use actix_web::{
     HttpResponse,
 };
 use actix_web::http::header::ContentType;
+use indexmap::IndexMap;
 use log::*;
 use mime;
 use r2d2_redis::{r2d2, redis, RedisConnectionManager};
@@ -37,7 +38,7 @@ pub fn generate_source_data(cube: &Cube) -> SourceMetadata {
     }
     let annotations = match cube.annotations.clone(){
         Some(annotations) => {
-            let mut anotate_hashmap = HashMap::new();
+            let mut anotate_hashmap = IndexMap::new();
             for annotation in annotations.iter(){
                 anotate_hashmap.insert(annotation.name.to_string(), annotation.text.to_string());
             }
