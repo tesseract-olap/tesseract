@@ -35,10 +35,9 @@ impl Clickhouse {
                     let num_match = rg_match.parse::<u8>().expect(&format!("Failed to parse {} into a numeric value", rg_match));
                     Some(num_match)
                 },
-                // Note: was previously set as commented line, but not sure why? Maybe it worked
-                // with a previous clickhouse driver
+                // 1 is readonly
                 //None => Some(1)
-                None => None,
+                None => None
             }
         ).ping_timeout(Duration::from_millis(PING_TIMEOUT));
 
