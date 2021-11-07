@@ -126,7 +126,6 @@ pub async fn do_aggregate(
 
     match format_records(&headers, df, format, source_data, false) {
         Ok(res) => {
-            // TODO turn redis cache back on
             // Try to insert this result in the Redis cache, if available
             insert_into_redis_cache(&res, state.redis_pool.as_ref(), &redis_cache_key);
 
