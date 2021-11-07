@@ -23,13 +23,18 @@ mod app;
 mod db_config;
 mod errors;
 mod auth;
-pub mod handlers;
+mod handlers;
 mod logic_layer;
 mod schema_config;
 
-use actix_web::server;
+use actix_web::{
+    middleware,
+    web,
+    App,
+    HttpServer,
+};
+use anyhow::{format_err, Error};
 use dotenv::dotenv;
-use failure::{Error, format_err};
 use log::*;
 use std::env;
 use structopt::StructOpt;
@@ -37,10 +42,11 @@ use url::Url;
 
 use std::sync::{Arc, RwLock};
 
-use crate::app::{EnvVars, SchemaSource, create_app};
+use crate::app::{AppState, EnvVars, SchemaSource, config_app};
 use r2d2_redis::{r2d2, RedisConnectionManager};
 
-fn main() -> Result<(), Error> {
+#[actix_web::main]
+async fn main() -> Result<(), Error> {
     // Configuration
 
     pretty_env_logger::init();
@@ -152,31 +158,35 @@ fn main() -> Result<(), Error> {
         Err(_) => None
     };
 
-    // Initialize actix system
-    let mut sys = actix::System::new("tesseract");
-
     // Populate internal cache
-    let cache = logic_layer::populate_cache(
-        schema.clone(), &logic_layer_config, db.clone(), &mut sys
-    ).map_err(|err| format_err!("Cache population error: {}", err))?;
-
-    let cache_arc = Arc::new(RwLock::new(cache));
+    let db_for_cache = db.clone(); // TODO remove clone
+    let cache = if opt.no_logic_layer {
+        Default::default()
+    } else {
+        logic_layer::populate_cache(
+                schema.clone(), logic_layer_config.as_ref(), db_for_cache
+            )
+            .await.map_err(|err| format_err!("Cache population error: {}", err))?
+    };
 
     // Create lock on logic layer config
     let logic_layer_config = match logic_layer_config {
-        Some(ll_config) => Some(Arc::new(RwLock::new(ll_config))),
+        Some(ll_config) => Some(Arc::new(RwLock::new(ll_config.clone()))),
         None => None
     };
+
+    let cache_arc = Arc::new(RwLock::new(cache));
+
 
     let redis_url = env::var("TESSERACT_REDIS_URL").ok();
 
     // Setup redis pool and settings if enabled by user
     let redis_pool = match redis_url {
-        Some(conn_str) => {
+        Some(ref conn_str) => {
             let redis_connection_timeout = env::var("TESSERACT_REDIS_TIMEOUT").ok();
             let redis_max_size = env::var("TESSERACT_REDIS_MAX_SIZE").ok();
 
-            let manager = RedisConnectionManager::new(conn_str).expect("Failed to connect to redis");
+            let manager = RedisConnectionManager::new(conn_str.clone()).expect("Failed to connect to redis");
             let pool: r2d2::Pool<RedisConnectionManager> = r2d2::Pool::builder()
                 .connection_timeout(if let Some(val) = redis_connection_timeout{
                     std::time::Duration::from_secs(val.parse::<u64>().expect("Invalid value for TESSERACT_REDIS_TIMEOUT"))
@@ -195,31 +205,40 @@ fn main() -> Result<(), Error> {
         None => None,
     };
 
+    let appstate = AppState {
+        debug,
+        backend: db,
+        redis_pool,
+        db_type,
+        env_vars,
+        schema: schema_arc,
+        cache: cache_arc,
+        logic_layer_config,
+        has_unique_levels_properties,
+        no_logic_layer: opt.no_logic_layer,
+    };
+
     // Initialize Server
-    server::new(
-        move|| create_app(
-                debug,
-                db.clone(),
-                match &redis_pool {
-                    Some(pool) => Some(pool.clone()),
-                    None => None
-                },
-                db_type.clone(),
-                env_vars.clone(),
-                schema_arc.clone(),
-                cache_arc.clone(),
-                logic_layer_config.clone(),
-                streaming_response,
-                has_unique_levels_properties.clone(),
-            )
-        )
-        .bind(&server_addr)
-        .expect(&format!("cannot bind to {}", server_addr))
-        .start();
+    HttpServer::new(move || {
+        App::new()
+            .configure(|cfg: &mut web::ServiceConfig| {
+                config_app(
+                    cfg,
+                    appstate.clone(),
+                    streaming_response,
+                )
+            })
+        .wrap(middleware::Logger::default())
+        .wrap(middleware::DefaultHeaders::new().header("Vary", "Accept-Encoding"))
+    })
+    .bind(&server_addr)?
+    .run()
+    .await?;
 
     println!("Tesseract listening on: {}", server_addr);
     println!("Tesseract database:     {}, {}", db_url, db_type_viz);
     println!("Tesseract schema path:  {}", schema_path);
+    println!("Tesseract redis cache:  {:?}", redis_url);
 
     println!("Tesseract JWT token protection: {}", jwt_status);
 
@@ -229,8 +248,6 @@ fn main() -> Result<(), Error> {
     if streaming_response {
         println!("Tesseract streaming mode: ON");
     }
-
-    sys.run();
 
     Ok(())
 }
@@ -254,4 +271,7 @@ struct Opt {
 
     #[structopt(long="streaming")]
     streaming_response: bool,
+
+    #[structopt(long="no-logic-layer")]
+    no_logic_layer: bool,
 }

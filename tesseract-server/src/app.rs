@@ -1,34 +1,17 @@
 use actix_web::{
-    http::Method,
-    middleware,
-    App,
-    http::NormalizePath,
+    web,
+    //http::NormalizePath,
 };
 use tesseract_core::{Backend, Schema, CubeHasUniqueLevelsAndProperties};
 use crate::db_config::Database;
 use crate::handlers::{
-    aggregate_handler,
-    aggregate_default_handler,
-    aggregate_stream_handler,
-    aggregate_stream_default_handler,
-    diagnosis_handler,
-    diagnosis_default_handler,
-    logic_layer_default_handler,
-    logic_layer_handler,
-    logic_layer_non_unique_levels_handler,
-    logic_layer_non_unique_levels_default_handler,
-    logic_layer_members_handler,
-    logic_layer_members_default_handler,
-    flush_handler,
-    index_handler,
-    metadata_handler,
-    metadata_all_handler,
-    members_handler,
-    members_default_handler,
-    logic_layer_relations_handler,
-    logic_layer_relations_default_handler,
-    logic_layer_relations_non_unique_levels_default_handler,
-    logic_layer_relations_non_unique_levels_handler
+    aggregate,
+    //aggregate_stream,
+    diagnosis,
+    flush,
+    index,
+    logic_layer,
+    metadata,
 };
 use crate::logic_layer::{Cache, LogicLayerConfig};
 
@@ -56,6 +39,7 @@ pub struct EnvVars {
 }
 
 /// Holds [ActixWeb State](https://actix.rs/docs/application/).
+#[derive(Clone)]
 pub struct AppState {
     pub debug: bool,
     pub backend: Box<dyn Backend + Sync + Send>,
@@ -71,133 +55,61 @@ pub struct AppState {
     // capture, but the handlers need to implement Fn, not FnOnce (which happens once capturing
     // variables from environment
     pub has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
+    pub no_logic_layer: bool,
 }
 
 /// Creates an ActixWeb application with an `AppState`.
-pub fn create_app(
-        debug: bool,
-        backend: Box<dyn Backend + Sync + Send>,
-        redis_pool: Option<r2d2::Pool<RedisConnectionManager>>,
-        db_type: Database,
-        env_vars: EnvVars,
-        schema: Arc<RwLock<Schema>>,
-        cache: Arc<RwLock<Cache>>,
-        logic_layer_config: Option<Arc<RwLock<LogicLayerConfig>>>,
-        streaming_response: bool,
-        has_unique_levels_properties: CubeHasUniqueLevelsAndProperties,
-    ) -> App<AppState>
+pub fn config_app(
+        cfg: &mut web::ServiceConfig,
+        appstate: AppState,
+        _streaming_response: bool,
+    )
 {
-    let app = App::with_state(
-            AppState {
-                debug,
-                backend,
-                redis_pool,
-                db_type,
-                env_vars,
-                schema,
-                cache,
-                logic_layer_config,
-                has_unique_levels_properties: has_unique_levels_properties.clone(),
-        })
-        .middleware(middleware::Logger::default())
-        .middleware(middleware::DefaultHeaders::new().header("Vary", "Accept-Encoding"))
+    let has_unique_levels_properties = appstate.has_unique_levels_properties.clone();
+    let app = cfg;
 
+    app
+        .data(appstate)
         // Metadata
-        .resource("/", |r| {
-            r.method(Method::GET).with(index_handler)
-        })
-        .resource("/cubes", |r| {
-            r.method(Method::GET).with(metadata_all_handler)
-        })
-        .resource("/cubes/{cube}", |r| {
-            r.method(Method::GET).with(metadata_handler)
-        })
+        .route("/", web::get().to(index::handler))
+        .route("/cubes", web::get().to(metadata::all_handler))
+        .route("/cubes/{cube}", web::get().to(metadata::handler))
 
         // Helpers
-        .resource("/cubes/{cube}/members", |r| {
-            r.method(Method::GET).with(members_default_handler)
-        })
-        .resource("/cubes/{cube}/members.{format}", |r| {
-            r.method(Method::GET).with(members_handler)
-        })
+        .route("/cubes/{cube}/members",web::get().to(metadata::members_default_handler))
+        .route("/cubes/{cube}/members.{format}", web::get().to(metadata::members_handler))
 
         // Data Quality Assurance
-        .resource("/diagnosis", |r| {
-            r.method(Method::GET).with(diagnosis_default_handler)
-        })
-        .resource("/diagnosis.{format}", |r| {
-            r.method(Method::GET).with(diagnosis_handler)
-        })
-
-        .resource("/flush", |r| {
-            r.method(Method::POST).with(flush_handler)
-        })
+        .route("/diagnosis", web::get().to(diagnosis::default_handler))
+        .route("/diagnosis.{format}", web::get().to(diagnosis::handler))
+        .route("/flush", web::post().to(flush::handler))
         // Allow the API to accept /my-path or /my-path/ for all requests
-        .default_resource(|r| r.h(NormalizePath::default()));
+        //.default_resource(|r| r.h(NormalizePath::default()));
 
-    let app = if streaming_response {
-        app
-            .resource("/cubes/{cube}/aggregate", |r| {
-                r.method(Method::GET).with(aggregate_stream_default_handler)
-            })
-            .resource("/cubes/{cube}/aggregate.{format}", |r| {
-                r.method(Method::GET).with(aggregate_stream_handler)
-            })
-    } else {
-        app
-            .resource("/cubes/{cube}/aggregate", |r| {
-                r.method(Method::GET).with(aggregate_default_handler)
-            })
-            .resource("/cubes/{cube}/aggregate.{format}", |r| {
-                r.method(Method::GET).with(aggregate_handler)
-            })
-    };
+        .route("/cubes/{cube}/aggregate", web::get().to(aggregate::default_handler))
+        .route("/cubes/{cube}/aggregate.{format}", web::get().to(aggregate::handler));
 
     match has_unique_levels_properties {
         CubeHasUniqueLevelsAndProperties::True => {
             // Logic Layer
             app
-                .resource("/data", |r| {
-                    r.method(Method::GET).with(logic_layer_default_handler)
-                })
-                .resource("/data.{format}", |r| {
-                    r.method(Method::GET).with(logic_layer_handler)
-                })
-                .resource("/members", |r| {
-                    r.method(Method::GET).with(logic_layer_members_default_handler)
-                })
-                .resource("/members.{format}", |r| {
-                    r.method(Method::GET).with(logic_layer_members_handler)
-                })
-                .resource("/relations", |r| {
-                    r.method(Method::GET).with(logic_layer_relations_default_handler)
-                })
-                .resource("/relations.{foramt}", |r| {
-                    r.method(Method::GET).with(logic_layer_relations_handler)
-                })
+                .route("/data", web::get().to(logic_layer::aggregate::default_handler))
+                .route("/data.{format}", web::get().to(logic_layer::aggregate::handler))
+                .route("/members", web::get().to(logic_layer::metadata::members_default_handler))
+                .route("/members.{format}", web::get().to(logic_layer::metadata::members_handler))
+                .route("/relations", web::get().to(logic_layer::relations::default_handler))
+                .route("/relations.{foramt}", web::get().to(logic_layer::relations::handler))
         },
         CubeHasUniqueLevelsAndProperties::False { .. } => {
             // No Logic Layer, give error instead
             app
-                .resource("/data", |r| {
-                    r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
-                })
-                .resource("/data.{format}", |r| {
-                    r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
-                })
-                .resource("/members", |r| {
-                    r.method(Method::GET).with(logic_layer_non_unique_levels_default_handler)
-                })
-                .resource("/members.{format}", |r| {
-                    r.method(Method::GET).with(logic_layer_non_unique_levels_handler)
-                })
-                .resource("/relations", |r| {
-                    r.method(Method::GET).with(logic_layer_relations_non_unique_levels_default_handler)
-                })
-                .resource("/relations.{foramt}", |r| {
-                    r.method(Method::GET).with(logic_layer_relations_non_unique_levels_handler)
-                })
+                .route("/data", web::get().to(logic_layer::non_unique_levels_default_handler))
+                .route("/data.{format}", web::get().to(logic_layer::non_unique_levels_handler))
+                .route("/members", web::get().to(logic_layer::non_unique_levels_default_handler))
+                .route("/members.{format}", web::get().to(logic_layer::non_unique_levels_handler))
+                .route("/relations", web::get().to(logic_layer::relations_non_unique_levels_default_handler))
+                // FIXME format typo
+                .route("/relations.{foramt}", web::get().to(logic_layer::relations_non_unique_levels_handler))
         },
-    }
-
+    };
 }

@@ -1,63 +1,65 @@
 use actix_web::{
-    AsyncResponder,
-    FutureResponse,
+    web,
     HttpRequest,
     HttpResponse,
-    Path,
+    Result as ActixResult
 };
-use failure::Error;
-use futures::future::{self, Future};
+use anyhow::Error;
 use lazy_static::lazy_static;
 use log::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_qs as qs;
 
 use crate::app::AppState;
-use crate::logic_layer::{LogicLayerConfig};
+use crate::logic_layer::LogicLayerConfig;
 
 use tesseract_core::format::{format_records, FormatType};
 use tesseract_core::names::LevelName;
 
 use super::super::util::{
-    boxed_error_string, boxed_error_http_response,
     verify_authorization, format_to_content_type
 };
 
 
 /// Handles default members query when a format is not specified.
 /// Default format is CSV.
-pub fn logic_layer_members_default_handler(
-    (req, _cube): (HttpRequest<AppState>, Path<()>)
-) -> FutureResponse<HttpResponse>
+pub async fn members_default_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    _cube: web::Path<()>
+) -> ActixResult<HttpResponse>
 {
-    get_members(req, "jsonrecords".to_owned())
+    get_members(req, state, "jsonrecords").await
 }
 
 
 /// Handles members query when a format is specified.
-pub fn logic_layer_members_handler(
-    (req, cube_format): (HttpRequest<AppState>, Path<(String)>)
-) -> FutureResponse<HttpResponse>
+pub async fn members_handler(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    cube_format: web::Path<String>
+) -> ActixResult<HttpResponse>
 {
-    get_members(req, cube_format.to_owned())
+    get_members(req, state, &cube_format).await
 }
 
 
 /// Performs members query.
-pub fn get_members(
-    req: HttpRequest<AppState>,
-    format: String,
-) -> FutureResponse<HttpResponse>
+pub async fn get_members(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    format: &str,
+) -> ActixResult<HttpResponse>
 {
     let format = ok_or_404!(format.parse::<FormatType>());
 
     info!("Format: {:?}", format);
 
     let query = req.query_string();
-    let schema = req.state().schema.read().unwrap();
-    let _debug = req.state().debug;
+    let schema = state.schema.read().unwrap();
+    let _debug = state.debug;
 
-    let logic_layer_config: Option<LogicLayerConfig> = match &req.state().logic_layer_config {
+    let logic_layer_config: Option<LogicLayerConfig> = match &state.logic_layer_config {
         Some(llc) => Some(llc.read().unwrap().clone()),
         None => None
     };
@@ -75,9 +77,7 @@ pub fn get_members(
     // Get cube object to check for API key
     let cube_obj = ok_or_404!(schema.get_cube_by_name(&cube_name));
 
-    if let Err(err) = verify_authorization(&req, cube_obj.min_auth_level) {
-        return boxed_error_http_response(err);
-    }
+    verify_authorization(&req, &state, cube_obj.min_auth_level)?;
 
     if let Some(logic_layer_config) = &logic_layer_config {
         if let Some(aliases) = &logic_layer_config.aliases {
@@ -139,7 +139,7 @@ pub fn get_members(
 
     let level_name = match level_name {
         Some(level_name) => level_name,
-        None => return boxed_error_string("Unable to find a level with the name provided".to_string())
+        None => return Ok(HttpResponse::NotFound().json("Unable to find a level with the name provided"))
     };
 
     debug!("{:?}", cube_name);
@@ -153,30 +153,20 @@ pub fn get_members(
     let (members_sql, header) = match members_sql_and_headers {
         Ok(s) => s,
         Err(err) => {
-            return Box::new(
-                future::result(
-                    Ok(HttpResponse::BadRequest().json(err.to_string()))
-                )
-            );
+            return Ok(HttpResponse::BadRequest().json(err.to_string()));
         },
     };
 
     debug!("{:?}", members_sql);
     debug!("{:?}", header);
 
-    req.state()
-        .backend
-        .exec_sql(members_sql)
-        .from_err()
-        .and_then(move |df| {
-            let content_type = format_to_content_type(&format);
+    let df = ok_or_500!(state.backend.exec_sql(members_sql).await);
+    let content_type = format_to_content_type(&format);
 
-            match format_records(&header, df, format, None, false) {
-                Ok(res) => Ok(HttpResponse::Ok().set(content_type).body(res)),
-                Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
-            }
-        })
-        .responder()
+    match format_records(&header, df, format, None, false) {
+        Ok(res) => Ok(HttpResponse::Ok().content_type(content_type).body(res)),
+        Err(err) => Ok(HttpResponse::NotFound().json(err.to_string())),
+    }
 }
 
 
