@@ -1,3 +1,4 @@
+use log::*;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde_derive::{Serialize, Deserialize};
 use std::collections::HashMap;
@@ -82,6 +83,7 @@ pub fn validate_web_token(jwt_secret: &Option<String>, raw_token: &str, min_auth
             match decode::<Claims>(&raw_token, &decoding_key, &validation) {
                 Ok(c) => {
                     let claims: Claims = c.claims;
+                    info!("Validating claim: {:?}, min_auth_level: {}", claims, min_auth_level);
                     let part1 = claims.status == "valid"; // TODO allow this value to be configurable
                     let part2 = match claims.auth_level {
                         Some(lvl) => lvl >= min_auth_level,
