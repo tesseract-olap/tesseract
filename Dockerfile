@@ -1,9 +1,9 @@
-FROM rust:latest as builder
+FROM rust:1.64.0 as builder
 WORKDIR /opt/tesseract
 COPY . .
 RUN cargo install --path ./tesseract-server
 
-FROM debian:buster-slim
+FROM ubuntu:20.04
 RUN groupadd -r tesseract &&\
     useradd -r -g tesseract tesseract &&\
     apt-get update &&\
