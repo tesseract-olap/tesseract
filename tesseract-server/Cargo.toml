@@ -22,7 +22,7 @@ serde_qs = "0.4.1"
 structopt = "0.2.13"
 mime = "0.3.13"
 url = "2.1.0"
-jsonwebtoken = "6"
+jsonwebtoken = "7"
 r2d2_redis = "0.13.0"
 
 [dependencies.actix-web]
