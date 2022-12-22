@@ -2849,7 +2849,7 @@ dependencies = [
 
 [[package]]
 name = "tesseract-olap"
-version = "0.14.12"
+version = "0.14.13"
 dependencies = [
  "actix",
  "actix-web",
