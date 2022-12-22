@@ -1,4 +1,4 @@
-use jsonwebtoken::{decode, Validation};
+use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
 use serde_derive::{Serialize, Deserialize};
 use actix_web::{HttpRequest};
 pub const X_TESSERACT_JWT_TOKEN: &str = "x-tesseract-jwt-token";
@@ -49,7 +49,7 @@ pub fn user_auth_level(jwt_secret: &Option<String>, raw_token: &str) -> Option<i
     match jwt_secret {
         Some(key) => {
             let validation = Validation::default();
-            match decode::<Claims>(&raw_token, key.as_ref(), &validation) {
+            match decode::<Claims>(&raw_token, &DecodingKey::from_secret(key.as_ref()), &validation) {
                 Ok(c) => {
                     let claims: Claims = c.claims;
                     if claims.auth_level.is_some() && claims.status == "valid" {
@@ -73,7 +73,7 @@ pub fn validate_web_token(jwt_secret: &Option<String>, raw_token: &str, min_auth
     match jwt_secret {
         Some(key) => {
             let validation = Validation::default();
-            match decode::<Claims>(&raw_token, key.as_ref(), &validation) {
+            match decode::<Claims>(&raw_token, &DecodingKey::from_secret(key.as_ref()), &validation) {
                 Ok(c) => {
                     let claims: Claims = c.claims;
                     let part1 = claims.status == "valid"; // TODO allow this value to be configurable
