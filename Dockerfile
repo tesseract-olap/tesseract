@@ -7,6 +7,8 @@ FROM ubuntu:20.04
 RUN groupadd -r tesseract &&\
     useradd -r -g tesseract tesseract &&\
     apt-get update &&\
+    apt-get install -y openssl ca-certificates &&\
+    apt-get install -y wget curl &&\
     apt-get install --no-install-recommends -y libssl-dev &&\
     rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/cargo/bin/tesseract-olap /usr/local/bin/tesseract-olap
