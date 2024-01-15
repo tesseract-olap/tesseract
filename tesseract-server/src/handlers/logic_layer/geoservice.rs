@@ -33,7 +33,8 @@ pub fn query_geoservice(
     geo_id: &str
 ) -> Result<Vec<GeoServiceResponseJson>, Error> {
     let join_str = match geoservice_query {
-        GeoserviceQuery::Neighbors => format!("neighbors/{}", geo_id),
+        // add path when there is no proxy
+        GeoserviceQuery::Neighbors => format!("/api/neighbors/{}", geo_id),
         GeoserviceQuery::Children => format!("relations/children/{}", geo_id),
         GeoserviceQuery::Parents => format!("relations/parents/{}", geo_id),
         _ => return Err(format_err!("This type of geoservice query is not yet supported"))
