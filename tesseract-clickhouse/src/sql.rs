@@ -42,6 +42,7 @@ pub fn clickhouse_sql(
 
         let rca = &query_ir.rca;
         let rate = &query_ir.rate;
+
         if let Some(rca) = rca {
             rca::calculate(table, cuts, drills, meas, rca)
         } else if let Some(rate) = rate {

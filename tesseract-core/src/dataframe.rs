@@ -6,6 +6,8 @@ pub struct DataFrame {
     pub columns: Vec<Column>,
 }
 
+/// Check out this file in Beryl when adding support for array columns:
+/// https://github.com/Datawheel/beryl/blob/master/src/dataframe.rs
 impl DataFrame {
     pub fn new() -> Self {
         DataFrame {

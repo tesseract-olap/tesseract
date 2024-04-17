@@ -50,7 +50,7 @@ macro_rules! some_or_break {
 
 
 /// Handles default aggregation when a format is not specified.
-/// Default format is CSV.
+/// Default format is JSON records.
 pub fn logic_layer_default_handler(
     (req, _cube): (HttpRequest<AppState>, Path<()>)
 ) -> FutureResponse<HttpResponse>
@@ -66,7 +66,6 @@ pub fn logic_layer_handler(
 {
     logic_layer_aggregation(req, cube_format.to_owned())
 }
-
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogicLayerQueryOpt {
@@ -253,7 +252,7 @@ pub fn logic_layer_aggregation(
     // Gets the Source Data
     let source_data = Some(generate_source_data(&cube));
 
-    // Turn AggregateQueryOpt into TsQuery
+    // Turn LogicLayerQueryOpt into TsQuery
     let ts_queries = generate_ts_queries(
         agg_query.clone(), &cube, &cube_cache,
         &logic_layer_config, &req.state().env_vars.geoservice_url
