@@ -14,6 +14,7 @@ tokio = "0.1"
 bb8 = "0.3"
 bb8-postgres = "0.3"
 futures-state-stream = "0.2"
+itertools = "0.8.0"
 
 [dependencies.tesseract-core]
 path = "../tesseract-core"

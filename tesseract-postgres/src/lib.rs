@@ -1,5 +1,5 @@
 use failure::{Error, format_err};
-use tesseract_core::{Backend, DataFrame};
+use tesseract_core::{Backend, DataFrame, QueryIr};
 use futures::{Future, Stream};
 use tokio_postgres::NoTls;
 extern crate futures;
@@ -16,6 +16,10 @@ use futures::{
 };
 
 mod df;
+mod sql;
+
+use self::sql::postgres_sql;
+
 use self::df::{rows_to_df};
 
 #[derive(Clone)]
@@ -76,6 +80,23 @@ impl Backend for Postgres {
     fn box_clone(&self) -> Box<dyn Backend + Send + Sync> {
         Box::new((*self).clone())
     }
+
+    fn generate_sql(&self, query_ir: QueryIr) -> String {
+        postgres_sql(
+            &query_ir.table,
+            &query_ir.cuts,
+            &query_ir.drills,
+            &query_ir.meas,
+            &query_ir.filters,
+            &query_ir.top,
+            &query_ir.top_where,
+            &query_ir.sort,
+            &query_ir.limit,
+            &query_ir.rca,
+            &query_ir.growth,
+        )
+    }
+
 }
 
 
